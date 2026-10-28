@@ -1,0 +1,251 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PanTiltTracker.Desktop.ViewModels"
+        xmlns:controls="using:PanTiltTracker.Desktop.Controls"
+        x:Class="PanTiltTracker.Desktop.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="PanTilt Tracker · CMOS 视觉跟踪实验台"
+        Width="1280" Height="860" MinWidth="980" MinHeight="700"
+        WindowStartupLocation="CenterScreen" Background="#F3F6F5">
+  <Grid Margin="24,20,24,14" RowDefinitions="Auto,*,Auto" RowSpacing="18">
+    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="13">
+      <Border Width="42" Height="42" Background="#126F65" CornerRadius="10" VerticalAlignment="Center">
+        <Path Data="M 8,16 H 24 M 16,8 V 24 M 11,5 H 5 V 11 M 21,5 H 27 V 11 M 5,21 V 27 H 11 M 21,27 H 27 V 21"
+              Stroke="White" StrokeThickness="1.6" Width="32" Height="32" Stretch="Uniform" Margin="6" />
+      </Border>
+      <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+        <TextBlock Text="PanTilt Tracker" FontSize="23" FontWeight="SemiBold" />
+        <TextBlock Text="CMOS 视觉跟踪实验台" Classes="muted" FontSize="12" />
+      </StackPanel>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <Button x:Name="MarkerButton" Content="生成标记" Classes="quiet" Click="SaveMarker" IsEnabled="{Binding CanConfigure}" />
+        <Button x:Name="ExportButton" Content="导出 CSV" Classes="quiet" Click="ExportCsv" IsEnabled="{Binding CanExport}" />
+        <Border Background="#E6EEEB" CornerRadius="15" Padding="12,7" Margin="6,0,0,0">
+          <TextBlock Text="硬件输出关闭" Foreground="#456C61" FontSize="12" />
+        </Border>
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Row="1" ColumnDefinitions="270,*" ColumnSpacing="18">
+      <Border Classes="card" Padding="18">
+        <Grid RowDefinitions="*,Auto" RowSpacing="15">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="14" Margin="0,0,4,0">
+              <TextBlock Text="实验设置" FontSize="16" FontWeight="SemiBold" />
+              <StackPanel Spacing="8" IsEnabled="{Binding CanConfigure}">
+                <TextBlock Text="图像来源" Classes="muted" />
+                <ComboBox x:Name="SourceSelector" SelectedIndex="{Binding SourceIndex}">
+                  <ComboBoxItem Content="合成场景" />
+                  <ComboBoxItem Content="本地图片" />
+                  <ComboBoxItem Content="视频回放" />
+                  <ComboBoxItem Content="USB 摄像头" />
+                </ComboBox>
+                <TextBlock Text="{Binding SourceDescription}" Classes="muted" FontSize="11" TextWrapping="Wrap" LineHeight="18" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding IsFileSource}">
+                  <TextBox x:Name="InputPathBox" Text="{Binding InputPath}" Watermark="选择图片或视频" MinWidth="0" />
+                  <Button Grid.Column="1" Content="…" Padding="10,6" Click="PickInput" Classes="quiet" />
+                </Grid>
+                <Grid ColumnDefinitions="*,120" IsVisible="{Binding IsCameraSource}">
+                  <TextBlock Text="设备编号" VerticalAlignment="Center" />
+                  <NumericUpDown Grid.Column="1" Value="{Binding CameraIndex}" Minimum="0" Maximum="99" FormatString="0" />
+                </Grid>
+                <Grid ColumnDefinitions="*,120" Margin="0,6,0,0">
+                  <StackPanel Spacing="3" VerticalAlignment="Center">
+                    <TextBlock Text="目标标记 ID" />
+                    <TextBlock Text="DICT_4X4_50" Classes="muted" FontSize="10" />
+                  </StackPanel>
+                  <NumericUpDown x:Name="MarkerIdInput" Grid.Column="1" Value="{Binding MarkerId}" Minimum="0" Maximum="49" FormatString="0" />
+                </Grid>
+              </StackPanel>
+
+              <Border Height="1" Background="#E5EBE9" Margin="0,3" />
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="闭环参数" Classes="section" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Content="重置" Padding="8,3" FontSize="11" Command="{Binding ResetParametersCommand}" />
+              </Grid>
+              <StackPanel Spacing="7" IsEnabled="{Binding CanConfigure}">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="水平增益" />
+                  <TextBlock Grid.Column="1" Text="{Binding PanGain, StringFormat={}{0:0}}" FontWeight="SemiBold" />
+                </Grid>
+                <Slider x:Name="PanGainSlider" Value="{Binding PanGain}" Minimum="10" Maximum="160" TickFrequency="5" IsSnapToTickEnabled="True" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="俯仰增益" />
+                  <TextBlock Grid.Column="1" Text="{Binding TiltGain, StringFormat={}{0:0}}" FontWeight="SemiBold" />
+                </Grid>
+                <Slider Value="{Binding TiltGain}" Minimum="10" Maximum="160" TickFrequency="5" IsSnapToTickEnabled="True" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="转速上限" />
+                  <TextBlock Grid.Column="1" Text="{Binding MaxSpeed, StringFormat={}{0:0} °/s}" FontWeight="SemiBold" />
+                </Grid>
+                <Slider Value="{Binding MaxSpeed}" Minimum="5" Maximum="60" TickFrequency="5" IsSnapToTickEnabled="True" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="中心死区" />
+                  <TextBlock Grid.Column="1" Text="{Binding DeadZone, StringFormat={}{0:P1}}" FontWeight="SemiBold" />
+                </Grid>
+                <Slider Value="{Binding DeadZone}" Minimum="0" Maximum="0.10" TickFrequency="0.005" IsSnapToTickEnabled="True" />
+                <WrapPanel>
+                  <CheckBox Content="反转水平" IsChecked="{Binding ReversePan}" Margin="0,0,12,0" FontSize="11" />
+                  <CheckBox Content="反转俯仰" IsChecked="{Binding ReverseTilt}" FontSize="11" />
+                </WrapPanel>
+                <TextBlock Text="参数在下一次开始时生效。" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+              </StackPanel>
+              <Border Background="#F2F6F3" CornerRadius="6" Padding="10">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="软件限位" FontSize="11" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding LimitsLabel}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                  <TextBlock Text="当前为初值，待实物校准。" Classes="muted" FontSize="10" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+          <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button x:Name="StartButton" Content="开始实验" Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding StartCommand}" />
+            <Button x:Name="StopButton" Grid.Column="1" Content="停止" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding StopCommand}" />
+          </Grid>
+        </Grid>
+      </Border>
+
+      <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*,180" RowSpacing="14">
+        <Border Background="#FBEDE8" CornerRadius="7" Padding="12,9" IsVisible="{Binding HasError}">
+          <TextBlock x:Name="ErrorBanner" Text="{Binding ErrorMessage}" Foreground="#9A4331" TextWrapping="Wrap" />
+        </Border>
+        <UniformGrid Grid.Row="1" Columns="4">
+          <Border Classes="card" Padding="14,12" Margin="0,0,9,0">
+            <StackPanel Spacing="5">
+              <TextBlock Text="横向偏差 eₓ" Classes="muted" FontSize="11" />
+              <TextBlock Text="{Binding ErrorX}" Classes="metric" Foreground="#167D71" />
+              <TextBlock Text="相对画面宽度" Classes="muted" FontSize="10" />
+            </StackPanel>
+          </Border>
+          <Border Classes="card" Padding="14,12" Margin="0,0,9,0">
+            <StackPanel Spacing="5">
+              <TextBlock Text="纵向偏差 eᵧ" Classes="muted" FontSize="11" />
+              <TextBlock Text="{Binding ErrorY}" Classes="metric" Foreground="#BC7C37" />
+              <TextBlock Text="相对画面高度" Classes="muted" FontSize="10" />
+            </StackPanel>
+          </Border>
+          <Border Classes="card" Padding="14,12" Margin="0,0,9,0">
+            <StackPanel Spacing="5">
+              <TextBlock Text="有效检测率" Classes="muted" FontSize="11" />
+              <TextBlock Text="{Binding DetectionRate}" Classes="metric" />
+              <TextBlock Text="本次全部处理帧" Classes="muted" FontSize="10" />
+            </StackPanel>
+          </Border>
+          <Border Classes="card" Padding="14,12">
+            <StackPanel Spacing="5">
+              <TextBlock Text="处理更新" Classes="muted" FontSize="11" />
+              <TextBlock Text="{Binding ProcessingRate}" Classes="metric" />
+              <TextBlock Text="按实际运行时间统计" Classes="muted" FontSize="10" />
+            </StackPanel>
+          </Border>
+        </UniformGrid>
+
+        <Border Grid.Row="2" Classes="card" ClipToBounds="True">
+          <Grid RowDefinitions="Auto,*">
+            <Grid Margin="16,12" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+              <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <TextBlock Text="跟踪画面" Classes="section" />
+                <Border Background="#EDF3F0" CornerRadius="4" Padding="7,3">
+                  <TextBlock Text="{Binding SourceLabel}" Foreground="#55766B" FontSize="10" />
+                </Border>
+              </StackPanel>
+              <ToggleButton x:Name="OcclusionToggle" Grid.Column="1" Content="模拟遮挡" IsChecked="{Binding HideTarget}" IsEnabled="{Binding CanOcclude}" FontSize="11" Padding="10,5" />
+            </Grid>
+            <Grid Grid.Row="1" ColumnDefinitions="*,185">
+              <Border x:Name="PreviewPane" Background="#E9EFED" Margin="12,0,0,12" CornerRadius="6" ClipToBounds="True">
+                <Grid>
+                  <Image x:Name="PreviewImage" Source="{Binding Preview}" Stretch="Uniform" />
+                  <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" IsVisible="{Binding !HasPreview}">
+                    <Path Data="M 0,18 H 36 M 18,0 V 36 M 5,5 H 12 M 5,5 V 12 M 24,5 H 31 V 12 M 5,24 V 31 H 12 M 24,31 H 31 V 24"
+                          Width="46" Height="46" Stretch="Uniform" Stroke="#8EA69B" StrokeThickness="1.5" HorizontalAlignment="Center" />
+                    <TextBlock Text="准备开始第一轮跟踪" FontSize="15" HorizontalAlignment="Center" />
+                    <TextBlock Text="选择来源，然后点击「开始实验」" Classes="muted" FontSize="11" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+              <ScrollViewer Grid.Column="1" Margin="15,0,14,12" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="12">
+                  <StackPanel Spacing="5">
+                    <TextBlock Text="跟踪状态" Classes="muted" FontSize="11" />
+                    <TextBlock x:Name="TrackingStateText" Text="{Binding StateLabel}" FontWeight="SemiBold" Foreground="{Binding StateBrush}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding DetectionLabel}" FontSize="11" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <Border Height="1" Background="#E5ECE9" />
+                  <StackPanel Spacing="5">
+                    <TextBlock Text="目标中心" Classes="muted" FontSize="11" />
+                    <TextBlock Text="{Binding TargetPosition}" FontSize="12" />
+                  </StackPanel>
+                  <StackPanel Spacing="5">
+                    <TextBlock Text="水平命令" Classes="muted" FontSize="11" />
+                    <TextBlock Text="{Binding PanCommand}" FontSize="21" FontWeight="SemiBold" />
+                  </StackPanel>
+                  <StackPanel Spacing="5">
+                    <TextBlock Text="俯仰命令" Classes="muted" FontSize="11" />
+                    <TextBlock Text="{Binding TiltCommand}" FontSize="21" FontWeight="SemiBold" />
+                  </StackPanel>
+                  <Border Height="1" Background="#E5ECE9" />
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="运算耗时" Classes="muted" FontSize="11" />
+                    <TextBlock Grid.Column="1" Text="{Binding ProcessingTime}" FontSize="11" />
+                  </Grid>
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="处理帧数" Classes="muted" FontSize="11" />
+                    <TextBlock Grid.Column="1" Text="{Binding ProcessedFrames}" FontSize="11" />
+                  </Grid>
+                </StackPanel>
+              </ScrollViewer>
+            </Grid>
+          </Grid>
+        </Border>
+
+        <Grid Grid.Row="3" ColumnDefinitions="*,*" ColumnSpacing="14">
+          <Border Classes="card" Padding="14,12">
+            <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="中心偏差" Classes="section" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+                  <TextBlock Text="─ 水平" Foreground="#167D71" FontSize="10" />
+                  <TextBlock Text="─ 纵向" Foreground="#BC7C37" FontSize="10" />
+                </StackPanel>
+              </Grid>
+              <Grid Grid.Row="1" ColumnDefinitions="26,*">
+                <Grid RowDefinitions="*,*,*">
+                  <TextBlock Text="+.5" FontSize="9" Classes="muted" VerticalAlignment="Top" />
+                  <TextBlock Grid.Row="1" Text="0" FontSize="9" Classes="muted" VerticalAlignment="Center" />
+                  <TextBlock Grid.Row="2" Text="−.5" FontSize="9" Classes="muted" VerticalAlignment="Bottom" />
+                </Grid>
+                <controls:ErrorChart x:Name="HistoryChart" Grid.Column="1" Samples="{Binding PlotSamples}" />
+              </Grid>
+              <TextBlock Grid.Row="2" Text="最近 180 个处理帧 · 丢失处断开" FontSize="10" Classes="muted" />
+            </Grid>
+          </Border>
+          <Border Grid.Column="1" Classes="card" Padding="14,12">
+            <Grid RowDefinitions="Auto,*" RowSpacing="10">
+              <TextBlock Text="运行记录" Classes="section" />
+              <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Events}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{ReflectionBinding}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="#61777C" LineHeight="17" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Grid>
+          </Border>
+        </Grid>
+      </Grid>
+    </Grid>
+
+    <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="16">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <Ellipse Width="6" Height="6" Fill="#7F9C8D" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding RunLabel}" Classes="muted" FontSize="11" />
+      </StackPanel>
+      <TextBlock Grid.Column="1" Text="{Binding FrameSize}" Classes="muted" FontSize="11" />
+      <TextBlock Grid.Column="2" Text="命令角度非实测轴角 · 合成结果不代表实物性能" Classes="muted" FontSize="10" TextTrimming="CharacterEllipsis" />
+      <TextBlock Grid.Column="3" Text="{Binding Elapsed}" FontSize="11" FontFamily="Consolas" />
+    </Grid>
+  </Grid>
+</Window>

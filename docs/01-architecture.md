@@ -19,6 +19,8 @@ camera：DirectShow → 最新帧缓冲 ───┘                       ↓
 - Core：不含平台或视觉库依赖，接收带时间和尺寸的目标中心，产生两轴命令和状态。
 - Vision：实际 OpenCV ArUco 检测、标记生成、合成图像和 Mat 所有权交接。
 - App：命令行参数、视频／相机读取、处理流程、预览和 CSV。当前以控制台验证算法，后续 UI 可以复用 Core 与 Vision。
+- Desktop：Avalonia 实验台，复用 Core 与 Vision，使用后台任务处理图像，在 UI 线程交接预览及指标；配置在单次运行期间固定。
+- Shared/RunLog.cs：命令行和桌面共同编译的日志写入代码，保持 CSV 与元数据字段一致。
 - firmware：未来由 STM32 接收 PC 指令，检查限位与独立通信超时，并控制亚博驱动板。
 
 ## 视觉约定

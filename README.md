@@ -4,6 +4,14 @@ EESM 5840 期末项目。室内带标记模型 → USB 摄像头 → C# / OpenCv
 
 当前阶段为 **v0.1.0-prep：采购前软件准备**。支持生成 ArUco 标记、合成图像闭环、图片检测、视频回放与摄像头检测入口。所有模式均只记录角度指令，尚未连接串口或驱动舵机。
 
+桌面实验台已加入，启动命令：
+
+```powershell
+dotnet run --project src/PanTiltTracker.Desktop
+```
+
+默认选择合成场景，点击“开始实验”。支持参数设置、模拟遮挡、实时画面、误差曲线、停止和 CSV 导出；图片／视频可从文件选择，摄像头入口待实物验证。操作说明见 [桌面界面](docs/06-desktop-interface.md)。
+
 ## 从这里开始
 
 需要 Windows x64、.NET 8 SDK。无需 Visual Studio、MSVC 或原眼动项目的 C++/CLI 组件。可用任意文本编辑器和 PowerShell；本机已有 SDK，直接运行即可。
@@ -59,6 +67,8 @@ Microsensor/
 │  ├─ PanTiltTracker.Core/           观测模型、比例控制、限位与超时状态
 │  ├─ PanTiltTracker.Vision/         ArUco、合成场景、最新帧交接
 │  └─ PanTiltTracker.App/            命令行、采集入口、预览与日志
+│  ├─ PanTiltTracker.Desktop/        Avalonia 桌面实验台
+│  └─ Shared/                       命令行与桌面共享的日志写入
 ├─ tests/PanTiltTracker.Tests/       控制逻辑与实际 OpenCV 合成图像测试
 ├─ scripts/verify.ps1                还原、编译、测试和离线冒烟检查
 ├─ docs/                            分阶段计划、架构、开发和实验规范
@@ -84,7 +94,7 @@ Microsensor/
 ## 当前边界
 
 - 原眼动工程只作为参考，未修改、复制其设备专用采集代码。
-- 标定校正、串口输出、STM32 固件和 Avalonia 界面属于后续阶段，目前没有伪实现。
+- 标定校正、串口输出和 STM32 固件属于后续阶段。
 - 初始方向、90°中位、限位和增益均不是实物校准结果。
 - 项目先建立本地 Git 历史；远端地址与可见性待确定。
 

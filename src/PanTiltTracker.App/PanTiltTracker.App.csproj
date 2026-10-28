@@ -5,6 +5,7 @@
   <ItemGroup>
     <ProjectReference Include="../PanTiltTracker.Core/PanTiltTracker.Core.csproj" />
     <ProjectReference Include="../PanTiltTracker.Vision/PanTiltTracker.Vision.csproj" />
+    <Compile Include="../Shared/RunLog.cs" Link="Services/RunLog.cs" />
     <None Include="../../config/tracker.json" Link="tracker.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

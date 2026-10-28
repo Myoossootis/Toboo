@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using PanTiltTracker.Core;
 
-namespace PanTiltTracker.App;
+namespace PanTiltTracker;
 
 internal sealed class RunLog : IDisposable
 {

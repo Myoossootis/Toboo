@@ -11,6 +11,8 @@ public sealed class ArucoTargetDetector : IDisposable
     private readonly DetectorParameters parameters = new();
     private readonly int targetId;
 
+    public int TargetId => targetId;
+
     public ArucoTargetDetector(int targetId = 7)
     {
         if (targetId is < 0 or >= 50)
