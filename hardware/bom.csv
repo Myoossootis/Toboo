@@ -1,0 +1,7 @@
+item,quantity,reference_cost_cny,status,notes
+"16-channel driver + 7.4V battery + charger",1,105,"selected / not hardware-verified","User shopping-cart screenshot; battery and charger included"
+"2DOF pan-tilt + 2MP USB camera kit",1,142,"selected / not hardware-verified","Check shipped servo and camera variants"
+"Existing STM32 development board",1,0,"owned / model pending","Record exact MCU and PC communication interface"
+"USB extension and communication wires",1,,"check existing stock","Purchase only after connector check"
+"Rigid base and fasteners",1,,"pending","Allow cable movement without dragging gimbal"
+"Printed ArUco marker and calibration board",1,,"prepare before arrival","Measure printed dimensions"

@@ -1,0 +1,17 @@
+{
+  "panInitialDegrees": 90,
+  "tiltInitialDegrees": 90,
+  "panMinDegrees": 60,
+  "panMaxDegrees": 120,
+  "tiltMinDegrees": 70,
+  "tiltMaxDegrees": 110,
+  "panDirection": 1,
+  "tiltDirection": 1,
+  "panGain": 80,
+  "tiltGain": 80,
+  "maxSpeedDegreesPerSecond": 30,
+  "deadZone": 0.02,
+  "lostTimeoutSeconds": 0.5,
+  "maxFrameAgeSeconds": 0.2,
+  "maxUpdateGapSeconds": 0.15
+}

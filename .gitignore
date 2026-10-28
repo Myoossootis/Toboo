@@ -1,0 +1,31 @@
+# Local build / editors
+**/bin/
+**/obj/
+.vs/
+.idea/
+*.user
+*.suo
+TestResults/
+
+# Existing reference downloads and scratch work
+/tmp/
+
+# Generated experiment data, recordings, calibration and printable markers
+/artifacts/
+/data/raw/*
+!/data/raw/README.md
+/data/processed/*
+!/data/processed/README.md
+/calibration/local/*
+!/calibration/local/README.md
+
+# Local settings and credentials
+.env
+.env.*
+!.env.example
+*.local.json
+*.pfx
+*.key
+*.pem
+Thumbs.db
+.DS_Store

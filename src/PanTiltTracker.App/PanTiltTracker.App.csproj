@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PanTiltTracker.Core/PanTiltTracker.Core.csproj" />
+    <ProjectReference Include="../PanTiltTracker.Vision/PanTiltTracker.Vision.csproj" />
+    <None Include="../../config/tracker.json" Link="tracker.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
