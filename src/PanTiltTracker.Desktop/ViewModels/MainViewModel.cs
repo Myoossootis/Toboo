@@ -12,6 +12,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PanTiltTracker.Core;
 using PanTiltTracker.Desktop.Services;
+using PanTiltTracker.Vision;
 
 namespace PanTiltTracker.Desktop.ViewModels;
 
@@ -28,18 +29,31 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private long detectedFrames;
     private bool disposed;
     private bool cameraFaulted;
+    private string? preparedVideoPath;
+    private int previewWidth;
+    private int previewHeight;
+    private OpenCvSharp.Rect? initialRegion;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanConfigure), nameof(CanSelectRegion))]
+    [NotifyCanExecuteChangedFor(nameof(StartCommand), nameof(LoadFirstFrameCommand), nameof(LoadExampleCommand), nameof(ResetParametersCommand))]
+    private bool isLoadingPreview;
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanConfigure), nameof(CanExport), nameof(CanOcclude), nameof(RunLabel))]
-    [NotifyCanExecuteChangedFor(nameof(StartCommand), nameof(StopCommand), nameof(ResetParametersCommand))]
+    [NotifyPropertyChangedFor(nameof(CanSelectRegion))]
+    [NotifyCanExecuteChangedFor(nameof(StartCommand), nameof(StopCommand), nameof(ResetParametersCommand), nameof(LoadFirstFrameCommand), nameof(LoadExampleCommand))]
     private bool isRunning;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanExport), nameof(RunLabel))]
     private bool hasRun;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsFileSource), nameof(IsCameraSource), nameof(IsSimulation),
-        nameof(CanOcclude), nameof(SourceDescription), nameof(SourceLabel))]
+        nameof(CanOcclude), nameof(SourceDescription), nameof(SourceLabel), nameof(IsVideoSource), nameof(IsAruco), nameof(IsCsrt))]
     private int sourceIndex;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsCsrt), nameof(IsAruco), nameof(AlgorithmDescription), nameof(CanSelectRegion))]
+    private int algorithmIndex;
+    [ObservableProperty] private string regionLabel = "尚未框选";
     [ObservableProperty] private string inputPath = "";
     [ObservableProperty] private int cameraIndex;
     [ObservableProperty] private int markerId = 7;
@@ -75,10 +89,23 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<string> Events { get; } = [];
     public event Action? FramePresented;
-    public bool CanConfigure => !IsRunning;
+    public bool CanConfigure => !IsRunning && !IsLoadingPreview;
+    public bool IsVideoSource => SourceIndex == 2;
+    public bool IsCsrt => IsVideoSource && AlgorithmIndex == 1;
+    public bool IsAruco => !IsVideoSource || AlgorithmIndex == 0;
+    public bool CanSelectRegion => CanConfigure && IsCsrt && preparedVideoPath == InputPath && HasPreview;
+    public OpenCvSharp.Rect? InitialRegion => initialRegion;
+    public int PreviewWidth => previewWidth;
+    public int PreviewHeight => previewHeight;
+    public string AlgorithmDescription => AlgorithmIndex switch
+    {
+        1 => "载入首帧，在画面上拖框，再开始。丢失后需停止并重新载入。",
+        2 => "帧差与形态学：取最大运动区域，不判断无人机类别。",
+        _ => "检测固定字典中的标记 ID。"
+    };
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
     public bool CanExport => !IsRunning && HasRun && File.Exists(Path.Combine(LastRunDirectory, "telemetry.csv"));
-    public bool CanStart => !IsRunning && !(IsCameraSource && cameraFaulted);
+    public bool CanStart => CanConfigure && !(IsCameraSource && cameraFaulted);
     public bool CanOcclude => IsSimulation && IsRunning;
     public bool IsFileSource => SourceIndex is 1 or 2;
     public bool IsCameraSource => SourceIndex == 3;
@@ -117,6 +144,59 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (!IsRunning) ResetPresentation();
     }
 
+    partial void OnInputPathChanged(string value) { if (!IsRunning) ResetPresentation(); }
+    partial void OnAlgorithmIndexChanged(int value) { if (!IsRunning) ResetPresentation(); }
+
+    [RelayCommand(CanExecute = nameof(CanConfigure))]
+    public async Task LoadExampleAsync()
+    {
+        SourceIndex = 2;
+        AlgorithmIndex = 1;
+        InputPath = Path.Combine(workspace, "data", "processed", "drone-11204831-1080p30.mp4");
+        await LoadFirstFrameAsync();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanConfigure))]
+    public async Task LoadFirstFrameAsync()
+    {
+        if (!CanConfigure) return;
+        if (!IsVideoSource || !File.Exists(InputPath)) { ReportError("请先选择存在的视频文件。"); return; }
+        var path = InputPath;
+        ResetPresentation();
+        IsLoadingPreview = true;
+        try
+        {
+            var frame = await Task.Run(() =>
+            {
+                using var capture = new OpenCvSharp.VideoCapture(path);
+                using var image = new OpenCvSharp.Mat();
+                if (!capture.IsOpened() || !capture.Read(image) || image.Empty()) throw new IOException("无法读取视频首帧。");
+                using var bgra = new OpenCvSharp.Mat();
+                OpenCvSharp.Cv2.CvtColor(image, bgra, OpenCvSharp.ColorConversionCodes.BGR2BGRA);
+                var bytes = new byte[bgra.Width * bgra.Height * 4];
+                Marshal.Copy(bgra.Data, bytes, 0, bytes.Length);
+                return (Pixels: bytes, Width: image.Width, Height: image.Height);
+            });
+            if (disposed || InputPath != path || !IsVideoSource) return;
+            preparedVideoPath = path;
+            UpdatePreview(frame.Pixels, frame.Width, frame.Height);
+            FrameSize = $"{frame.Width} × {frame.Height}";
+            StateLabel = "首帧已载入";
+            AddEvent("已载入第 0 帧。拖框时包含机身和机臂，尽量少含背景。");
+        }
+        catch (Exception error) { if (!disposed) ReportError(error.Message); }
+        finally { IsLoadingPreview = false; }
+    }
+
+    public void SetInitialRegion(OpenCvSharp.Rect region)
+    {
+        if (!CanSelectRegion) throw new InvalidOperationException("请先在 CSRT 视频模式载入首帧。");
+        VideoTargetTracker.ValidateRegion(region, new(previewWidth, previewHeight));
+        initialRegion = region;
+        RegionLabel = $"({region.X}, {region.Y})  {region.Width}×{region.Height} px";
+        FramePresented?.Invoke();
+    }
+
     [RelayCommand(CanExecute = nameof(CanStart))]
     public async Task StartAsync()
     {
@@ -133,6 +213,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             AddEvent(ErrorMessage);
             return;
         }
+        if (IsCsrt && (preparedVideoPath != InputPath || initialRegion is null))
+        {
+            ReportError("CSRT 需要先载入首帧，并在画面上拖框选择目标。");
+            return;
+        }
         var settings = initialSettings with
         {
             PanGain = PanGain, TiltGain = TiltGain, MaxSpeedDegreesPerSecond = MaxSpeed,
@@ -144,7 +229,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         LastRunDirectory = Path.Combine(workspace, "artifacts", "desktop",
             DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmssfff", CultureInfo.InvariantCulture) + "Z");
         var options = new SessionOptions((InputSource)SourceIndex, InputPath, CameraIndex,
-            MarkerId, settings, LastRunDirectory);
+            MarkerId, settings, LastRunDirectory, IsVideoSource ? (VideoAlgorithm)AlgorithmIndex : VideoAlgorithm.Aruco,
+            initialRegion);
         IsRunning = true;
         ResetPresentation();
         HasRun = true;
@@ -155,7 +241,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         PlotSamples = Array.Empty<ErrorSample>();
         displayClock.Restart();
         StateLabel = "正在启动";
-        AddEvent($"开始：{SourceLabel}，标记 ID {MarkerId}。硬件输出保持关闭。");
+        AddEvent($"开始：{SourceLabel}，{(IsAruco ? $"标记 ID {MarkerId}" : ((VideoAlgorithm)AlgorithmIndex).ToString())}。硬件输出保持关闭。");
         cancellation = new();
         try
         {
@@ -226,7 +312,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var command = frame.Command;
         ProcessedFrames++;
         if (observation.HasTarget) detectedFrames++;
-        DetectionLabel = observation.HasTarget ? $"已检测 · ID {MarkerId}" : "未检测到目标";
+        DetectionLabel = frame.VisionStatus switch
+        {
+            "manual_initialization" => "人工首框 · 非自动识别",
+            "tracker_reported_target" => "CSRT 报告有效 · 需核查漂移",
+            "lost_reinitialize" => "CSRT 丢失 · 请重新框选",
+            "motion_warmup" => "帧差初始化",
+            "motion_candidate_not_classified" => "运动候选 · 未分类",
+            "no_motion_candidate" => "没有运动候选",
+            _ => observation.HasTarget ? $"已检测 · ID {MarkerId}" : "未检测到目标"
+        };
         TargetPosition = observation.HasTarget ? $"({observation.CenterX:0.0}, {observation.CenterY:0.0}) px" : "—";
         ErrorX = Format(command.ErrorX);
         ErrorY = Format(command.ErrorY);
@@ -250,19 +345,26 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         history.Add(new(command.ErrorX, command.ErrorY));
         if (history.Count > 180) history.RemoveAt(0);
         PlotSamples = history.ToArray();
-        if (Preview is null || Preview.PixelSize.Width != frame.Width || Preview.PixelSize.Height != frame.Height)
+        UpdatePreview(frame.Pixels, frame.Width, frame.Height);
+    }
+
+    private void UpdatePreview(byte[] pixels, int width, int height)
+    {
+        previewWidth = width;
+        previewHeight = height;
+        if (Preview is null || Preview.PixelSize.Width != width || Preview.PixelSize.Height != height)
         {
             Preview?.Dispose();
-            Preview = new WriteableBitmap(new PixelSize(frame.Width, frame.Height), new Vector(96, 96),
+            Preview = new WriteableBitmap(new PixelSize(width, height), new Vector(96, 96),
                 PixelFormat.Bgra8888, AlphaFormat.Opaque);
         }
         using (var locked = Preview.Lock())
         {
-            for (var row = 0; row < frame.Height; row++)
-                Marshal.Copy(frame.Pixels, row * frame.Width * 4,
-                    IntPtr.Add(locked.Address, row * locked.RowBytes), frame.Width * 4);
+            for (var row = 0; row < height; row++)
+                Marshal.Copy(pixels, row * width * 4, IntPtr.Add(locked.Address, row * locked.RowBytes), width * 4);
         }
         HasPreview = true;
+        OnPropertyChanged(nameof(CanSelectRegion));
         FramePresented?.Invoke();
     }
 
@@ -278,6 +380,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void ResetPresentation()
     {
+        preparedVideoPath = null;
+        initialRegion = null;
+        RegionLabel = "尚未框选";
         ErrorMessage = "";
         Preview?.Dispose();
         Preview = null;
@@ -291,6 +396,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         Elapsed = "00:00.0";
         history.Clear();
         PlotSamples = Array.Empty<ErrorSample>();
+        OnPropertyChanged(nameof(CanSelectRegion));
+        FramePresented?.Invoke();
     }
 
     private static string Format(double? value) => value?.ToString("+0.000;-0.000;0.000", CultureInfo.InvariantCulture) ?? "—";

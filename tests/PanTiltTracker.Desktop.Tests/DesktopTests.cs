@@ -1,8 +1,11 @@
 using System.Text.Json;
 using Avalonia.Controls;
+using Avalonia;
+using Avalonia.Input;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using PanTiltTracker.Desktop.ViewModels;
+using PanTiltTracker.Desktop.Controls;
 using PanTiltTracker.Vision;
 using Xunit;
 
@@ -11,6 +14,85 @@ namespace PanTiltTracker.Desktop.Tests;
 public sealed class DesktopTests
 {
     private static string OutputRoot => Path.Combine(Workspace(), "artifacts", "desktop-tests");
+
+    [AvaloniaTheory]
+    [InlineData(1280, 860)]
+    [InlineData(980, 700)]
+    public async Task VideoCanLoadSelectWithMouseTrackAndInvalidateRegion(int width, int height)
+    {
+        Directory.CreateDirectory(OutputRoot);
+        var path = Path.Combine(OutputRoot, $"synthetic-tracking-{width}.avi");
+        using (var writer = new OpenCvSharp.VideoWriter(path, OpenCvSharp.FourCC.MJPG, 30, new(640, 360)))
+        {
+            Assert.True(writer.IsOpened());
+            using var scene = new SyntheticScene();
+            for (var index = 0; index < 15; index++)
+            {
+                using var gray = scene.RenderAt(420 + index, 200);
+                using var resized = new OpenCvSharp.Mat();
+                using var color = new OpenCvSharp.Mat();
+                OpenCvSharp.Cv2.Resize(gray, resized, new(640, 360));
+                OpenCvSharp.Cv2.CvtColor(resized, color, OpenCvSharp.ColorConversionCodes.GRAY2BGR);
+                writer.Write(color);
+            }
+        }
+        using var model = new MainViewModel(OutputRoot) { SourceIndex = 2, AlgorithmIndex = 1, InputPath = path };
+        var window = new MainWindow(model) { Width = width, Height = height };
+        try
+        {
+            window.Show();
+            await model.StartAsync();
+            Assert.True(model.HasError);
+            Assert.False(model.HasRun);
+            await model.LoadFirstFrameAsync();
+            Assert.False(model.HasError);
+            Assert.True(model.CanSelectRegion);
+            await Task.Delay(80);
+            var canvas = window.FindControl<Canvas>("SelectionCanvas")!;
+            var bounds = ImageSelectionGeometry.ImageBounds(canvas.Bounds.Size, 640, 360);
+            var start = canvas.TranslatePoint(new Point(bounds.X + bounds.Width * 350 / 640,
+                bounds.Y + bounds.Height * 95 / 360), window)!.Value;
+            var end = canvas.TranslatePoint(new Point(bounds.X + bounds.Width * 490 / 640,
+                bounds.Y + bounds.Height * 205 / 360), window)!.Value;
+            window.MouseMove(start);
+            window.MouseDown(start, MouseButton.Left);
+            window.MouseMove(end, RawInputModifiers.LeftMouseButton);
+            window.MouseUp(end, MouseButton.Left);
+            Assert.NotNull(model.InitialRegion);
+            Assert.InRange(model.InitialRegion!.Value.X, 349, 351);
+            Assert.InRange(model.InitialRegion.Value.Y, 94, 96);
+            SavePreview(window, $"video-selected-{width}.png");
+            // Keyboard start may occur before an in-progress mouse selection is released.
+            window.MouseDown(start, MouseButton.Left);
+            var running = model.StartAsync();
+            window.MouseUp(end, MouseButton.Left);
+            await running;
+            Assert.False(model.HasError, model.ErrorMessage);
+            Assert.Equal(15, model.ProcessedFrames);
+            Assert.Contains("CSRT", model.DetectionLabel);
+            SavePreview(window, $"video-tracked-{width}.png");
+            using var metadata = JsonDocument.Parse(File.ReadAllText(Path.Combine(model.LastRunDirectory, "run.json")));
+            Assert.Equal("Csrt", metadata.RootElement.GetProperty("algorithm").GetString());
+            Assert.Equal(JsonValueKind.Null, metadata.RootElement.GetProperty("markerId").ValueKind);
+            Assert.True(File.ReadLines(Path.Combine(model.LastRunDirectory, "telemetry.csv")).First().Contains("box_width", StringComparison.Ordinal));
+            await model.LoadFirstFrameAsync();
+            model.SetInitialRegion(new(350, 95, 140, 110));
+            model.InputPath = path + ".changed";
+            Assert.Null(model.InitialRegion);
+            Assert.False(model.HasPreview);
+        }
+        finally { await model.StopAsync(); window.Close(); }
+    }
+
+    [Fact]
+    public void RegionSelectionAccountsForLetterboxingAndReverseDrag()
+    {
+        var viewport = new Size(800, 600);
+        Assert.Null(ImageSelectionGeometry.Region(new(50, 20), new(200, 100), viewport, 1920, 1080));
+        var region = ImageSelectionGeometry.Region(new(600, 400), new(200, 200), viewport, 1920, 1080);
+        Assert.Equal(new OpenCvSharp.Rect(480, 300, 960, 480), region);
+        Assert.Null(ImageSelectionGeometry.Region(new(200, 200), new(201, 201), viewport, 1920, 1080));
+    }
 
     [AvaloniaTheory]
     [InlineData(1280, 860, "wide")]

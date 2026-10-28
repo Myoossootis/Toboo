@@ -1,15 +1,18 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Input;
 using Avalonia.Platform.Storage;
 using OpenCvSharp;
 using PanTiltTracker.Desktop.ViewModels;
 using PanTiltTracker.Vision;
+using PanTiltTracker.Desktop.Controls;
 
 namespace PanTiltTracker.Desktop;
 
 public sealed partial class MainWindow : Avalonia.Controls.Window
 {
     private bool closing;
+    private Avalonia.Point? regionStart;
     public MainViewModel ViewModel { get; }
 
     public MainWindow() : this(new MainViewModel()) { }
@@ -22,7 +25,60 @@ public sealed partial class MainWindow : Avalonia.Controls.Window
         viewModel.FramePresented += RefreshPreview;
     }
 
-    private void RefreshPreview() => PreviewImage.InvalidateVisual();
+    private void RefreshPreview()
+    {
+        PreviewImage.InvalidateVisual();
+        DrawSelection(ViewModel.CanSelectRegion ? ViewModel.InitialRegion : null);
+    }
+
+    private void BeginRegion(object? sender, PointerPressedEventArgs args)
+    {
+        if (!ViewModel.CanSelectRegion || !args.GetCurrentPoint(SelectionCanvas).Properties.IsLeftButtonPressed) return;
+        var point = args.GetPosition(SelectionCanvas);
+        var image = ImageSelectionGeometry.ImageBounds(SelectionCanvas.Bounds.Size, ViewModel.PreviewWidth, ViewModel.PreviewHeight);
+        if (!image.Contains(point)) return;
+        regionStart = point;
+        args.Pointer.Capture(SelectionCanvas);
+        args.Handled = true;
+    }
+
+    private void MoveRegion(object? sender, PointerEventArgs args)
+    {
+        if (regionStart is not { } start || !ViewModel.CanSelectRegion) return;
+        DrawSelection(ImageSelectionGeometry.Region(start, args.GetPosition(SelectionCanvas),
+            SelectionCanvas.Bounds.Size, ViewModel.PreviewWidth, ViewModel.PreviewHeight));
+    }
+
+    private void EndRegion(object? sender, PointerReleasedEventArgs args)
+    {
+        if (regionStart is not { } start) return;
+        var region = ImageSelectionGeometry.Region(start, args.GetPosition(SelectionCanvas),
+            SelectionCanvas.Bounds.Size, ViewModel.PreviewWidth, ViewModel.PreviewHeight);
+        regionStart = null;
+        args.Pointer.Capture(null);
+        if (region is { } selected && ViewModel.CanSelectRegion) ViewModel.SetInitialRegion(selected);
+        DrawSelection(ViewModel.CanSelectRegion ? ViewModel.InitialRegion : null);
+        args.Handled = true;
+    }
+
+    private void CancelRegion(object? sender, PointerCaptureLostEventArgs args)
+    {
+        regionStart = null;
+        DrawSelection(ViewModel.CanSelectRegion ? ViewModel.InitialRegion : null);
+    }
+
+    private void SelectionSizeChanged(object? sender, SizeChangedEventArgs args) => RefreshPreview();
+
+    private void DrawSelection(Rect? region)
+    {
+        SelectionBox.IsVisible = region is not null;
+        if (region is not { } r) return;
+        var image = ImageSelectionGeometry.ImageBounds(SelectionCanvas.Bounds.Size, ViewModel.PreviewWidth, ViewModel.PreviewHeight);
+        Canvas.SetLeft(SelectionBox, image.X + r.X * image.Width / ViewModel.PreviewWidth);
+        Canvas.SetTop(SelectionBox, image.Y + r.Y * image.Height / ViewModel.PreviewHeight);
+        SelectionBox.Width = r.Width * image.Width / ViewModel.PreviewWidth;
+        SelectionBox.Height = r.Height * image.Height / ViewModel.PreviewHeight;
+    }
 
     private async void PickInput(object? sender, RoutedEventArgs args)
     {

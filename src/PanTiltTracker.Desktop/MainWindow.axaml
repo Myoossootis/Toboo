@@ -49,7 +49,19 @@
                   <TextBlock Text="设备编号" VerticalAlignment="Center" />
                   <NumericUpDown Grid.Column="1" Value="{Binding CameraIndex}" Minimum="0" Maximum="99" FormatString="0" />
                 </Grid>
-                <Grid ColumnDefinitions="*,120" Margin="0,6,0,0">
+                <StackPanel Spacing="8" IsVisible="{Binding IsVideoSource}">
+                  <TextBlock Text="视频算法" Classes="muted" />
+                  <ComboBox x:Name="AlgorithmSelector" SelectedIndex="{Binding AlgorithmIndex}">
+                    <ComboBoxItem Content="ArUco 标记" />
+                    <ComboBoxItem Content="CSRT · 人工首框" />
+                    <ComboBoxItem Content="帧差 · 运动候选" />
+                  </ComboBox>
+                  <TextBlock Text="{Binding AlgorithmDescription}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                  <Button Content="载入无人机示例" Command="{Binding LoadExampleCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                  <Button x:Name="LoadFrameButton" Content="载入首帧 / 重新框选" Command="{Binding LoadFirstFrameCommand}" IsVisible="{Binding IsCsrt}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                  <TextBlock Text="{Binding RegionLabel}" IsVisible="{Binding IsCsrt}" FontSize="11" TextWrapping="Wrap" />
+                </StackPanel>
+                <Grid ColumnDefinitions="*,120" Margin="0,6,0,0" IsVisible="{Binding IsAruco}">
                   <StackPanel Spacing="3" VerticalAlignment="Center">
                     <TextBlock Text="目标标记 ID" />
                     <TextBlock Text="DICT_4X4_50" Classes="muted" FontSize="10" />
@@ -127,9 +139,9 @@
           </Border>
           <Border Classes="card" Padding="14,12" Margin="0,0,9,0">
             <StackPanel Spacing="5">
-              <TextBlock Text="有效检测率" Classes="muted" FontSize="11" />
+              <TextBlock Text="报告有效比例" Classes="muted" FontSize="11" />
               <TextBlock Text="{Binding DetectionRate}" Classes="metric" />
-              <TextBlock Text="本次全部处理帧" Classes="muted" FontSize="10" />
+              <TextBlock Text="非准确率 · 全部处理帧" Classes="muted" FontSize="10" />
             </StackPanel>
           </Border>
           <Border Classes="card" Padding="14,12">
@@ -156,6 +168,11 @@
               <Border x:Name="PreviewPane" Background="#E9EFED" Margin="12,0,0,12" CornerRadius="6" ClipToBounds="True">
                 <Grid>
                   <Image x:Name="PreviewImage" Source="{Binding Preview}" Stretch="Uniform" />
+                  <Canvas x:Name="SelectionCanvas" Background="Transparent" IsHitTestVisible="{Binding CanSelectRegion}"
+                          PointerPressed="BeginRegion" PointerMoved="MoveRegion" PointerReleased="EndRegion" PointerCaptureLost="CancelRegion"
+                          SizeChanged="SelectionSizeChanged">
+                    <Rectangle x:Name="SelectionBox" Stroke="#E8AE35" StrokeThickness="2" Fill="#20E8AE35" IsVisible="False" IsHitTestVisible="False" />
+                  </Canvas>
                   <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" IsVisible="{Binding !HasPreview}">
                     <Path Data="M 0,18 H 36 M 18,0 V 36 M 5,5 H 12 M 5,5 V 12 M 24,5 H 31 V 12 M 5,24 V 31 H 12 M 24,31 H 31 V 24"
                           Width="46" Height="46" Stretch="Uniform" Stroke="#8EA69B" StrokeThickness="1.5" HorizontalAlignment="Center" />

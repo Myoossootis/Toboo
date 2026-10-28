@@ -12,7 +12,7 @@ dotnet run --project src/PanTiltTracker.Desktop
 
 默认选择合成场景，点击“开始实验”。支持参数设置、模拟遮挡、实时画面、误差曲线、停止和 CSV 导出；图片／视频可从文件选择，摄像头入口待实物验证。操作说明见 [桌面界面](docs/06-desktop-interface.md)。
 
-真实无人机素材已准备：`data/processed/drone-11204831-1080p30.mp4`，1920×1080 / 30fps，约 6 秒。原始文件保留在 `data/raw/pexels/`。来源、处理过程及算法讨论见 [真实录像与算法选择](docs/07-real-drone-video-and-algorithms.md)。当前界面仍是 ArUco 检测，打开无标记真机录像只完成回放；后续先讨论并实现运动检测／目标跟踪。
+真实无人机素材已准备：`data/processed/drone-11204831-1080p30.mp4`，1920×1080 / 30fps，约 6 秒。原始文件保留在 `data/raw/pexels/`。界面现支持人工首框 + CSRT 以及帧差对照，操作与初步结果见 [无人机跟踪基线](docs/08-drone-tracking-baseline.md)，来源和规格见 [真实录像说明](docs/07-real-drone-video-and-algorithms.md)。
 
 ## 从这里开始
 
@@ -92,6 +92,12 @@ Microsensor/
 6. [Git 管理](docs/05-git-workflow.md)：分支、提交、数据与远端。
 
 前期资料：[预 proposal](output/vision_tracking_preproposal.md)、[算法与旧工程复用分析](output/pc_vision_algorithm_review.md)。它们保留讨论时的版本；当前实现路线以本 README 和 `docs/` 为准，PC 端采用 C#。
+
+## 无人机录像实验
+
+已加入人工首帧框选 + CSRT，以及相邻帧差对照。桌面程序选择“视频回放”→“载入无人机示例”→拖框→“开始实验”。不需要 ArUco 标记，也不自动识别无人机类别。
+
+命令行对照可运行 `scripts/run-drone-baseline.ps1`；使用方法、输出字段和首次真实录像结果见 [无人机跟踪基线](docs/08-drone-tracking-baseline.md)。报告有效比例不等于定位准确率；目前没有参考框真值。
 
 ## 当前边界
 

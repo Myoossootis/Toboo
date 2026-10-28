@@ -61,6 +61,26 @@ internal static class Program
             Console.CancelKeyPress += onCancel;
             try
             {
+                if (options.Mode == "track-video")
+                {
+                    var algorithm = options.Text("algorithm", "csrt") switch
+                    {
+                        "csrt" => VideoAlgorithm.Csrt, "frame-diff" => VideoAlgorithm.FrameDifference,
+                        _ => throw new ArgumentException("--algorithm must be csrt or frame-diff.")
+                    };
+                    Rect? region = null;
+                    if (options.Has("roi"))
+                    {
+                        var parts = options.Required("roi").Split(',');
+                        if (parts.Length != 4 || parts.Any(p => !int.TryParse(p, NumberStyles.Integer,
+                            CultureInfo.InvariantCulture, out _))) throw new ArgumentException("--roi expects x,y,width,height.");
+                        var values = parts.Select(p => int.Parse(p, CultureInfo.InvariantCulture)).ToArray();
+                        region = new(values[0], values[1], values[2], values[3]);
+                    }
+                    DroneVideoExperiment.Run(options.Required("input"), options.Text("out", "artifacts/drone-csrt"),
+                        algorithm, region, settings, options.Integer("frames", int.MaxValue), cancellation.Token);
+                    return 0;
+                }
                 using var detector = new ArucoTargetDetector(options.Id);
                 var controller = new PanTiltController(settings);
                 var directory = options.Text("out", $"artifacts/{options.Mode}");
@@ -259,6 +279,8 @@ internal static class Program
         camera   [--index 0] [--frames 300] [--preview]
         inspect  --input clip.mp4 [--out artifacts/video-inspection]
         prepare-video --input original.mp4 --out prepared-1080p.mp4
+        track-video --input clip.mp4 --algorithm csrt --roi x,y,width,height [--out artifacts/drone-csrt]
+        track-video --input clip.mp4 --algorithm frame-diff [--out artifacts/drone-motion]
         All detection modes: --id 7 --config config/tracker.json --out <directory>
         """);
 
@@ -282,9 +304,9 @@ internal static class Program
 
         public static Options Parse(string[] args)
         {
-            if (args[0] is not ("simulate" or "marker" or "image" or "video" or "camera" or "inspect" or "prepare-video"))
+            if (args[0] is not ("simulate" or "marker" or "image" or "video" or "camera" or "inspect" or "prepare-video" or "track-video"))
                 throw new ArgumentException($"Unknown mode: {args[0]}");
-            string[] known = ["out", "id", "size", "input", "index", "frames", "fps", "config", "preview"];
+            string[] known = ["out", "id", "size", "input", "index", "frames", "fps", "config", "preview", "algorithm", "roi"];
             var values = new Dictionary<string, string>(StringComparer.Ordinal);
             for (var index = 1; index < args.Length; index++)
             {

@@ -8,10 +8,12 @@ namespace PanTiltTracker.Desktop.Services;
 public enum InputSource { Simulation, Image, Video, Camera }
 
 public sealed record SessionOptions(InputSource Source, string InputPath, int CameraIndex,
-    int MarkerId, ControllerSettings Settings, string OutputDirectory);
+    int MarkerId, ControllerSettings Settings, string OutputDirectory,
+    VideoAlgorithm Algorithm = VideoAlgorithm.Aruco, Rect? InitialRegion = null);
 
 public sealed record SessionFrame(byte[] Pixels, int Width, int Height,
-    TargetObservation Observation, TrackingCommand Command, TimeSpan Time, double AlgorithmMs);
+    TargetObservation Observation, TrackingCommand Command, TimeSpan Time, double AlgorithmMs,
+    string VisionStatus = "aruco_detection");
 
 public static class TrackingSession
 {
@@ -19,14 +21,22 @@ public static class TrackingSession
         Func<bool> hideTarget, CancellationToken cancellation) => Task.Run(async () =>
     {
         options.Settings.Validate();
+        if (options.Algorithm != VideoAlgorithm.Aruco && options.Source != InputSource.Video)
+            throw new ArgumentException("CSRT 和帧差实验目前只支持视频文件。");
         using var detector = new ArucoTargetDetector(options.MarkerId);
+        using var videoTracker = options.Algorithm == VideoAlgorithm.Aruco ? null
+            : new VideoTargetTracker(options.Algorithm, options.InitialRegion);
         var controller = new PanTiltController(options.Settings);
         var mode = options.Source switch
         {
             InputSource.Simulation => "simulate", InputSource.Image => "image",
             InputSource.Video => "video", _ => "camera"
         };
-        using var log = new RunLog(options.OutputDirectory, mode, options.MarkerId, options.Settings);
+        using var log = new RunLog(options.OutputDirectory, mode, options.MarkerId, options.Settings,
+            options.Algorithm == VideoAlgorithm.Aruco ? "aruco" : options.Algorithm.ToString(),
+            new { input = options.InputPath, initialRegion = options.InitialRegion is { } r
+                ? new { x = r.X, y = r.Y, width = r.Width, height = r.Height } : null,
+                workingMaxWidth = VideoTargetTracker.WorkingMaxWidth });
         if (options.Source == InputSource.Camera)
         {
             await RunCameraAsync(options, detector, controller, log, present, cancellation);
@@ -55,7 +65,7 @@ public static class TrackingSession
             {
                 var time = TimeSpan.FromSeconds(frame / fps);
                 await ProcessAsync(image, frame++, time, time, detector, controller, log,
-                    present, false, cancellation);
+                    present, false, cancellation, videoTracker);
                 await PaceAsync(wallClock, TimeSpan.FromSeconds(frame / fps), cancellation);
             }
             cancellation.ThrowIfCancellationRequested();
@@ -138,15 +148,18 @@ public static class TrackingSession
 
     private static async Task<TrackingCommand> ProcessAsync(Mat image, long number,
         TimeSpan capturedAt, TimeSpan time, ArucoTargetDetector detector, PanTiltController controller,
-        RunLog log, Func<SessionFrame, Task> present, bool realTime, CancellationToken cancellation)
+        RunLog log, Func<SessionFrame, Task> present, bool realTime, CancellationToken cancellation,
+        VideoTargetTracker? videoTracker = null)
     {
         cancellation.ThrowIfCancellationRequested();
         var watch = Stopwatch.StartNew();
-        var observation = detector.Detect(image, number, capturedAt);
+        var tracked = videoTracker?.Process(image, number, capturedAt);
+        var observation = tracked?.Observation ?? detector.Detect(image, number, capturedAt);
         if (realTime) time += watch.Elapsed;
         var command = controller.Step(observation, time);
         watch.Stop();
-        log.Write(observation, command, time, watch.Elapsed.TotalMilliseconds);
+        log.Write(observation, command, time, watch.Elapsed.TotalMilliseconds, tracked?.Box,
+            tracked?.Status ?? "aruco_detection", tracked?.CandidateCount);
 
         using var color = new Mat();
         switch (image.Channels())
@@ -155,6 +168,7 @@ public static class TrackingSession
             case 3: image.CopyTo(color); break;
             default: Cv2.CvtColor(image, color, ColorConversionCodes.BGRA2BGR); break;
         }
+        if (tracked is not null) VideoTargetTracker.DrawResult(color, tracked);
         var center = new Point(image.Width / 2, image.Height / 2);
         Cv2.DrawMarker(color, center, new Scalar(120, 130, 140), MarkerTypes.Cross, 32, 1);
         if (observation.HasTarget)
@@ -162,7 +176,7 @@ public static class TrackingSession
             var target = new Point((int)observation.CenterX!.Value, (int)observation.CenterY!.Value);
             Cv2.Line(color, center, target, new Scalar(150, 185, 180), 1, LineTypes.AntiAlias);
             Cv2.Circle(color, target, 10, new Scalar(105, 135, 15), 2, LineTypes.AntiAlias);
-            Cv2.PutText(color, $"ID {detector.TargetId}  ({target.X}, {target.Y})",
+            Cv2.PutText(color, $"{(tracked is null ? $"ID {detector.TargetId}" : "target")}  ({target.X}, {target.Y})",
                 new Point(Math.Clamp(target.X + 15, 5, Math.Max(5, image.Width - 210)),
                     Math.Clamp(target.Y - 18, 20, Math.Max(20, image.Height - 10))),
                 HersheyFonts.HersheySimplex, 0.45, new Scalar(95, 105, 35), 1, LineTypes.AntiAlias);
@@ -171,7 +185,8 @@ public static class TrackingSession
         Cv2.CvtColor(color, bgra, ColorConversionCodes.BGR2BGRA);
         var pixels = new byte[bgra.Width * bgra.Height * 4];
         System.Runtime.InteropServices.Marshal.Copy(bgra.Data, pixels, 0, pixels.Length);
-        await present(new(pixels, bgra.Width, bgra.Height, observation, command, time, watch.Elapsed.TotalMilliseconds));
+        await present(new(pixels, bgra.Width, bgra.Height, observation, command, time,
+            watch.Elapsed.TotalMilliseconds, tracked?.Status ?? "aruco_detection"));
         return command;
     }
 
