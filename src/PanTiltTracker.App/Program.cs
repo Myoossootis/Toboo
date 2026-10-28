@@ -20,6 +20,21 @@ internal static class Program
         try
         {
             var options = Options.Parse(args);
+            if (options.Mode is "inspect" or "prepare-video")
+            {
+                var input = options.Required("input");
+                var inspectedPath = options.Mode == "prepare-video" ? options.Required("out") : input;
+                var metadata = options.Mode == "prepare-video"
+                    ? VideoInspection.Prepare1080p(input, inspectedPath) : VideoInspection.Read(input);
+                var directory = options.Mode == "prepare-video"
+                    ? Path.ChangeExtension(inspectedPath, null) + "-inspection"
+                    : options.Text("out", "artifacts/video-inspection");
+                VideoInspection.SaveSamples(inspectedPath, directory);
+                var json = JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(Path.Combine(directory, "metadata.json"), json);
+                Console.WriteLine(json);
+                return 0;
+            }
             if (options.Mode == "marker")
             {
                 var path = options.Text("out", $"artifacts/marker-{options.Id}.png");
@@ -242,6 +257,8 @@ internal static class Program
         image    --input image.png [--out artifacts/image]
         video    --input clip.mp4 [--frames 300] [--fps 30] [--preview]
         camera   [--index 0] [--frames 300] [--preview]
+        inspect  --input clip.mp4 [--out artifacts/video-inspection]
+        prepare-video --input original.mp4 --out prepared-1080p.mp4
         All detection modes: --id 7 --config config/tracker.json --out <directory>
         """);
 
@@ -265,7 +282,7 @@ internal static class Program
 
         public static Options Parse(string[] args)
         {
-            if (args[0] is not ("simulate" or "marker" or "image" or "video" or "camera"))
+            if (args[0] is not ("simulate" or "marker" or "image" or "video" or "camera" or "inspect" or "prepare-video"))
                 throw new ArgumentException($"Unknown mode: {args[0]}");
             string[] known = ["out", "id", "size", "input", "index", "frames", "fps", "config", "preview"];
             var values = new Dictionary<string, string>(StringComparer.Ordinal);

@@ -1,0 +1,36 @@
+{
+  "id": "pexels-11204831",
+  "title": "Drone Flying on Grass Field",
+  "creator": "Traveling on the Go",
+  "sourcePage": "https://www.pexels.com/video/drone-flying-on-grass-field-11204831/",
+  "downloadUrl": "https://videos.pexels.com/video-files/11204831/11204831-uhd_3840_2160_30fps.mp4",
+  "licensePage": "https://www.pexels.com/license/",
+  "verifiedDate": "2026-10-29",
+  "original": {
+    "path": "data/raw/pexels/11204831-original.mp4",
+    "width": 2560,
+    "height": 1440,
+    "reportedFps": 30,
+    "frameCount": 179,
+    "durationSeconds": 5.966666666666667,
+    "codec": "h264",
+    "sha256": "13dcbb27c833519d4ae1687ebbd1126fd4ea6b3df783a7a6a2747675ae65e8bb"
+  },
+  "prepared": {
+    "path": "data/processed/drone-11204831-1080p30.mp4",
+    "width": 1920,
+    "height": 1080,
+    "reportedFps": 30,
+    "frameCount": 179,
+    "codec": "MPEG-4 Part 2 / FMP4",
+    "sha256": "abb847f361e92a7009afa93efe956e7e2e3748d6f4283ad465fdf65b917a7ad9",
+    "transformation": "Each frame resized by 0.75 using INTER_AREA and re-encoded; no frame insertion, removal, crop or aspect-ratio change."
+  },
+  "knownLimitations": [
+    "The web page and file name advertise different dimensions or FPS; values here are from the downloaded file decoder.",
+    "Source camera, lens, field of view, exposure, shutter and stabilization are unknown.",
+    "Spatial resolution and nominal FPS match the intended 1080p30 camera mode; optical and noise characteristics are not matched.",
+    "No ground-truth bounding boxes are provided with this clip.",
+    "A six-second clip is for initial functional tests, not generalization or hardware performance claims."
+  ]
+}

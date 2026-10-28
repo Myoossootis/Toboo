@@ -12,6 +12,8 @@ dotnet run --project src/PanTiltTracker.Desktop
 
 默认选择合成场景，点击“开始实验”。支持参数设置、模拟遮挡、实时画面、误差曲线、停止和 CSV 导出；图片／视频可从文件选择，摄像头入口待实物验证。操作说明见 [桌面界面](docs/06-desktop-interface.md)。
 
+真实无人机素材已准备：`data/processed/drone-11204831-1080p30.mp4`，1920×1080 / 30fps，约 6 秒。原始文件保留在 `data/raw/pexels/`。来源、处理过程及算法讨论见 [真实录像与算法选择](docs/07-real-drone-video-and-algorithms.md)。当前界面仍是 ArUco 检测，打开无标记真机录像只完成回放；后续先讨论并实现运动检测／目标跟踪。
+
 ## 从这里开始
 
 需要 Windows x64、.NET 8 SDK。无需 Visual Studio、MSVC 或原眼动项目的 C++/CLI 组件。可用任意文本编辑器和 PowerShell；本机已有 SDK，直接运行即可。
