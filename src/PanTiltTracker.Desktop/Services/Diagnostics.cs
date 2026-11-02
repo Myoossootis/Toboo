@@ -26,6 +26,10 @@ internal static class Diagnostics
         using var detector = new ArucoTargetDetector();
         var observation = detector.Detect(image, 0, TimeSpan.Zero);
         if (!observation.HasTarget) throw new InvalidOperationException("Native OpenCV ArUco smoke test failed.");
+        using var faceDetector = new FaceTargetDetector();
+        using var blank = new Mat(240, 320, MatType.CV_8UC1, Scalar.Black);
+        if (faceDetector.Detect(blank, 0, TimeSpan.Zero).Boxes.Length != 0)
+            throw new InvalidOperationException("Native face detector blank-frame smoke test failed.");
         using var process = Process.GetCurrentProcess();
         Write("self-test.json", new
         {
@@ -35,7 +39,8 @@ internal static class Diagnostics
             nativeLibraries = process.Modules.Cast<ProcessModule>()
                 .Where(m => m.ModuleName is "OpenCvSharpExtern.dll" or "msvcp140.dll" or "vcruntime140.dll")
                 .Select(m => new { name = m.ModuleName, path = m.FileName }).ToArray(),
-            openCv = Cv2.GetVersionString(), syntheticMarkerDetected = true, physicalCameraTested = false,
+            openCv = Cv2.GetVersionString(), syntheticMarkerDetected = true, faceModelLoaded = true,
+            faceBlankFramePassed = true, physicalCameraTested = false,
             hardwareOutput = "disabled", cameraDevices = CameraDevices.List()
         });
     }

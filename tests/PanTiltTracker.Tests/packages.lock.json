@@ -133,7 +133,7 @@
         "dependencies": {
           "OpenCvSharp4": "[4.10.0.20240616, )",
           "OpenCvSharp4.runtime.win": "[4.10.0.20240616, )",
-          "PanTiltTracker.Core": "[0.1.1-preview.1, )"
+          "PanTiltTracker.Core": "[0.1.2, )"
         }
       }
     },
