@@ -21,11 +21,19 @@ public sealed class FaceTargetDetector : IDisposable
         modelPath ??= DefaultModelPath;
         if (!File.Exists(modelPath))
             throw new FileNotFoundException("缺少人脸模型，请完整解压或覆盖更新包中的 models 文件夹。", modelPath);
-        classifier = new CascadeClassifier(modelPath);
-        if (classifier.Empty())
+        // This OpenCvSharp version marshals filenames as ANSI. Keep Unicode paths in .NET;
+        // the upstream XML is ASCII and can safely be passed to OpenCV as in-memory data.
+        using var storage = new FileStorage(File.ReadAllText(modelPath), FileStorage.Modes.Read | FileStorage.Modes.Memory);
+        using var node = storage.GetFirstTopLevelNode() ?? throw new InvalidDataException("人脸模型缺少级联节点。");
+        classifier = new CascadeClassifier();
+        try
+        {
+            if (!classifier.Read(node) || classifier.Empty()) throw new InvalidDataException("无法加载人脸检测模型。");
+        }
+        catch
         {
             classifier.Dispose();
-            throw new InvalidDataException("无法加载人脸检测模型。");
+            throw;
         }
     }
 
