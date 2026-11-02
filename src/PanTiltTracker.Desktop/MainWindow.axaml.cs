@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Avalonia.Controls.Window
 
     private void RefreshPreview()
     {
+        if (!ViewModel.HasRun) AnalysisExpander.IsExpanded = false;
         PreviewImage.InvalidateVisual();
         DrawSelection(ViewModel.CanSelectRegion ? ViewModel.InitialRegion : null);
     }

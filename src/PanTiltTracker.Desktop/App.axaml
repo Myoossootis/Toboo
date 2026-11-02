@@ -2,6 +2,21 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="PanTiltTracker.Desktop.App"
              RequestedThemeVariant="Light">
+  <!-- Existing light/teal palette, consolidated into semantic brushes (§1.5, §5.6).
+       Spacing: 4/8/12/16/24/32; type: 12/14/16/20/24; two emphasis levels. -->
+  <Application.Resources>
+    <SolidColorBrush x:Key="WorkspaceBrush" Color="#F3F6F5" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="White" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#1C333A" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#456C61" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#126F65" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#0C5C54" />
+    <SolidColorBrush x:Key="SurfaceBorderBrush" Color="#DFE7E8" />
+    <SolidColorBrush x:Key="ControlBorderBrush" Color="#D5DFE0" />
+    <SolidColorBrush x:Key="SubtleBrush" Color="#EDF3F0" />
+    <SolidColorBrush x:Key="StageBrush" Color="#1C333A" />
+    <SolidColorBrush x:Key="StageTextBrush" Color="White" />
+  </Application.Resources>
   <Application.Styles>
     <FluentTheme>
       <FluentTheme.Palettes>
@@ -10,58 +25,86 @@
     </FluentTheme>
     <Style Selector="Window">
       <Setter Property="FontFamily" Value="Segoe UI, Microsoft YaHei UI" />
-      <Setter Property="FontSize" Value="13" />
-      <Setter Property="Foreground" Value="#1C333A" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+      <Setter Property="Background" Value="{StaticResource WorkspaceBrush}" />
     </Style>
     <Style Selector="Button">
-      <Setter Property="CornerRadius" Value="7" />
-      <Setter Property="Padding" Value="14,9" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="MinHeight" Value="36" />
       <Setter Property="FontWeight" Value="Medium" />
       <Setter Property="Cursor" Value="Hand" />
     </Style>
     <Style Selector="Button.primary">
-      <Setter Property="Background" Value="#126F65" />
+      <Setter Property="Background" Value="{StaticResource AccentBrush}" />
       <Setter Property="Foreground" Value="White" />
       <Setter Property="BorderThickness" Value="0" />
     </Style>
     <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="#0C5C54" />
+      <Setter Property="Background" Value="{StaticResource AccentHoverBrush}" />
     </Style>
     <Style Selector="Button.quiet">
-      <Setter Property="Background" Value="White" />
-      <Setter Property="BorderBrush" Value="#D5DFE0" />
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource ControlBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
+    <Style Selector="Button.tertiary">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
     <Style Selector="TextBlock.muted">
-      <Setter Property="Foreground" Value="#657B82" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.caption">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
     </Style>
     <Style Selector="TextBlock.section">
-      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontSize" Value="16" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="TextBlock.metric">
-      <Setter Property="FontSize" Value="25" />
+      <Setter Property="FontSize" Value="24" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Border.card">
-      <Setter Property="Background" Value="White" />
-      <Setter Property="BorderBrush" Value="#DFE7E8" />
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource SurfaceBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="CornerRadius" Value="8" />
     </Style>
     <Style Selector="ComboBox">
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="MinHeight" Value="36" />
     </Style>
     <Style Selector="TextBox">
       <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="FontSize" Value="12" />
     </Style>
     <Style Selector="NumericUpDown">
       <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="FontSize" Value="12" />
     </Style>
     <Style Selector="Slider">
-      <Setter Property="Height" Value="50" />
-      <Setter Property="MinHeight" Value="50" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="MinHeight" Value="32" />
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Padding" Value="12,8" />
+    </Style>
+    <Style Selector="TabControl">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+    </Style>
+    <Style Selector="Expander">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Padding" Value="0" />
     </Style>
   </Application.Styles>
 </Application>

@@ -12,7 +12,7 @@ public sealed class ErrorChart : Control
     private static readonly Pen grid = new(Brush.Parse("#E8EEEE"), 1);
     private static readonly Pen zero = new(Brush.Parse("#CCD9DA"), 1);
     private static readonly Pen xLine = new(Brush.Parse("#167D71"), 1.8);
-    private static readonly Pen yLine = new(Brush.Parse("#C9843C"), 1.8);
+    private static readonly Pen yLine = new(Brush.Parse("#BC7C37"), 1.8);
 
     static ErrorChart() => AffectsRender<ErrorChart>(SamplesProperty);
 
@@ -42,7 +42,8 @@ public sealed class ErrorChart : Control
             for (var index = 1; index < Samples.Count; index++)
             {
                 Draw(Samples[index - 1].X, Samples[index].X, xLine);
-                Draw(Samples[index - 1].Y, Samples[index].Y, yLine);
+                // Different line patterns keep X/Y distinguishable without color (§5.7).
+                if (index % 6 < 3) Draw(Samples[index - 1].Y, Samples[index].Y, yLine);
 
                 void Draw(double? previous, double? current, Pen pen)
                 {
