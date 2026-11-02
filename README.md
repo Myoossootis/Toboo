@@ -1,8 +1,10 @@
-# PanTiltTracker：CMOS 视觉双轴云台跟踪
+# UAVTrack / PanTiltTracker：CMOS 视觉双轴云台跟踪
 
 EESM 5840 期末项目。室内带标记模型 → USB 摄像头 → C# / OpenCvSharp → 云台位置控制。正式目标是完成相机标定、受控目标跟踪及误差实验。
 
-当前阶段为 **v0.1.0-prep：采购前软件准备**。支持生成 ArUco 标记、合成图像闭环、图片检测、视频回放与摄像头检测入口。所有模式均只记录角度指令，尚未连接串口或驱动舵机。
+当前版本为 **v0.1.1-preview.1：Windows 便携版摄像头测试**。支持生成 ArUco 标记、合成图像闭环、图片检测、视频回放与实时摄像头采集。所有模式均只记录角度指令，尚未连接串口或驱动舵机；新摄像头的实际采集验收需在连接设备的笔记本上完成。
+
+**直接使用程序：** 从 [GitHub Releases](https://github.com/Myoossootis/UAVTrack/releases) 下载 `win-x64-portable.zip`，完整解压后双击 `PanTiltTracker.Desktop.exe`。无需安装 .NET 或 Visual Studio。摄像头选择、远程操作和故障定位见 [便携版说明](docs/09-portable-camera.md)。
 
 桌面实验台已加入，启动命令：
 
@@ -12,7 +14,7 @@ dotnet run --project src/PanTiltTracker.Desktop
 
 默认选择合成场景，点击“开始实验”。支持参数设置、模拟遮挡、实时画面、误差曲线、停止和 CSV 导出；图片／视频可从文件选择，摄像头入口待实物验证。操作说明见 [桌面界面](docs/06-desktop-interface.md)。
 
-真实无人机素材已准备：`data/processed/drone-11204831-1080p30.mp4`，1920×1080 / 30fps，约 6 秒。原始文件保留在 `data/raw/pexels/`。界面现支持人工首框 + CSRT 以及帧差对照，操作与初步结果见 [无人机跟踪基线](docs/08-drone-tracking-baseline.md)，来源和规格见 [真实录像说明](docs/07-real-drone-video-and-algorithms.md)。
+开发时使用的真实无人机素材为 `data/processed/drone-11204831-1080p30.mp4`，1920×1080 / 30fps，约 6 秒。录像未上传仓库，也不包含在便携包中；可选择自己的视频。界面支持人工首框 + CSRT 以及帧差对照，操作与初步结果见 [无人机跟踪基线](docs/08-drone-tracking-baseline.md)，来源和规格见 [真实录像说明](docs/07-real-drone-video-and-algorithms.md)。
 
 ## 从这里开始
 
@@ -104,6 +106,6 @@ Microsensor/
 - 原眼动工程只作为参考，未修改、复制其设备专用采集代码。
 - 标定校正、串口输出和 STM32 固件属于后续阶段。
 - 初始方向、90°中位、限位和增益均不是实物校准结果。
-- 项目先建立本地 Git 历史；远端地址与可见性待确定。
+- 正式仓库为 [Myoossootis/UAVTrack](https://github.com/Myoossootis/UAVTrack)，主分支 `main`；便携二进制通过 Release 分发。
 
 参考库及许可见 [参考资料](docs/references.md)。

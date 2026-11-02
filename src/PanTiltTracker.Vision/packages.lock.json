@@ -31,6 +31,14 @@
       "pantilttracker.core": {
         "type": "Project"
       }
+    },
+    "net8.0/win-x64": {
+      "OpenCvSharp4.runtime.win": {
+        "type": "Direct",
+        "requested": "[4.10.0.20240616, )",
+        "resolved": "4.10.0.20240616",
+        "contentHash": "dpQNIR6PpeB/oZM0e0fZpt9lOS3Htjm6ZjtOgLyxN7QwjRekbNevrmO8VbgezUoetk68CRwxYZGaymCm2vt8Sg=="
+      }
     }
   }
 }

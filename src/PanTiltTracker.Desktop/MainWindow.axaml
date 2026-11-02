@@ -49,6 +49,21 @@
                   <TextBlock Text="设备编号" VerticalAlignment="Center" />
                   <NumericUpDown Grid.Column="1" Value="{Binding CameraIndex}" Minimum="0" Maximum="99" FormatString="0" />
                 </Grid>
+                <StackPanel Spacing="8" IsVisible="{Binding IsCameraSource}">
+                  <Button Content="刷新摄像头列表" Command="{Binding RefreshCamerasCommand}" />
+                  <ComboBox x:Name="CameraSelector" ItemsSource="{Binding Cameras}" SelectedItem="{Binding SelectedCamera}" />
+                  <TextBlock Text="采集模式（请求值）" Classes="muted" FontSize="11" />
+                  <ComboBox SelectedIndex="{Binding CameraModeIndex}">
+                    <ComboBoxItem Content="640 × 480 / 30fps" />
+                    <ComboBoxItem Content="1280 × 720 / 30fps" />
+                    <ComboBoxItem Content="1920 × 1080 / 30fps" />
+                  </ComboBox>
+                  <ComboBox SelectedIndex="{Binding CameraBackendIndex}">
+                    <ComboBoxItem Content="DirectShow（优先）" />
+                    <ComboBoxItem Content="Media Foundation（备用）" />
+                  </ComboBox>
+                  <TextBlock Text="{Binding CaptureSummary}" FontSize="11" TextWrapping="Wrap" />
+                </StackPanel>
                 <StackPanel Spacing="8" IsVisible="{Binding IsVideoSource}">
                   <TextBlock Text="视频算法" Classes="muted" />
                   <ComboBox x:Name="AlgorithmSelector" SelectedIndex="{Binding AlgorithmIndex}">

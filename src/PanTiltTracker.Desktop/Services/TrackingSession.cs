@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using OpenCvSharp;
 using PanTiltTracker.Core;
 using PanTiltTracker.Vision;
@@ -9,11 +10,11 @@ public enum InputSource { Simulation, Image, Video, Camera }
 
 public sealed record SessionOptions(InputSource Source, string InputPath, int CameraIndex,
     int MarkerId, ControllerSettings Settings, string OutputDirectory,
-    VideoAlgorithm Algorithm = VideoAlgorithm.Aruco, Rect? InitialRegion = null);
+    VideoAlgorithm Algorithm = VideoAlgorithm.Aruco, Rect? InitialRegion = null, CameraSettings? Camera = null);
 
 public sealed record SessionFrame(byte[] Pixels, int Width, int Height,
     TargetObservation Observation, TrackingCommand Command, TimeSpan Time, double AlgorithmMs,
-    string VisionStatus = "aruco_detection");
+    string VisionStatus = "aruco_detection", string? CaptureSummary = null);
 
 public static class TrackingSession
 {
@@ -93,24 +94,40 @@ public static class TrackingSession
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         using var buffer = new LatestFrameBuffer();
+        var settings = options.Camera ?? new CameraSettings();
+        settings.Validate();
+        string? captureSummary = null;
         var clock = Stopwatch.StartNew();
         var producer = Task.Run(() =>
         {
-            using var capture = new VideoCapture(options.CameraIndex, VideoCaptureAPIs.DSHOW);
-            if (!capture.IsOpened()) throw new IOException("无法打开 USB 摄像头，请核对设备编号及占用情况。");
-            capture.Set(VideoCaptureProperties.FrameWidth, 640);
-            capture.Set(VideoCaptureProperties.FrameHeight, 480);
-            capture.Set(VideoCaptureProperties.Fps, 30);
+            using var capture = new VideoCapture(options.CameraIndex, settings.Backend);
+            if (!capture.IsOpened()) throw new IOException("无法打开摄像头。请关闭微软相机/会议软件，检查设备编号、采集后端和 Windows 桌面应用相机权限。");
+            capture.Set(VideoCaptureProperties.FrameWidth, settings.Width);
+            capture.Set(VideoCaptureProperties.FrameHeight, settings.Height);
+            capture.Set(VideoCaptureProperties.Fps, settings.Fps);
+            var reportedFps = capture.Fps;
+            var fourcc = (int)capture.Get(VideoCaptureProperties.FourCC);
+            var format = new string(Enumerable.Range(0, 4).Select(i => (char)((fourcc >> (8 * i)) & 255)).ToArray()).Trim('\0');
+            Volatile.Write(ref captureSummary, $"{settings.Backend} · 格式 {format} · 驱动报告 {reportedFps:0.##} fps（非实测）");
             long number = 0;
             while (!stop.IsCancellationRequested)
             {
-                var image = new Mat();
-                if (!capture.Read(image) || image.Empty())
+                Mat? image = new();
+                try
                 {
-                    image.Dispose();
-                    throw new IOException("摄像头未返回有效图像。");
+                    if (!capture.Read(image) || image.Empty()) throw new IOException("摄像头未返回有效图像。");
+                    if (number == 0)
+                        File.WriteAllText(Path.Combine(options.OutputDirectory, "capture-info.json"), JsonSerializer.Serialize(new
+                        {
+                            index = options.CameraIndex, requested = settings, backend = settings.Backend.ToString(),
+                            returnedWidth = image.Width, returnedHeight = image.Height,
+                            driverReportedFps = double.IsFinite(reportedFps) ? (double?)reportedFps : null, format,
+                            timestamp = "PC arrival, not exposure", hardwareOutput = "disabled"
+                        }, new JsonSerializerOptions { WriteIndented = true }));
+                    buffer.Publish(new(number++, clock.Elapsed, image));
+                    image = null; // LatestFrameBuffer now owns the native allocation.
                 }
-                buffer.Publish(new(number++, clock.Elapsed, image));
+                finally { image?.Dispose(); }
             }
         }, CancellationToken.None);
         var lastArrival = clock.Elapsed;
@@ -130,7 +147,7 @@ public static class TrackingSession
                 }
                 lastArrival = clock.Elapsed;
                 await ProcessAsync(frame.Image, frame.Number, frame.CapturedAt, clock.Elapsed,
-                    detector, controller, log, present, true, cancellation);
+                    detector, controller, log, present, true, cancellation, captureSummary: Volatile.Read(ref captureSummary));
             }
         }
         finally
@@ -149,7 +166,7 @@ public static class TrackingSession
     private static async Task<TrackingCommand> ProcessAsync(Mat image, long number,
         TimeSpan capturedAt, TimeSpan time, ArucoTargetDetector detector, PanTiltController controller,
         RunLog log, Func<SessionFrame, Task> present, bool realTime, CancellationToken cancellation,
-        VideoTargetTracker? videoTracker = null)
+        VideoTargetTracker? videoTracker = null, string? captureSummary = null)
     {
         cancellation.ThrowIfCancellationRequested();
         var watch = Stopwatch.StartNew();
@@ -186,7 +203,7 @@ public static class TrackingSession
         var pixels = new byte[bgra.Width * bgra.Height * 4];
         System.Runtime.InteropServices.Marshal.Copy(bgra.Data, pixels, 0, pixels.Length);
         await present(new(pixels, bgra.Width, bgra.Height, observation, command, time,
-            watch.Elapsed.TotalMilliseconds, tracked?.Status ?? "aruco_detection"));
+            watch.Elapsed.TotalMilliseconds, tracked?.Status ?? "aruco_detection", captureSummary));
         return command;
     }
 

@@ -36,12 +36,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanConfigure), nameof(CanSelectRegion))]
-    [NotifyCanExecuteChangedFor(nameof(StartCommand), nameof(LoadFirstFrameCommand), nameof(LoadExampleCommand), nameof(ResetParametersCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StartCommand), nameof(LoadFirstFrameCommand), nameof(LoadExampleCommand), nameof(ResetParametersCommand), nameof(RefreshCamerasCommand))]
     private bool isLoadingPreview;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanConfigure), nameof(CanExport), nameof(CanOcclude), nameof(RunLabel))]
     [NotifyPropertyChangedFor(nameof(CanSelectRegion))]
-    [NotifyCanExecuteChangedFor(nameof(StartCommand), nameof(StopCommand), nameof(ResetParametersCommand), nameof(LoadFirstFrameCommand), nameof(LoadExampleCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StartCommand), nameof(StopCommand), nameof(ResetParametersCommand), nameof(LoadFirstFrameCommand), nameof(LoadExampleCommand), nameof(RefreshCamerasCommand))]
     private bool isRunning;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanExport), nameof(RunLabel))]
@@ -56,6 +56,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string regionLabel = "尚未框选";
     [ObservableProperty] private string inputPath = "";
     [ObservableProperty] private int cameraIndex;
+    [ObservableProperty] private CameraDevice? selectedCamera;
+    [ObservableProperty] private int cameraModeIndex;
+    [ObservableProperty] private int cameraBackendIndex;
+    [ObservableProperty] private string captureSummary = "连接成功后显示实际尺寸和驱动信息。";
     [ObservableProperty] private int markerId = 7;
     [ObservableProperty] private double panGain;
     [ObservableProperty] private double tiltGain;
@@ -88,6 +92,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private IReadOnlyList<ErrorSample> plotSamples = Array.Empty<ErrorSample>();
 
     public ObservableCollection<string> Events { get; } = [];
+    public ObservableCollection<CameraDevice> Cameras { get; } = [];
     public event Action? FramePresented;
     public bool CanConfigure => !IsRunning && !IsLoadingPreview;
     public bool IsVideoSource => SourceIndex == 2;
@@ -121,7 +126,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         0 => "理想相机模型反馈命令角度，适合到货前验证。",
         1 => "检测单张图片；只记录结果，不构成闭环。",
         2 => "按视频标称帧率回放；命令不影响原录像。",
-        _ => "请求 640×480 / 30fps，实际模式以设备返回为准。"
+        _ => "读取运行本程序的电脑上的摄像头。先刷新设备；未检测到标记也可正常预览。"
     };
 
     public MainViewModel(string? workspace = null)
@@ -146,6 +151,22 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnInputPathChanged(string value) { if (!IsRunning) ResetPresentation(); }
     partial void OnAlgorithmIndexChanged(int value) { if (!IsRunning) ResetPresentation(); }
+    partial void OnSelectedCameraChanged(CameraDevice? value) { if (value is not null) CameraIndex = value.Index; }
+
+    [RelayCommand(CanExecute = nameof(CanConfigure))]
+    public async Task RefreshCamerasAsync()
+    {
+        try
+        {
+            var devices = await Task.Run(CameraDevices.List);
+            if (disposed) return;
+            Cameras.Clear();
+            foreach (var device in devices) Cameras.Add(device);
+            SelectedCamera = Cameras.FirstOrDefault(c => c.Index == CameraIndex) ?? Cameras.FirstOrDefault();
+            AddEvent($"DirectShow 枚举到 {Cameras.Count} 个摄像头；MSMF 的编号顺序可能不同。");
+        }
+        catch (Exception error) { if (!disposed) ReportError($"枚举设备失败，仍可手动填写编号：{error.Message}"); }
+    }
 
     [RelayCommand(CanExecute = nameof(CanConfigure))]
     public async Task LoadExampleAsync()
@@ -230,7 +251,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmssfff", CultureInfo.InvariantCulture) + "Z");
         var options = new SessionOptions((InputSource)SourceIndex, InputPath, CameraIndex,
             MarkerId, settings, LastRunDirectory, IsVideoSource ? (VideoAlgorithm)AlgorithmIndex : VideoAlgorithm.Aruco,
-            initialRegion);
+            initialRegion, CameraModeIndex switch
+            {
+                1 => new(1280, 720, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW),
+                2 => new(1920, 1080, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW),
+                _ => new(640, 480, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW)
+            });
         IsRunning = true;
         ResetPresentation();
         HasRun = true;
@@ -310,6 +336,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         var observation = frame.Observation;
         var command = frame.Command;
+        if (frame.CaptureSummary is not null) CaptureSummary = frame.CaptureSummary;
         ProcessedFrames++;
         if (observation.HasTarget) detectedFrames++;
         DetectionLabel = frame.VisionStatus switch
@@ -380,6 +407,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void ResetPresentation()
     {
+        CaptureSummary = "连接成功后显示实际尺寸和驱动信息。";
         preparedVideoPath = null;
         initialRegion = null;
         RegionLabel = "尚未框选";
@@ -403,6 +431,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private static string Format(double? value) => value?.ToString("+0.000;-0.000;0.000", CultureInfo.InvariantCulture) ?? "—";
     private static string FindWorkspace()
     {
+        if (File.Exists(Path.Combine(AppContext.BaseDirectory, "portable.mode"))) return AppContext.BaseDirectory;
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
             if (File.Exists(Path.Combine(directory.FullName, "PanTiltTracker.sln"))) return directory.FullName;
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PanTiltTracker");
