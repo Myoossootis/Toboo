@@ -6,6 +6,8 @@ EESM 5840 期末项目。室内带标记模型 → USB 摄像头 → C# / OpenCv
 
 **直接使用程序：** 从 [GitHub Releases](https://github.com/Myoossootis/UAVTrack/releases) 下载 `win-x64-portable.zip`，完整解压后双击 `PanTiltTracker.Desktop.exe`。无需安装 .NET 或 Visual Studio。摄像头选择、远程操作和故障定位见 [便携版说明](docs/09-portable-camera.md)。
 
+`main` 新增了尚未发布的 **可选正面人脸检测与绘框**：图片、摄像头或视频的目标检测模式中，选择“检测目标 → 正面人脸”。多人全部绘框，最大框作为中心观测；不识别身份。模型随构建复制，运行无需联网。上面的旧版便携 ZIP 不包含此功能；按用户约定，小更新只推源码，明确获准后才发布新 Release。实现与局限见 [人脸检测](docs/10-face-detection.md)。
+
 桌面实验台已加入，启动命令：
 
 ```powershell

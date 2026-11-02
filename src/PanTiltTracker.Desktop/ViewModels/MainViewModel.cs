@@ -48,11 +48,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private bool hasRun;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsFileSource), nameof(IsCameraSource), nameof(IsSimulation),
-        nameof(CanOcclude), nameof(SourceDescription), nameof(SourceLabel), nameof(IsVideoSource), nameof(IsAruco), nameof(IsCsrt))]
+        nameof(CanOcclude), nameof(SourceDescription), nameof(SourceLabel), nameof(IsVideoSource), nameof(IsAruco), nameof(IsCsrt),
+        nameof(CanChooseTarget), nameof(IsFace), nameof(AlgorithmDescription))]
     private int sourceIndex;
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsCsrt), nameof(IsAruco), nameof(AlgorithmDescription), nameof(CanSelectRegion))]
+    [NotifyPropertyChangedFor(nameof(IsCsrt), nameof(IsAruco), nameof(AlgorithmDescription), nameof(CanSelectRegion), nameof(CanChooseTarget), nameof(IsFace))]
     private int algorithmIndex;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFace), nameof(IsAruco), nameof(AlgorithmDescription))]
+    private int targetIndex;
     [ObservableProperty] private string regionLabel = "尚未框选";
     [ObservableProperty] private string inputPath = "";
     [ObservableProperty] private int cameraIndex;
@@ -97,16 +101,18 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public bool CanConfigure => !IsRunning && !IsLoadingPreview;
     public bool IsVideoSource => SourceIndex == 2;
     public bool IsCsrt => IsVideoSource && AlgorithmIndex == 1;
-    public bool IsAruco => !IsVideoSource || AlgorithmIndex == 0;
+    public bool CanChooseTarget => !IsSimulation && (!IsVideoSource || AlgorithmIndex == 0);
+    public bool IsFace => CanChooseTarget && TargetIndex == 1;
+    public bool IsAruco => !IsFace && (!IsVideoSource || AlgorithmIndex == 0);
     public bool CanSelectRegion => CanConfigure && IsCsrt && preparedVideoPath == InputPath && HasPreview;
     public OpenCvSharp.Rect? InitialRegion => initialRegion;
     public int PreviewWidth => previewWidth;
     public int PreviewHeight => previewHeight;
-    public string AlgorithmDescription => AlgorithmIndex switch
+    public string AlgorithmDescription => (IsVideoSource ? AlgorithmIndex : 0) switch
     {
         1 => "载入首帧，在画面上拖框，再开始。丢失后需停止并重新载入。",
         2 => "帧差与形态学：取最大运动区域，不判断无人机类别。",
-        _ => "检测固定字典中的标记 ID。"
+        _ => IsFace ? "正面人脸检测；全部画框，以最大框计算中心。不识别身份。" : "检测固定字典中的标记 ID。"
     };
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
     public bool CanExport => !IsRunning && HasRun && File.Exists(Path.Combine(LastRunDirectory, "telemetry.csv"));
@@ -151,6 +157,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnInputPathChanged(string value) { if (!IsRunning) ResetPresentation(); }
     partial void OnAlgorithmIndexChanged(int value) { if (!IsRunning) ResetPresentation(); }
+    partial void OnTargetIndexChanged(int value) { if (!IsRunning) ResetPresentation(); }
     partial void OnSelectedCameraChanged(CameraDevice? value) { if (value is not null) CameraIndex = value.Index; }
 
     [RelayCommand(CanExecute = nameof(CanConfigure))]
@@ -223,7 +230,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (!CanStart) return;
         ErrorMessage = "";
-        if (MarkerId is < 0 or >= 50 || CameraIndex < 0)
+        if ((IsAruco && (MarkerId is < 0 or >= 50)) || CameraIndex < 0)
         {
             ErrorMessage = "标记 ID 应为 0–49，相机编号应为非负整数。";
             return;
@@ -256,7 +263,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 1 => new(1280, 720, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW),
                 2 => new(1920, 1080, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW),
                 _ => new(640, 480, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW)
-            });
+            }, DetectFaces: IsFace);
         IsRunning = true;
         ResetPresentation();
         HasRun = true;
@@ -267,7 +274,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         PlotSamples = Array.Empty<ErrorSample>();
         displayClock.Restart();
         StateLabel = "正在启动";
-        AddEvent($"开始：{SourceLabel}，{(IsAruco ? $"标记 ID {MarkerId}" : ((VideoAlgorithm)AlgorithmIndex).ToString())}。硬件输出保持关闭。");
+        AddEvent($"开始：{SourceLabel}，{(IsFace ? "正面人脸 / 最大框" : IsAruco ? $"标记 ID {MarkerId}" : ((VideoAlgorithm)AlgorithmIndex).ToString())}。硬件输出保持关闭。");
         cancellation = new();
         try
         {
@@ -341,6 +348,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (observation.HasTarget) detectedFrames++;
         DetectionLabel = frame.VisionStatus switch
         {
+            "face_detected" => $"检测到 {frame.TargetCount} 张人脸 · 目标为最大框",
+            "no_face_detected" => "未检测到正面人脸",
             "manual_initialization" => "人工首框 · 非自动识别",
             "tracker_reported_target" => "CSRT 报告有效 · 需核查漂移",
             "lost_reinitialize" => "CSRT 丢失 · 请重新框选",

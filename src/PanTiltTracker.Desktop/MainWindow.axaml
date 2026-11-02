@@ -41,6 +41,14 @@
                   <ComboBoxItem Content="USB 摄像头" />
                 </ComboBox>
                 <TextBlock Text="{Binding SourceDescription}" Classes="muted" FontSize="11" TextWrapping="Wrap" LineHeight="18" />
+                <StackPanel Spacing="8" IsVisible="{Binding CanChooseTarget}">
+                  <TextBlock Text="检测目标" Classes="muted" />
+                  <ComboBox x:Name="TargetSelector" SelectedIndex="{Binding TargetIndex}">
+                    <ComboBoxItem Content="ArUco 标记" />
+                    <ComboBoxItem Content="正面人脸" />
+                  </ComboBox>
+                  <TextBlock Text="{Binding AlgorithmDescription}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                </StackPanel>
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding IsFileSource}">
                   <TextBox x:Name="InputPathBox" Text="{Binding InputPath}" Watermark="选择图片或视频" MinWidth="0" />
                   <Button Grid.Column="1" Content="…" Padding="10,6" Click="PickInput" Classes="quiet" />
@@ -67,7 +75,7 @@
                 <StackPanel Spacing="8" IsVisible="{Binding IsVideoSource}">
                   <TextBlock Text="视频算法" Classes="muted" />
                   <ComboBox x:Name="AlgorithmSelector" SelectedIndex="{Binding AlgorithmIndex}">
-                    <ComboBoxItem Content="ArUco 标记" />
+                    <ComboBoxItem Content="目标检测（ArUco / 人脸）" />
                     <ComboBoxItem Content="CSRT · 人工首框" />
                     <ComboBoxItem Content="帧差 · 运动候选" />
                   </ComboBox>

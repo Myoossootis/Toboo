@@ -36,6 +36,8 @@ git push origin main
 
 ## 发布约定
 
+**用户约定：小更新完成验证后只推送代码，不自动创建或更新 GitHub Release。只有用户明确同意某个版本发布时，才整合便携包并发布；旧版本附件与标签保持不变。** 本地编译和验证不等于对外发布。
+
 先运行 `scripts/verify.ps1`，提交源码，再运行 `scripts/publish-portable.ps1`。用打包后的 EXE 执行 `--self-test` 和 `--smoke-test-ui`，记录与真实摄像头测试的区别。Git 标签必须对应 `build-info.json` 的源码提交；Release 附 ZIP 和 SHA256 文件，不上传自检后的相机列表、运行日志或个人录像。共享后不重写历史或移动已发布标签。
 
 项目整体的开源许可证尚未选定；公开可读不代表自动采用依赖的开源许可证。第三方许可独立保留在 `licenses/`、`THIRD-PARTY-NOTICES.md` 和发布包中。

@@ -9,6 +9,7 @@ The source project's publication does not grant an additional license to third-p
 | CommunityToolkit.Mvvm 8.4.0 | MIT; https://github.com/CommunityToolkit/dotnet |
 | OpenCvSharp 4.10.0.20240616 | Apache-2.0; https://github.com/shimat/opencvsharp |
 | OpenCV 4.10.0 | Apache-2.0 plus bundled third-party components; https://github.com/opencv/opencv/tree/4.10.0 |
+| OpenCV frontal-face Haar cascade | Original Intel permissive terms retained in `models/face/haarcascade_frontalface_default.xml` and `licenses/OpenCV-Haar-model.txt`; https://github.com/opencv/opencv/tree/4.10.0/data/haarcascades |
 | OpenCV FFmpeg video plugin | FFmpeg LGPL; https://github.com/opencv/opencv_3rdparty/tree/ffmpeg/4.x and https://ffmpeg.org/legal.html |
 | SkiaSharp 2.88.9 / Skia and native dependencies | MIT / BSD and original third-party notices included in package; https://github.com/mono/SkiaSharp |
 | HarfBuzzSharp 8.3.1.1 / HarfBuzz | MIT and original third-party notices included in package; https://github.com/harfbuzz/harfbuzz |
