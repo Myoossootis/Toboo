@@ -1,6 +1,8 @@
 item,quantity,reference_cost_cny,status,notes
-"16-channel driver + 7.4V battery + charger",1,105,"selected / not hardware-verified","User shopping-cart screenshot; battery and charger included"
-"2DOF pan-tilt + 2MP USB camera kit",1,142,"selected / not hardware-verified","Check shipped servo and camera variants"
+"16-channel servo driver",1,,"received / user reported 2026-11-02","Power not purchased; earlier 105 CNY quote included unpurchased battery and charger"
+"2DOF pan-tilt + 2MP USB camera kit",1,142,"camera received and capturing / user reported 2026-11-02","142 CNY was earlier cart reference; actual frame rate and latency not verified"
+"Regulated 5V 3A enclosed DC adapter",1,,"recommended / not purchased","Fixed 5V; continuous 3A rating; choose matching 5.5x2.1mm center-positive plug"
+"DC 5.5x2.1mm female to red-black wire",1,,"recommended if adapter uses barrel plug","18-20 AWG; short wire to driver screw power terminal; not communication VCC"
 "Existing STM32 development board",1,0,"owned / model pending","Record exact MCU and PC communication interface"
 "USB extension and communication wires",1,,"check existing stock","Purchase only after connector check"
 "Rigid base and fasteners",1,,"pending","Allow cable movement without dragging gimbal"
