@@ -58,10 +58,10 @@ public sealed class FaceTargetTests
             Assert.False(model.HasError, model.ErrorMessage);
             Assert.True(model.HasPreview);
             Assert.Equal(1, model.ProcessedFrames);
-            Assert.Equal("未检测到正面人脸", model.DetectionLabel);
+            Assert.Equal("未检测到人脸", model.DetectionLabel);
             Assert.Equal("—", model.TargetPosition);
             using var metadata = JsonDocument.Parse(File.ReadAllText(Path.Combine(model.LastRunDirectory, "run.json")));
-            Assert.Equal("haar_face", metadata.RootElement.GetProperty("algorithm").GetString());
+            Assert.Equal("yunet_face", metadata.RootElement.GetProperty("algorithm").GetString());
             Assert.Equal(JsonValueKind.Null, metadata.RootElement.GetProperty("markerId").ValueKind);
             Assert.Equal(JsonValueKind.Null, metadata.RootElement.GetProperty("dictionary").ValueKind);
             var csv = File.ReadAllLines(Path.Combine(model.LastRunDirectory, "telemetry.csv"));

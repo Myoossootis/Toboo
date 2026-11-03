@@ -112,7 +112,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         1 => "载入首帧，在画面上拖框，再开始。丢失后需停止并重新载入。",
         2 => "帧差与形态学：取最大运动区域，不判断无人机类别。",
-        _ => IsFace ? "正面人脸检测；全部画框，以最大框计算中心。不识别身份。" : "检测固定字典中的标记 ID。"
+        _ => IsFace ? "人脸检测支持正面与侧面；全部画框，以最大框计算中心。不识别身份。" : "检测固定字典中的标记 ID。"
     };
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
     public bool CanExport => !IsRunning && HasRun && File.Exists(Path.Combine(LastRunDirectory, "telemetry.csv"));
@@ -274,7 +274,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         PlotSamples = Array.Empty<ErrorSample>();
         displayClock.Restart();
         StateLabel = "正在启动";
-        AddEvent($"开始：{SourceLabel}，{(IsFace ? "正面人脸 / 最大框" : IsAruco ? $"标记 ID {MarkerId}" : ((VideoAlgorithm)AlgorithmIndex).ToString())}。硬件输出保持关闭。");
+        AddEvent($"开始：{SourceLabel}，{(IsFace ? "正面与侧面人脸 / 最大框" : IsAruco ? $"标记 ID {MarkerId}" : ((VideoAlgorithm)AlgorithmIndex).ToString())}。硬件输出保持关闭。");
         cancellation = new();
         try
         {
@@ -349,7 +349,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         DetectionLabel = frame.VisionStatus switch
         {
             "face_detected" => $"检测到 {frame.TargetCount} 张人脸 · 目标为最大框",
-            "no_face_detected" => "未检测到正面人脸",
+            "no_face_detected" => "未检测到人脸",
             "manual_initialization" => "人工首框 · 非自动识别",
             "tracker_reported_target" => "CSRT 报告有效 · 需核查漂移",
             "lost_reinitialize" => "CSRT 丢失 · 请重新框选",

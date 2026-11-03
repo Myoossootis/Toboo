@@ -39,7 +39,7 @@ internal static class Diagnostics
             nativeLibraries = process.Modules.Cast<ProcessModule>()
                 .Where(m => m.ModuleName is "OpenCvSharpExtern.dll" or "msvcp140.dll" or "vcruntime140.dll")
                 .Select(m => new { name = m.ModuleName, path = m.FileName }).ToArray(),
-            openCv = Cv2.GetVersionString(), syntheticMarkerDetected = true, faceModelLoaded = true,
+            openCv = Cv2.GetVersionString(), syntheticMarkerDetected = true, faceModelLoaded = true, faceDetector = "yunet_2023mar",
             faceBlankFramePassed = true, physicalCameraTested = false,
             hardwareOutput = "disabled", cameraDevices = CameraDevices.List()
         });

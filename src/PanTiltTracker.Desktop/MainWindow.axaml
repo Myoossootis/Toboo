@@ -88,7 +88,7 @@
                     <TextBlock Text="检测目标" FontWeight="SemiBold" FontSize="12" />
                     <ComboBox x:Name="TargetSelector" SelectedIndex="{Binding TargetIndex}">
                       <ComboBoxItem Content="ArUco 标记" />
-                      <ComboBoxItem Content="正面人脸" />
+                      <ComboBoxItem Content="人脸（正面 / 侧面）" />
                     </ComboBox>
                     <TextBlock Text="{Binding AlgorithmDescription}" Classes="caption" TextWrapping="Wrap" LineHeight="18" />
                   </StackPanel>

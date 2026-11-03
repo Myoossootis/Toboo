@@ -51,7 +51,7 @@ try {
     }
     $selfTest = Get-Content -LiteralPath (Join-Path $appPath 'diagnostics/self-test.json') -Raw | ConvertFrom-Json
     $uiTest = Get-Content -LiteralPath (Join-Path $appPath 'diagnostics/ui-smoke-test.json') -Raw | ConvertFrom-Json
-    if (!$selfTest.success -or !$selfTest.faceModelLoaded -or !$selfTest.faceBlankFramePassed -or
+    if (!$selfTest.success -or !$selfTest.faceModelLoaded -or $selfTest.faceDetector -ne 'yunet_2023mar' -or !$selfTest.faceBlankFramePassed -or
         !$uiTest.success -or $uiTest.frames -lt 12) { throw 'Portable smoke checks did not pass.' }
     if (!$selfTest.runtimeDirectory.StartsWith($appPath, [StringComparison]::OrdinalIgnoreCase)) {
         throw 'The executable did not use its app-local .NET runtime.'

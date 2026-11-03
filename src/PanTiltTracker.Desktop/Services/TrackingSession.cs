@@ -38,11 +38,12 @@ public static class TrackingSession
             InputSource.Video => "video", _ => "camera"
         };
         using var log = new RunLog(options.OutputDirectory, mode, options.MarkerId, options.Settings,
-            options.DetectFaces ? "haar_face" : options.Algorithm == VideoAlgorithm.Aruco ? "aruco" : options.Algorithm.ToString(),
+            options.DetectFaces ? "yunet_face" : options.Algorithm == VideoAlgorithm.Aruco ? "aruco" : options.Algorithm.ToString(),
             new { input = options.InputPath, initialRegion = options.InitialRegion is { } r
                 ? new { x = r.X, y = r.Y, width = r.Width, height = r.Height } : null,
                 workingMaxWidth = options.DetectFaces ? FaceTargetDetector.WorkingMaxWidth : VideoTargetTracker.WorkingMaxWidth,
-                faceSelection = options.DetectFaces ? "largest_per_frame; not identity tracking" : null });
+                faceSelection = options.DetectFaces ? "largest_per_frame; not identity tracking" : null,
+                faceViews = options.DetectFaces ? "YuNet 2023mar; frontal and profile; score 0.8; IoU NMS 0.3" : null });
         if (options.Source == InputSource.Camera)
         {
             await RunCameraAsync(options, detector, faceDetector, controller, log, present, cancellation);

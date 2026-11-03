@@ -1,5 +1,7 @@
 # UAVTrack Windows 便携版：摄像头测试
 
+本文便携包操作说明对应已发布 v0.1.2。main 另有尚未发布的 YuNet 正面/侧面改进，见 [当前人脸检测](10-face-detection.md)；旧版 ZIP 不会因源码更新而自动改变。
+
 适用于 Windows 10/11 **x64**。ZIP 包含 .NET 与本机图像运行库，无需 Visual Studio、.NET SDK 或单独安装 .NET。必须完整解压，不能只复制 EXE 或直接在压缩包里运行。
 
 ## 远程测试怎么用
