@@ -36,6 +36,7 @@ public sealed class WorkbenchPreviewTests
                 {
                     model.TargetIndex = 2;
                     model.DroneModelPath = droneModel;
+                    model.DroneTrackingEnabled = Environment.GetEnvironmentVariable("UAVTRACK_PREVIEW_DRONE_TRACKING") == "1";
                 }
                 else
                 {
@@ -56,7 +57,7 @@ public sealed class WorkbenchPreviewTests
             // Reserve at least half a VGA frame's height at the supported 700px window
             // height, including the extra toolbar controls visible during simulation.
             Assert.True(preview.Bounds.Height >= 240, $"Image height is only {preview.Bounds.Height}.");
-            Save(model.IsDrone ? "drone-detection" : string.IsNullOrEmpty(recorded) ? "simulation" : "recorded-video");
+            Save(model.IsDrone ? model.DroneTrackingEnabled ? "drone-hybrid" : "drone-detection" : string.IsNullOrEmpty(recorded) ? "simulation" : "recorded-video");
 
             var analysis = window.FindControl<Expander>("AnalysisExpander")!;
             Assert.True(analysis.IsEffectivelyVisible);

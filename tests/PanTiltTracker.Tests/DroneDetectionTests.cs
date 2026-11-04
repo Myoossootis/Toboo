@@ -82,6 +82,17 @@ public sealed class DroneDetectionTests
     }
 
     [Fact]
+    public void Yolo11UsesClassScoresWithoutObjectnessAndRejectsBirds()
+    {
+        var map = new DroneTargetDetector.Letterbox(new(200,100),new(200,100),0,0);
+        float[] channels = [50,150, 50,50, 40,20, 40,20, .8f,.7f, .1f,.9f];
+        var boxes = DroneTargetDetector.Decode(channels,[1,6,2],map,true);
+        Assert.Single(boxes); Assert.Equal(new Rect(30,30,40,40),boxes[0].Box);
+        Assert.Equal(.8f,boxes[0].Score);
+        Assert.Throws<InvalidDataException>(()=>DroneTargetDetector.Decode(channels,[1,2,6],map,true));
+    }
+
+    [Fact]
     public void BadPredictionsAndNoCandidatesDoNotInventCoordinates()
     {
         var map = new DroneTargetDetector.Letterbox(new(100,100), new(100,100), 0, 0);

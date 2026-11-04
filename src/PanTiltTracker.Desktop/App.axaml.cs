@@ -39,6 +39,7 @@ public sealed partial class App : Application
                                 throw new ArgumentException("--drone-model requires --camera-index and a verified ONNX path.");
                             window.ViewModel.TargetIndex = 2;
                             window.ViewModel.DroneModelPath = desktop.Args[droneArgument + 1];
+                            window.ViewModel.DroneTrackingEnabled = desktop.Args.Contains("--drone-tracking", StringComparer.Ordinal);
                         }
                         var run = window.ViewModel.StartAsync();
                         var until = DateTime.UtcNow.AddSeconds(15);
@@ -52,6 +53,7 @@ public sealed partial class App : Application
                             success, synthetic = !useCamera, physicalCameraTested = useCamera,
                             frames = window.ViewModel.ProcessedFrames, window.ViewModel.ErrorMessage,
                             target = window.ViewModel.IsDrone ? "drone" : "aruco",
+                            droneTracking = window.ViewModel.IsDroneStream && window.ViewModel.DroneTrackingEnabled,
                             framework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
                             hardwareOutput = "disabled"
                         });

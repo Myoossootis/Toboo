@@ -11,6 +11,34 @@ namespace PanTiltTracker.Desktop.Tests;
 
 public sealed class DroneTargetTests
 {
+    [DroneVideoFact]
+    public async Task RealVideoHybridSessionLogsVisualTrackingWithoutInventingClassificationScores()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "UAVTrack-drone-video", Guid.NewGuid().ToString("N"));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var frames = new List<SessionFrame>();
+        var options = new SessionOptions(InputSource.Video, Environment.GetEnvironmentVariable("UAVTRACK_DRONE_TEST_VIDEO")!,
+            0,7,new(),output,DroneModelPath:Environment.GetEnvironmentVariable("UAVTRACK_DRONE_MODEL")!,TrackDrones:true);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(()=>TrackingSession.RunAsync(options,frame=>
+        {
+            frames.Add(frame);
+            if(frames.Count>=8) cancellation.Cancel();
+            return Task.CompletedTask;
+        },()=>false,cancellation.Token));
+        Assert.Equal(8,frames.Count);
+        Assert.Contains(frames,f=>f.VisionStatus=="drone_acquired" && f.TargetScore is not null);
+        Assert.Contains(frames,f=>f.VisionStatus=="drone_tracked" && f.Observation.HasTarget && f.TargetScore is null);
+        var csv=File.ReadAllLines(Path.Combine(output,"telemetry.csv"));
+        var header=csv[0].Split(',');
+        var rows=csv.Skip(1).Select(row=>header.Zip(row.Split(',')).ToDictionary(p=>p.First,p=>p.Second)).ToArray();
+        var visual=rows.First(row=>row["target_source"]=="csrt");
+        Assert.Empty(visual["target_score"]); Assert.Empty(visual["target_class"]);
+        Assert.Empty(visual["candidate_count"]); Assert.NotEmpty(visual["track_epoch"]);
+        using var run=JsonDocument.Parse(File.ReadAllText(Path.Combine(output,"run.json")));
+        Assert.EndsWith("_csrt",run.RootElement.GetProperty("algorithm").GetString());
+        Assert.Equal("disabled",run.RootElement.GetProperty("hardwareOutput").GetString());
+    }
+
     [DroneImageFact]
     public async Task ActualModelImageThenBlankKeepsPreviewLogsScoresAndClearsTheTarget()
     {
@@ -70,6 +98,14 @@ public sealed class DroneTargetTests
             Assert.False(model.IsDrone); Assert.True(model.IsAruco);
             model.SourceIndex = 1; Assert.True(model.IsDrone);
             model.SourceIndex = 2; Assert.True(model.IsDrone);
+            Assert.True(model.IsDroneStream);
+            Assert.True(window.FindControl<CheckBox>("DroneTrackingToggle")!.IsEffectivelyVisible);
+            model.DroneTrackingEnabled = true;
+            Assert.Contains("CSRT",model.AlgorithmDescription);
+            model.SourceIndex = 1;
+            Assert.False(model.IsDroneStream);
+            Assert.DoesNotContain("CSRT",model.AlgorithmDescription);
+            model.SourceIndex = 2;
             model.AlgorithmIndex = 1;
             Assert.False(model.IsDrone); Assert.True(model.IsCsrt);
         }
@@ -99,6 +135,9 @@ public sealed class DroneTargetTests
         await Assert.ThrowsAsync<ArgumentException>(() => TrackingSession.RunAsync(options with
             { Source = InputSource.Video, DetectFaces = false, Algorithm = VideoAlgorithm.Csrt }, _ => Task.CompletedTask,
             () => false, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(() => TrackingSession.RunAsync(options with
+            { Source = InputSource.Image, DetectFaces = false, TrackDrones = true }, _ => Task.CompletedTask,
+            () => false, CancellationToken.None));
     }
 }
 
@@ -109,5 +148,15 @@ public sealed class DroneImageFactAttribute : FactAttribute
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("UAVTRACK_DRONE_MODEL")) ||
             string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("UAVTRACK_DRONE_TEST_IMAGE")))
             Skip = "Optional real-image integration: set UAVTRACK_DRONE_MODEL and UAVTRACK_DRONE_TEST_IMAGE.";
+    }
+}
+
+public sealed class DroneVideoFactAttribute : FactAttribute
+{
+    public DroneVideoFactAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("UAVTRACK_DRONE_MODEL")) ||
+            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("UAVTRACK_DRONE_TEST_VIDEO")))
+            Skip="Optional real-video integration: set UAVTRACK_DRONE_MODEL and UAVTRACK_DRONE_TEST_VIDEO.";
     }
 }

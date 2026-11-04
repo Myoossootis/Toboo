@@ -6,6 +6,8 @@
 *.user
 *.suo
 TestResults/
+__pycache__/
+*.pyc
 
 # Existing reference downloads and scratch work
 /tmp/

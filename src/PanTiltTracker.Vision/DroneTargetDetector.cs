@@ -12,10 +12,12 @@ public sealed record DroneDetectionResult(TargetObservation Observation, DroneDe
     public float? PrimaryScore => Detections.Length == 0 ? null : Detections[0].Score;
 }
 
-/// <summary>Single-class YOLOv5 CPU inference. Owns native/tensor buffers, never the input image.</summary>
+/// <summary>Verified CPU model profiles, emitting drone boxes only. Owns buffers, never the input image.</summary>
 public sealed class DroneTargetDetector : IDisposable
 {
     public const string ModelSha256 = "4d078f4235221dbaa1299796d5a6bd5cc8f2210013b07e8199e5d06e88b43e8a";
+    public const string CandidateModelSha256 = "ad7dbd93bb7da4e20651d49d7dff399af8ffc7a2c69a4214fe0a682179318fed";
+    public const string Yolo11ModelSha256 = "f3b238b537fe420f21ce1e2504055a21816b5ad80a8d9346f56ac3bced1afc29";
     public const float ScoreThreshold = 0.35f;
     public const float NmsThreshold = 0.45f;
     public static string DefaultModelPath => Path.Combine(AppContext.BaseDirectory, "models", "drone", "best.onnx");
@@ -28,13 +30,16 @@ public sealed class DroneTargetDetector : IDisposable
     private bool disposed;
     public int InputWidth { get; }
     public int InputHeight { get; }
+    public string LoadedModelSha256 { get; }
+    public string ModelId => LoadedModelSha256 == Yolo11ModelSha256 ? "yolo11n_drone_bird" : "yolov5_drone";
 
     public DroneTargetDetector(string modelPath)
     {
         if (!File.Exists(modelPath)) throw new FileNotFoundException("无人机模型不存在。请运行 scripts/prepare-drone-model.ps1，再选择 models/drone/best.onnx。", modelPath);
         var bytes = File.ReadAllBytes(modelPath); // Unicode paths stay in .NET.
-        if (Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant() != ModelSha256)
-            throw new ArgumentException("第一阶段仅支持已核验的无人机 best.onnx，请使用 prepare-drone-model.ps1 下载的版本。", nameof(modelPath));
+        LoadedModelSha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+        if (LoadedModelSha256 is not (ModelSha256 or CandidateModelSha256 or Yolo11ModelSha256))
+            throw new ArgumentException("仅支持已核验的无人机 ONNX，请使用 prepare-drone-model.ps1 下载的版本。", nameof(modelPath));
         using var settings = new SessionOptions { IntraOpNumThreads = 4, InterOpNumThreads = 1,
             GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL };
         session = new InferenceSession(bytes, settings);
@@ -44,10 +49,11 @@ public sealed class DroneTargetDetector : IDisposable
                 throw new InvalidDataException("Expected one YOLOv5 input and output.");
             var metadata = session.InputMetadata.Single();
             var shape = metadata.Value.Dimensions;
-            if (metadata.Value.ElementType != typeof(float) || shape.Length != 4 || shape[0] != 1 || shape[1] != 3 ||
-                shape[2] <= 0 || shape[3] <= 0 || shape[2] > 1280 || shape[3] > 1280)
+            var yolo11 = LoadedModelSha256 == Yolo11ModelSha256;
+            if (metadata.Value.ElementType != typeof(float) || shape.Length != 4 || shape[1] != 3 ||
+                (!yolo11 && (shape[0] != 1 || shape[2] <= 0 || shape[3] <= 0 || shape[2] > 1280 || shape[3] > 1280)))
                 throw new InvalidDataException("Expected fixed float32 NCHW input [1,3,H,W].");
-            InputHeight = shape[2]; InputWidth = shape[3];
+            InputHeight = yolo11 ? 640 : shape[2]; InputWidth = yolo11 ? 640 : shape[3];
             inputNames = [metadata.Key]; outputNames = session.OutputMetadata.Keys.ToArray();
             pixels = new float[3 * InputWidth * InputHeight];
             runOptions = new();
@@ -63,7 +69,8 @@ public sealed class DroneTargetDetector : IDisposable
         using var outputs = session.Run(runOptions, inputNames, [input], outputNames);
         var output = outputs[0];
         var outputShape = output.GetTensorTypeAndShape();
-        var detections = Decode(output.GetTensorDataAsSpan<float>(), outputShape.Shape, geometry);
+        var detections = Decode(output.GetTensorDataAsSpan<float>(), outputShape.Shape, geometry,
+            LoadedModelSha256 == Yolo11ModelSha256);
         var primary = detections.Length == 0 ? (Rect?)null : detections[0].Box;
         return new(new(number, capturedAt, image.Width, image.Height,
             primary is { } b ? b.X + b.Width / 2.0 : null,
@@ -111,17 +118,24 @@ public sealed class DroneTargetDetector : IDisposable
         return new(image.Size(), size, left, top);
     }
 
-    internal static DroneDetection[] Decode(ReadOnlySpan<float> data, long[] shape, Letterbox geometry)
+    internal static DroneDetection[] Decode(ReadOnlySpan<float> data, long[] shape, Letterbox geometry, bool yolo11 = false)
     {
-        if (shape.Length != 3 || shape[0] != 1 || shape[1] <= 0 || shape[2] != 6 || data.Length != shape[1] * 6)
-            throw new InvalidDataException("Expected single-class YOLOv5 output [1,N,6], not YOLO11 or a COCO model.");
+        if (shape.Length != 3 || shape[0] != 1 || shape[1] <= 0 || shape[2] <= 0 ||
+            (yolo11 ? shape[1] != 6 : shape[2] != 6) || data.Length != shape[1] * shape[2])
+            throw new InvalidDataException("Output does not match the pinned YOLOv5 [1,N,6] or YOLO11 [1,6,N] profile.");
         var boxes = new List<Rect>(); var scores = new List<float>();
-        for (var i = 0; i < data.Length; i += 6)
+        var rows = (int)(yolo11 ? shape[2] : shape[1]);
+        for (var row = 0; row < rows; row++)
         {
-            var obj = data[i + 4]; var cls = data[i + 5];
+            var i = row * 6;
+            var obj = yolo11 ? 1 : data[i + 4];
+            var cls = yolo11 ? data[4 * rows + row] : data[i + 5];
+            if (yolo11 && (!float.IsFinite(data[5 * rows + row]) || data[5 * rows + row] is < 0 or > 1 || data[5 * rows + row] > cls)) continue;
             if (!float.IsFinite(obj) || !float.IsFinite(cls) || obj < 0 || obj > 1 || cls < 0 || cls > 1) continue;
             var score = obj * cls;
-            if (score < ScoreThreshold || geometry.Map(data[i], data[i + 1], data[i + 2], data[i + 3]) is not { } box) continue;
+            var mapped = yolo11 ? geometry.Map(data[row], data[rows + row], data[2 * rows + row], data[3 * rows + row])
+                : geometry.Map(data[i], data[i + 1], data[i + 2], data[i + 3]);
+            if (score < ScoreThreshold || mapped is not { } box) continue;
             boxes.Add(box); scores.Add(score);
         }
         if (boxes.Count == 0) return [];

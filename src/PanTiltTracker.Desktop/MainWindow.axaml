@@ -97,10 +97,12 @@
                   <StackPanel x:Name="DroneModelPanel" Spacing="8" IsVisible="{Binding IsDrone}">
                     <TextBlock Text="无人机模型" FontWeight="SemiBold" FontSize="12" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
-                      <TextBox Text="{Binding DroneModelPath}" Watermark="选择核验版本 best.onnx" MinWidth="0" />
+                      <TextBox Text="{Binding DroneModelPath}" Watermark="选择已核验 ONNX" MinWidth="0" />
                       <Button Grid.Column="1" Content="…" Padding="8,4" Click="PickDroneModel" Classes="quiet" ToolTip.Tip="选择无人机 ONNX 模型" />
                     </Grid>
                     <TextBlock Text="实验权重单独准备，未随包附带。" Classes="caption" TextWrapping="Wrap" />
+                    <CheckBox x:Name="DroneTrackingToggle" Content="连续跟踪与重新捕获" IsChecked="{Binding DroneTrackingEnabled}"
+                              IsVisible="{Binding IsDroneStream}" FontSize="12" />
                   </StackPanel>
 
                   <StackPanel Spacing="8" IsVisible="{Binding IsAruco}">

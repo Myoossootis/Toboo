@@ -1,6 +1,6 @@
 # 本地实验无人机模型
 
-第一阶段固定使用 Ahmed Darwish 的单类 YOLOv5 `best.onnx`，模型只输出 `drone`，不能区分鸟类或具体无人机机型。
+默认保留第一阶段 Ahmed Darwish 的单类 YOLOv5 `best.onnx`，不能区分鸟类或具体无人机机型。第二阶段另外支持固定指纹候选，不自动替换默认。
 
 - 来源：[上游模型](https://github.com/eahmeddarwish/drone-detection-yolov5/blob/ca515c165600a776a04d9f98db83efe829f18603/models/best.onnx)
 - 固定提交：`ca515c165600a776a04d9f98db83efe829f18603`
@@ -16,7 +16,18 @@
 ./scripts/prepare-drone-model.ps1
 ```
 
-脚本校验哈希，不覆盖内容不同的现有文件。它下载真正的 LFS 二进制，而不是 133 字节的 Git LFS 指针。程序运行时不会自动联网下载。默认开发环境从本目录读取，也可在界面选择模型文件；其他 ONNX 模型、不同哈希或 YOLO11 模型会明确拒绝，而不是误用输出解析。
+脚本校验哈希，不覆盖不同内容的现有文件；下载实际二进制而非 LFS 指针。程序不会自动联网下载。可在界面选择已核验文件，未核验哈希仍明确拒绝，不猜测输出格式。
+
+## 第二阶段候选
+
+| 参数 | 文件 / SHA256 | 输入输出 |
+| --- | --- | --- |
+| `-Variant candidate` | best2.onnx，7,257,431 字节；`ad7dbd93bb7da4e20651d49d7dff399af8ffc7a2c69a4214fe0a682179318fed` | 同一上游固定提交，YOLOv5 单类 `[1,3,416,416]` → `[1,10647,6]` |
+| `-Variant yolo11` | yolo11-drone-bird.onnx，12,088,461 字节；`f3b238b537fe420f21ce1e2504055a21816b5ad80a8d9346f56ac3bced1afc29` | [固定提交](https://github.com/kanishk083/DRONE-DETECTION/tree/ee6a84ac18f188f9a85363cebc2dabea257f98de)；动态 NCHW，本实验 640×640 → `[1,6,N]`，0=drone、1=bird，无独立 objectness |
+
+YOLO11 仅保留 drone 达门限且分数不低于 bird 的候选，不按 YOLOv5 的 objectness×class 解析。两个候选均实际加载并参与对照；不接受任意同名文件。best2 和 YOLO11 未解决飞机误报，best2 在原 Pexels 片段中也更弱，不改变默认。见 [第二阶段报告](../../docs/13-drone-phase2.md)。
+
+YOLO11 仓库未见明确项目许可，模型元数据声明 AGPL-3.0；与其他权重一样，不进 Git 或发布包。
 
 ## 分发状态
 

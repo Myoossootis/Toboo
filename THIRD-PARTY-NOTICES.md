@@ -1,5 +1,7 @@
 # Third-party components in the Windows portable distribution
 
+The optional offline MATLAB annotation conversion tool uses `mcos-decoder` 0.1.0 (MIT), NumPy 2.3.4 and SciPy 1.16.3 (BSD and their third-party terms). These are evaluation-only Python dependencies, not part of the desktop runtime or portable package. `mcos_decoder.MatStream` is imported; its source is not vendored. Source: https://github.com/bozdemir/mcos-decoder . Experimental model candidates remain external; see `models/drone/README.md`.
+
 The source project's publication does not grant an additional license to third-party components. Original license and notice texts are retained in `licenses/`, including texts extracted from the exact locked NuGet packages. Dependency versions and hashes are recorded in `licenses/packages.lock.json`.
 
 | Component | License / source |

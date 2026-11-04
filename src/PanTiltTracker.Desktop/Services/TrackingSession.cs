@@ -11,7 +11,7 @@ public enum InputSource { Simulation, Image, Video, Camera }
 public sealed record SessionOptions(InputSource Source, string InputPath, int CameraIndex,
     int MarkerId, ControllerSettings Settings, string OutputDirectory,
     VideoAlgorithm Algorithm = VideoAlgorithm.Aruco, Rect? InitialRegion = null, CameraSettings? Camera = null,
-    bool DetectFaces = false, string? DroneModelPath = null);
+    bool DetectFaces = false, string? DroneModelPath = null, bool TrackDrones = false);
 
 public sealed record SessionFrame(byte[] Pixels, int Width, int Height,
     TargetObservation Observation, TrackingCommand Command, TimeSpan Time, double AlgorithmMs,
@@ -30,7 +30,10 @@ public static class TrackingSession
             throw new ArgumentException("人脸检测适用于图片、摄像头或视频的目标检测模式。");
         if (options.DroneModelPath is not null && (options.DetectFaces || options.Source == InputSource.Simulation || options.Algorithm != VideoAlgorithm.Aruco))
             throw new ArgumentException("无人机检测适用于图片、摄像头或视频的目标检测模式，不能同时选择人脸。");
+        if (options.TrackDrones && (options.DroneModelPath is null || options.Source is not (InputSource.Camera or InputSource.Video)))
+            throw new ArgumentException("连续无人机跟踪需要模型及录像或摄像头输入。");
         using var droneDetector = options.DroneModelPath is { } modelPath ? new DroneTargetDetector(modelPath) : null;
+        using var droneTracker = options.TrackDrones ? new DroneTargetTracker(droneDetector!) : null;
         using var detector = options.DetectFaces || droneDetector is not null ? null : new ArucoTargetDetector(options.MarkerId);
         using var faceDetector = options.DetectFaces ? new FaceTargetDetector() : null;
         using var videoTracker = options.Algorithm == VideoAlgorithm.Aruco ? null
@@ -42,20 +45,22 @@ public static class TrackingSession
             InputSource.Video => "video", _ => "camera"
         };
         using var log = new RunLog(options.OutputDirectory, mode, options.MarkerId, options.Settings,
-            droneDetector is not null ? "yolov5_drone" : options.DetectFaces ? "yunet_face" : options.Algorithm == VideoAlgorithm.Aruco ? "aruco" : options.Algorithm.ToString(),
+            droneDetector is not null ? droneDetector.ModelId + (options.TrackDrones ? "_csrt" : "") : options.DetectFaces ? "yunet_face" : options.Algorithm == VideoAlgorithm.Aruco ? "aruco" : options.Algorithm.ToString(),
             new { input = options.InputPath, initialRegion = options.InitialRegion is { } r
                 ? new { x = r.X, y = r.Y, width = r.Width, height = r.Height } : null,
                 workingMaxWidth = droneDetector is not null ? (int?)null : options.DetectFaces ? FaceTargetDetector.WorkingMaxWidth : VideoTargetTracker.WorkingMaxWidth,
                 faceSelection = options.DetectFaces ? "largest_per_frame; not identity tracking" : null,
                 faceViews = options.DetectFaces ? "YuNet 2023mar; frontal and profile; score 0.8; IoU NMS 0.3" : null,
-                drone = droneDetector is null ? null : new { modelSha256 = DroneTargetDetector.ModelSha256,
-                    model = "eahmeddarwish/yolov5; single class drone", inputWidth = droneDetector.InputWidth,
+                drone = droneDetector is null ? null : new { modelSha256 = droneDetector.LoadedModelSha256,
+                    model = droneDetector.ModelId, inputWidth = droneDetector.InputWidth,
                     inputHeight = droneDetector.InputHeight, scoreThreshold = DroneTargetDetector.ScoreThreshold,
                     nmsThreshold = DroneTargetDetector.NmsThreshold, runtime = "ONNX Runtime CPU 1.23.2",
-                    selection = "highest score per frame; no identity association or model-type classification" } });
+                    selection = options.TrackDrones ? "IoU-associated detector-initiated CSRT; lock epoch is not identity" : "highest score per frame",
+                    detectionIntervalSeconds = options.TrackDrones ? DroneTargetTracker.DetectionInterval.TotalSeconds : (double?)null,
+                    verificationTimeoutSeconds = options.TrackDrones ? DroneTargetTracker.VerificationTimeout.TotalSeconds : (double?)null } });
         if (options.Source == InputSource.Camera)
         {
-            await RunCameraAsync(options, detector, faceDetector, controller, log, present, cancellation, droneDetector);
+            await RunCameraAsync(options, detector, faceDetector, controller, log, present, cancellation, droneDetector, droneTracker);
             return;
         }
 
@@ -81,7 +86,7 @@ public static class TrackingSession
             {
                 var time = TimeSpan.FromSeconds(frame / fps);
                 await ProcessAsync(image, frame++, time, time, detector, controller, log,
-                    present, false, cancellation, videoTracker, faceDetector: faceDetector, droneDetector: droneDetector);
+                    present, false, cancellation, videoTracker, faceDetector: faceDetector, droneDetector: droneDetector, droneTracker: droneTracker);
                 await PaceAsync(wallClock, TimeSpan.FromSeconds(frame / fps), cancellation);
             }
             cancellation.ThrowIfCancellationRequested();
@@ -106,7 +111,7 @@ public static class TrackingSession
 
     private static async Task RunCameraAsync(SessionOptions options, ArucoTargetDetector? detector, FaceTargetDetector? faceDetector,
         PanTiltController controller, RunLog log, Func<SessionFrame, Task> present, CancellationToken cancellation,
-        DroneTargetDetector? droneDetector = null)
+        DroneTargetDetector? droneDetector = null, DroneTargetTracker? droneTracker = null)
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         using var buffer = new LatestFrameBuffer();
@@ -164,7 +169,7 @@ public static class TrackingSession
                 lastArrival = clock.Elapsed;
                 await ProcessAsync(frame.Image, frame.Number, frame.CapturedAt, clock.Elapsed,
                     detector, controller, log, present, true, cancellation, captureSummary: Volatile.Read(ref captureSummary),
-                    faceDetector: faceDetector, droneDetector: droneDetector);
+                    faceDetector: faceDetector, droneDetector: droneDetector, droneTracker: droneTracker);
             }
         }
         finally
@@ -184,23 +189,27 @@ public static class TrackingSession
         TimeSpan capturedAt, TimeSpan time, ArucoTargetDetector? detector, PanTiltController controller,
         RunLog log, Func<SessionFrame, Task> present, bool realTime, CancellationToken cancellation,
         VideoTargetTracker? videoTracker = null, string? captureSummary = null, FaceTargetDetector? faceDetector = null,
-        DroneTargetDetector? droneDetector = null)
+        DroneTargetDetector? droneDetector = null, DroneTargetTracker? droneTracker = null)
     {
         cancellation.ThrowIfCancellationRequested();
         var watch = Stopwatch.StartNew();
         var tracked = videoTracker?.Process(image, number, capturedAt);
         var faces = faceDetector?.Detect(image, number, capturedAt);
-        var drones = droneDetector?.Detect(image, number, capturedAt);
-        var observation = drones?.Observation ?? faces?.Observation ?? tracked?.Observation ?? detector!.Detect(image, number, capturedAt);
-        var status = drones is not null ? (observation.HasTarget ? "drone_detected" : "no_drone_detected")
+        var droneTrack = droneTracker?.Process(image, number, capturedAt);
+        var drones = droneTracker is null ? droneDetector?.Detect(image, number, capturedAt) : null;
+        var observation = droneTrack?.Observation ?? drones?.Observation ?? faces?.Observation ?? tracked?.Observation ?? detector!.Detect(image, number, capturedAt);
+        var status = droneTrack?.Status ?? (drones is not null ? (observation.HasTarget ? "drone_detected" : "no_drone_detected")
             : faces is not null ? (observation.HasTarget ? "face_detected" : "no_face_detected")
-            : tracked?.Status ?? "aruco_detection";
+            : tracked?.Status ?? "aruco_detection");
         if (realTime) time += watch.Elapsed;
         var command = controller.Step(observation, time);
         watch.Stop();
-        log.Write(observation, command, time, watch.Elapsed.TotalMilliseconds, drones?.PrimaryBox ?? faces?.PrimaryBox ?? tracked?.Box,
-            status, drones?.Detections.Length ?? faces?.Boxes.Length ?? tracked?.CandidateCount,
-            drones?.PrimaryScore, drones?.Observation.HasTarget == true ? "drone" : null);
+        log.Write(observation, command, time, watch.Elapsed.TotalMilliseconds, droneTrack?.Box ?? drones?.PrimaryBox ?? faces?.PrimaryBox ?? tracked?.Box,
+            status, droneTrack?.CandidateCount ?? drones?.Detections.Length ?? faces?.Boxes.Length ?? tracked?.CandidateCount,
+            droneTrack?.DetectionScore ?? drones?.PrimaryScore,
+            droneTrack?.DetectionScore is not null || drones?.Observation.HasTarget == true ? "drone" : null,
+            droneTrack?.BoxSource ?? (drones?.Observation.HasTarget == true ? "detector" : null),
+            droneTrack?.Observation.HasTarget == true ? droneTrack.TrackEpoch : null);
 
         using var color = new Mat();
         switch (image.Channels())
@@ -212,6 +221,7 @@ public static class TrackingSession
         if (tracked is not null) VideoTargetTracker.DrawResult(color, tracked);
         if (faces is not null) FaceTargetDetector.DrawResult(color, faces);
         if (drones is not null) DroneTargetDetector.DrawResult(color, drones);
+        if (droneTrack is not null) DroneTargetTracker.DrawResult(color, droneTrack);
         var center = new Point(image.Width / 2, image.Height / 2);
         Cv2.DrawMarker(color, center, new Scalar(120, 130, 140), MarkerTypes.Cross, 32, 1);
         if (observation.HasTarget)
@@ -219,7 +229,7 @@ public static class TrackingSession
             var target = new Point((int)observation.CenterX!.Value, (int)observation.CenterY!.Value);
             Cv2.Line(color, center, target, new Scalar(150, 185, 180), 1, LineTypes.AntiAlias);
             Cv2.Circle(color, target, 10, new Scalar(105, 135, 15), 2, LineTypes.AntiAlias);
-            Cv2.PutText(color, $"{(drones is not null ? "drone" : faces is not null ? "face" : tracked is null ? $"ID {detector!.TargetId}" : "target")}  ({target.X}, {target.Y})",
+            Cv2.PutText(color, $"{(droneTrack is not null || drones is not null ? "drone" : faces is not null ? "face" : tracked is null ? $"ID {detector!.TargetId}" : "target")}  ({target.X}, {target.Y})",
                 new Point(Math.Clamp(target.X + 15, 5, Math.Max(5, image.Width - 210)),
                     Math.Clamp(target.Y - 18, 20, Math.Max(20, image.Height - 10))),
                 HersheyFonts.HersheySimplex, 0.45, new Scalar(95, 105, 35), 1, LineTypes.AntiAlias);
@@ -229,8 +239,8 @@ public static class TrackingSession
         var pixels = new byte[bgra.Width * bgra.Height * 4];
         System.Runtime.InteropServices.Marshal.Copy(bgra.Data, pixels, 0, pixels.Length);
         await present(new(pixels, bgra.Width, bgra.Height, observation, command, time,
-            watch.Elapsed.TotalMilliseconds, status, captureSummary, drones?.Detections.Length ?? faces?.Boxes.Length ?? 0,
-            drones?.PrimaryScore));
+            watch.Elapsed.TotalMilliseconds, status, captureSummary, droneTrack is not null ? (observation.HasTarget ? 1 : 0) : drones?.Detections.Length ?? faces?.Boxes.Length ?? 0,
+            droneTrack?.DetectionScore ?? drones?.PrimaryScore));
         return command;
     }
 
