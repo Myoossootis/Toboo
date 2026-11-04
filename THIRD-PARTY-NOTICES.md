@@ -8,6 +8,8 @@ The source project's publication does not grant an additional license to third-p
 | Avalonia 11.3.22 | MIT; https://github.com/AvaloniaUI/Avalonia |
 | CommunityToolkit.Mvvm 8.4.0 | MIT; https://github.com/CommunityToolkit/dotnet |
 | OpenCvSharp 4.10.0.20240616 | Apache-2.0; https://github.com/shimat/opencvsharp |
+| ONNX Runtime / Microsoft.ML.OnnxRuntime 1.23.2 | MIT and bundled third-party notices; https://github.com/microsoft/onnxruntime/tree/v1.23.2 |
+| System.Numerics.Tensors 9.0.0 | MIT; https://github.com/dotnet/runtime |
 | OpenCV 4.10.0 | Apache-2.0 plus bundled third-party components; https://github.com/opencv/opencv/tree/4.10.0 |
 | YuNet 2023mar face-detection model | MIT, `licenses/YuNet-MIT.txt`; https://github.com/opencv/opencv_zoo/tree/f12e12798e8314f7c074a6656816c048dcc95b7a/models/face_detection_yunet |
 | OpenCV frontal-face Haar cascade | Original Intel permissive terms retained in `models/face/haarcascade_frontalface_default.xml` and `licenses/OpenCV-Haar-model.txt`; https://github.com/opencv/opencv/tree/4.10.0/data/haarcascades |
@@ -20,5 +22,7 @@ The source project's publication does not grant an additional license to third-p
 | Microsoft Visual C++ runtime 14.44.35211.0 | Microsoft redistributable terms; English and Chinese license RTFs extracted from the official signed x64 redistributable |
 
 Other Microsoft support libraries are distributed under their NuGet package terms. Libraries remain separate files; no static linking or modification of these libraries was performed by this project. No camera vendor SDK, proprietary eye-tracking binary or personal image dataset is included.
+
+Experimental drone weights are NOT distributed with this repository or portable packages. The optional local download is pinned to its upstream commit and SHA256. Its upstream MIT label and Ultralytics-derived weight licensing require clarification before redistribution; no license for UAVTrack or these weights is inferred here. See `models/drone/README.md` and `docs/12-drone-detection-plan.md`. No external inference/control source was copied.
 
 The portable application uses the OpenCV FFmpeg DLL supplied by the pinned `OpenCvSharp4.runtime.win` package. It can be replaced with a compatible plugin in the application directory. Upstream OpenCV build scripts and third-party source references are available at https://github.com/opencv/opencv/blob/4.10.0/3rdparty/ffmpeg/ffmpeg.cmake .

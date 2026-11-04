@@ -61,6 +61,13 @@ internal static class Program
             Console.CancelKeyPress += onCancel;
             try
             {
+                if (options.Mode == "detect-drone")
+                {
+                    DroneVideoExperiment.Run(options.Required("input"), options.Text("out", "artifacts/drone-detection"),
+                        VideoAlgorithm.Aruco, null, settings, options.Integer("frames", int.MaxValue), cancellation.Token,
+                        options.Required("model"));
+                    return 0;
+                }
                 if (options.Mode == "track-video")
                 {
                     var algorithm = options.Text("algorithm", "csrt") switch
@@ -280,6 +287,7 @@ internal static class Program
         inspect  --input clip.mp4 [--out artifacts/video-inspection]
         prepare-video --input original.mp4 --out prepared-1080p.mp4
         track-video --input clip.mp4 --algorithm csrt --roi x,y,width,height [--out artifacts/drone-csrt]
+        detect-drone --input clip.mp4 --model models/drone/best.onnx [--frames 300] [--out artifacts/drone-detection]
         track-video --input clip.mp4 --algorithm frame-diff [--out artifacts/drone-motion]
         All detection modes: --id 7 --config config/tracker.json --out <directory>
         """);
@@ -304,9 +312,9 @@ internal static class Program
 
         public static Options Parse(string[] args)
         {
-            if (args[0] is not ("simulate" or "marker" or "image" or "video" or "camera" or "inspect" or "prepare-video" or "track-video"))
+            if (args[0] is not ("simulate" or "marker" or "image" or "video" or "camera" or "inspect" or "prepare-video" or "track-video" or "detect-drone"))
                 throw new ArgumentException($"Unknown mode: {args[0]}");
-            string[] known = ["out", "id", "size", "input", "index", "frames", "fps", "config", "preview", "algorithm", "roi"];
+            string[] known = ["out", "id", "size", "input", "index", "frames", "fps", "config", "preview", "algorithm", "roi", "model"];
             var values = new Dictionary<string, string>(StringComparer.Ordinal);
             for (var index = 1; index < args.Length; index++)
             {

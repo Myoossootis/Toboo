@@ -32,6 +32,14 @@ public sealed partial class App : Application
                             window.ViewModel.SourceIndex = 3;
                             window.ViewModel.CameraIndex = index;
                         }
+                        var droneArgument = Array.IndexOf(desktop.Args!, "--drone-model");
+                        if (droneArgument >= 0)
+                        {
+                            if (!useCamera || droneArgument + 1 >= desktop.Args!.Length)
+                                throw new ArgumentException("--drone-model requires --camera-index and a verified ONNX path.");
+                            window.ViewModel.TargetIndex = 2;
+                            window.ViewModel.DroneModelPath = desktop.Args[droneArgument + 1];
+                        }
                         var run = window.ViewModel.StartAsync();
                         var until = DateTime.UtcNow.AddSeconds(15);
                         while (window.ViewModel.ProcessedFrames < 12 && window.ViewModel.IsRunning && DateTime.UtcNow < until)
@@ -43,6 +51,7 @@ public sealed partial class App : Application
                         {
                             success, synthetic = !useCamera, physicalCameraTested = useCamera,
                             frames = window.ViewModel.ProcessedFrames, window.ViewModel.ErrorMessage,
+                            target = window.ViewModel.IsDrone ? "drone" : "aruco",
                             framework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
                             hardwareOutput = "disabled"
                         });

@@ -62,9 +62,10 @@ try {
         vcInstallerSha256 = (Get-FileHash tmp/portable-deps/vc_redist.x64.exe -Algorithm SHA256).Hash;
         hardwareOutput = 'disabled'; physicalCameraVerified = $false
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputPath 'build-info.json') -Encoding UTF8
-    foreach ($required in @('PanTiltTracker.Desktop.exe', 'coreclr.dll', 'OpenCvSharpExtern.dll', 'libSkiaSharp.dll', 'vcruntime140.dll', 'msvcp140.dll', 'models/face/face_detection_yunet_2023mar.onnx')) {
+    foreach ($required in @('PanTiltTracker.Desktop.exe', 'coreclr.dll', 'OpenCvSharpExtern.dll', 'onnxruntime.dll', 'libSkiaSharp.dll', 'vcruntime140.dll', 'msvcp140.dll', 'models/face/face_detection_yunet_2023mar.onnx')) {
         if (!(Test-Path -LiteralPath (Join-Path $outputPath $required))) { throw "Missing portable dependency: $required" }
     }
+    if (Test-Path -LiteralPath (Join-Path $outputPath 'models/drone/best.onnx')) { throw 'Experimental drone weights must not be bundled.' }
     [IO.Compression.ZipFile]::CreateFromDirectory($outputPath, $zipPath, [IO.Compression.CompressionLevel]::Optimal, $true)
     $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
     "$hash  $packageName.zip" | Set-Content -LiteralPath "$zipPath.sha256" -Encoding ASCII

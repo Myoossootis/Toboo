@@ -10,6 +10,9 @@ TestResults/
 # Existing reference downloads and scratch work
 /tmp/
 
+# Third-party experimental drone weights are downloaded separately, never bundled.
+/models/drone/*.onnx
+
 # Generated experiment data, recordings, calibration and printable markers
 /artifacts/
 /data/raw/*

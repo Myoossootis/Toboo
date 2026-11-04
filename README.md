@@ -8,6 +8,8 @@ EESM 5840 期末项目。室内带标记模型 → USB 摄像头 → C# / OpenCv
 
 **直接使用程序：** 从 [GitHub Releases](https://github.com/Myoossootis/UAVTrack/releases) 下载 `win-x64-portable.zip`，完整解压后双击 `PanTiltTracker.Desktop.exe`。无需安装 .NET 或 Visual Studio。摄像头选择、远程操作和故障定位见 [便携版说明](docs/09-portable-camera.md)。
 
+**main 中尚未发布：无人机自动检测第一阶段。** 图片、录像与 USB 摄像头可选择“无人机（实验模型）”，使用 ONNX Runtime CPU；本地权重需显式运行 `scripts/prepare-drone-model.ps1` 准备，再在界面选择。无人机模型不随包分发，不区分机型；初测漏检较多，作为实验基线，不能替代 CSRT 的连续跟踪效果。分阶段计划、实测局限与命令见 [无人机检测计划](docs/12-drone-detection-plan.md)。v0.1.3 已发布 ZIP 不包含此改动，只有用户明确同意后才发布新版本。
+
 图片、摄像头或视频的目标检测模式均可选择人脸并绘框。界面分为采集设置、控制参数、跟踪画面与按需展开的分析区，验证了 1280×860 和 980×700 两种窗口尺寸。实现与局限见 [人脸检测](docs/10-face-detection.md)。
 
 已安装 `v0.1.2` 可使用 v0.1.3 Release 中的 `update-from-0.1.2` 覆盖包，退出程序后将所有文件及 `models` 目录解压到包含 EXE 的原目录并覆盖；其他版本或首次使用请选择完整便携 ZIP。操作与适用范围见 [覆盖更新说明](docs/11-portable-update.md)。

@@ -2,6 +2,8 @@
 
 日期：2026-10-29。使用 C# / .NET 8 和原有 OpenCvSharp 4.10，无新增依赖，没有训练或接入 YOLO。本阶段实现录像中的单目标定位实验，未实现相机内参标定、三维测距或舵机控制。
 
+2026-11-04 补充：本文保留原 CSRT/帧差实验。main 已加入独立的 YOLOv5 单类自动检测实验（图片、录像及摄像头），不是对本次 CSRT 结果的替换；实际模型表现及分阶段计划见 [无人机检测第一阶段](12-drone-detection-plan.md)。已发布 v0.1.3 尚不包含此功能。
+
 ## 在界面中使用
 
 启动 `src/PanTiltTracker.Desktop/bin/Release/net8.0/PanTiltTracker.Desktop.exe`，或运行：

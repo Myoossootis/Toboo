@@ -93,6 +93,16 @@ public sealed partial class MainWindow : Avalonia.Controls.Window
         if (files.Count > 0 && files[0].TryGetLocalPath() is { } path) ViewModel.InputPath = path;
     }
 
+    private async void PickDroneModel(object? sender, RoutedEventArgs args)
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "选择已核验的无人机 best.onnx", AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("ONNX 模型") { Patterns = ["*.onnx"] }]
+        });
+        if (files.Count > 0 && files[0].TryGetLocalPath() is { } path) ViewModel.DroneModelPath = path;
+    }
+
     private async void SaveMarker(object? sender, RoutedEventArgs args)
     {
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
