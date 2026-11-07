@@ -26,7 +26,7 @@
         <Button x:Name="MarkerButton" Content="生成标记" Classes="tertiary" Click="SaveMarker" IsEnabled="{Binding CanConfigure}" />
         <Button x:Name="ExportButton" Content="导出 CSV" Classes="quiet" Click="ExportCsv" IsEnabled="{Binding CanExport}" />
         <Border Background="{StaticResource SubtleBrush}" CornerRadius="6" Padding="12,8" Margin="8,0,0,0" VerticalAlignment="Center">
-          <TextBlock Text="硬件输出关闭" FontSize="12" />
+          <TextBlock Text="视觉跟踪 · 独立于舵机" FontSize="12" />
         </Border>
       </StackPanel>
     </Grid>
@@ -190,6 +190,55 @@
                 </StackPanel>
               </ScrollViewer>
             </TabItem>
+            <TabItem Header="舵机">
+              <ScrollViewer DataContext="{Binding Servo}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:DataType="vm:ServoViewModel" Spacing="8" Margin="0,12,4,0">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4" IsEnabled="{Binding !Busy}">
+                    <TextBox Text="{Binding Port}" Watermark="串口号" MinWidth="0" AutomationProperties.Name="舵机串口" />
+                    <Button Grid.Column="1" Content="读状态" Command="{Binding InspectCommand}" Classes="quiet" />
+                  </Grid>
+                  <TextBlock Text="5V 重接后先按 ESP32 的 RST。" Classes="caption" TextWrapping="Wrap" />
+                  <CheckBox Content="5V 已接，机构可动" IsChecked="{Binding Ready}" IsEnabled="{Binding !Busy}" FontSize="12" />
+                  <TextBlock Text="{Binding Status}" TextWrapping="Wrap" FontSize="12" />
+                  <TextBlock Text="{Binding LastRequests}" Classes="caption" TextWrapping="Wrap" />
+                  <TextBlock Text="矩形 + 交叉对角线" FontWeight="SemiBold" FontSize="12" />
+                  <CheckBox Content="已检查完整扫动路径" IsChecked="{Binding SweepReady}" IsEnabled="{Binding CanControl}" FontSize="12" />
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                    <Button x:Name="ServoPatternButton" Content="开启扫动" Command="{Binding PatternCommand}" IsEnabled="{Binding CanPattern}" Classes="quiet" />
+                    <Button x:Name="ServoStopSweep" Grid.Column="1" Content="停止运动" Command="{Binding StopSweepCommand}" IsEnabled="{Binding CanStopSweep}" Classes="quiet" />
+                  </Grid>
+                  <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="4" RowSpacing="6">
+                    <TextBlock Text="S1 水平" FontSize="12" VerticalAlignment="Center" />
+                    <Button x:Name="ServoPanDown" Grid.Column="1" Content="−1°" Command="{Binding PanDownCommand}" IsEnabled="{Binding CanPanDown}" Classes="quiet" />
+                    <Button Grid.Column="2" Content="+1°" Command="{Binding PanUpCommand}" IsEnabled="{Binding CanPanUp}" Classes="quiet" />
+                    <TextBlock Grid.Row="1" Text="S2 俯仰" FontSize="12" VerticalAlignment="Center" />
+                    <Button x:Name="ServoTiltDown" Grid.Row="1" Grid.Column="1" Content="−1°" Command="{Binding TiltDownCommand}" IsEnabled="{Binding CanTiltDown}" Classes="quiet" />
+                    <Button Grid.Row="1" Grid.Column="2" Content="+1°" Command="{Binding TiltUpCommand}" IsEnabled="{Binding CanTiltUp}" Classes="quiet" />
+                  </Grid>
+                  <TextBlock Text="{Binding CenterLabel}" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                    <Button x:Name="ServoHomeButton" Content="平滑回中心" Command="{Binding HomeCommand}" IsEnabled="{Binding CanControl}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                    <Button Grid.Column="1" Content="保存边界" Command="{Binding SaveCalibrationCommand}" IsEnabled="{Binding !Busy}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Classes="quiet" />
+                  </Grid>
+                  <Expander Header="矩形边界设置" FontSize="12">
+                    <StackPanel Spacing="6" Margin="0,8,0,0" IsEnabled="{Binding !Busy}">
+                      <TextBlock Text="S1 左边界 / 右边界" Classes="caption" />
+                      <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                        <NumericUpDown Value="{Binding PanMin}" Minimum="30" Maximum="175" Increment="1" FormatString="0" MinWidth="0" />
+                        <NumericUpDown Grid.Column="1" Value="{Binding PanMax}" Minimum="30" Maximum="175" Increment="1" FormatString="0" MinWidth="0" />
+                      </Grid>
+                      <TextBlock Text="S2 下边界 / 上边界" Classes="caption" />
+                      <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                        <NumericUpDown Value="{Binding TiltFloor}" Minimum="35" Maximum="65" Increment="1" FormatString="0" MinWidth="0" />
+                        <NumericUpDown Grid.Column="1" Value="{Binding TiltCeiling}" Minimum="35" Maximum="65" Increment="1" FormatString="0" MinWidth="0" />
+                      </Grid>
+                      <TextBlock Text="中心自动取边界中点，半度向上取整。首次初始化无位置反馈。遇到卡住或持续嗡鸣请拔掉 5V。" Classes="caption" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Expander>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
           </TabControl>
 
           <StackPanel Grid.Row="2" Spacing="8">
@@ -348,7 +397,7 @@
     <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="16">
       <TextBlock Text="{Binding RunLabel}" Classes="caption" />
       <TextBlock Grid.Column="1" Text="{Binding FrameSize}" Classes="caption" IsVisible="{Binding HasPreview}" />
-      <TextBlock Grid.Column="2" Text="角度为计算请求，未连接执行器" Classes="caption" TextTrimming="CharacterEllipsis" />
+      <TextBlock Grid.Column="2" Text="视觉角度仅作跟踪记录" Classes="caption" TextTrimming="CharacterEllipsis" />
       <TextBlock Grid.Column="3" Text="{Binding Elapsed}" FontSize="12" FontFamily="Consolas" />
     </Grid>
   </Grid>

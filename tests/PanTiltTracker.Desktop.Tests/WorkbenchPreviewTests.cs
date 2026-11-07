@@ -81,6 +81,26 @@ public sealed class WorkbenchPreviewTests
             Assert.True(window.FindControl<Slider>("PanGainSlider")!.IsEffectivelyVisible);
             Assert.True(window.FindControl<Button>("StartButton")!.IsEffectivelyVisible);
             Save("controls");
+            window.FindControl<TabControl>("SettingsTabs")!.SelectedIndex = 2;
+            await Task.Delay(80);
+            var home = window.FindControl<Button>("ServoHomeButton")!;
+            Assert.True(home.IsEffectivelyVisible);
+            Assert.False(home.IsEffectivelyEnabled);
+            Assert.False(window.FindControl<Button>("ServoPanDown")!.IsEffectivelyEnabled);
+            Assert.False(window.FindControl<Button>("ServoTiltDown")!.IsEffectivelyEnabled);
+            Assert.False(window.FindControl<Button>("ServoPatternButton")!.IsEffectivelyEnabled);
+            Assert.False(window.FindControl<Button>("ServoStopSweep")!.IsEffectivelyEnabled);
+            Assert.Equal((model.Servo.PanMin + model.Servo.PanMax + 1) / 2, model.Servo.CenterPan);
+            model.Servo.PanMin = 40;
+            model.Servo.PanMax = 150;
+            model.Servo.TiltFloor = 40;
+            model.Servo.TiltCeiling = 60;
+            Assert.Equal(95, model.Servo.CenterPan);
+            Assert.Equal(50, model.Servo.CenterTilt);
+            model.Servo.Ready = true; // Confirming power alone cannot enable motion without a serial status check.
+            Assert.False(home.IsEffectivelyEnabled);
+            model.Servo.Ready = false;
+            Save("servo");
 
             void Save(string state)
             {

@@ -11,6 +11,8 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <Compile Include="../Shared/RunLog.cs" Link="Services/RunLog.cs" />
+    <Compile Include="../Shared/ServoTool.cs" Link="Services/ServoTool.cs" />
     <None Include="../../config/tracker.json" Link="tracker.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../config/face-aim.json" Link="face-aim.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

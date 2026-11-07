@@ -14,7 +14,10 @@ try {
     Invoke-DotNet -Arguments @('build', 'PanTiltTracker.sln', '-c', 'Release', '--no-restore')
     Invoke-DotNet -Arguments @('test', 'PanTiltTracker.sln', '-c', 'Release', '--no-build', '--no-restore')
 
-    $applicationPath = Join-Path $repositoryPath 'src/PanTiltTracker.App/bin/Release/net8.0/PanTiltTracker.App.dll'
+    $applicationPath = & dotnet msbuild src/PanTiltTracker.App/PanTiltTracker.App.csproj `
+        -getProperty:TargetPath -property:Configuration=Release
+    if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the built CLI application path.' }
+    $applicationPath = $applicationPath.Trim()
     Invoke-DotNet -Arguments @($applicationPath, 'simulate', '--frames', '300', '--out', 'artifacts/verification/simulation')
     Invoke-DotNet -Arguments @($applicationPath, 'marker', '--out', 'artifacts/verification/marker-7.png')
     Invoke-DotNet -Arguments @($applicationPath, 'image', '--input', 'artifacts/verification/marker-7.png', '--out', 'artifacts/verification/image')

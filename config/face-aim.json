@@ -1,0 +1,20 @@
+{
+  "camera": null,
+  "directionsConfirmed": false,
+  "panDirection": 1,
+  "tiltDirection": 1,
+  "panMinDegrees": 30,
+  "panMaxDegrees": 175,
+  "tiltMinDegrees": 35,
+  "tiltMaxDegrees": 65,
+  "confirmationFrames": 3,
+  "lockRetentionSeconds": 0.4,
+  "filterTimeConstantSeconds": 0.10,
+  "deadZoneEnterDegrees": 1.0,
+  "deadZoneExitDegrees": 1.8,
+  "gainPerSecond": 2.0,
+  "maxSpeedDegreesPerSecond": 15.0,
+  "maxAccelerationDegreesPerSecondSquared": 60.0,
+  "maxFrameAgeSeconds": 0.2,
+  "maxUpdateGapSeconds": 0.15
+}

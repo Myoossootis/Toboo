@@ -11,6 +11,7 @@ __pycache__/
 
 # Existing reference downloads and scratch work
 /tmp/
+/firmware/**/build/
 
 # Third-party experimental drone weights are downloaded separately, never bundled.
 /models/drone/*.onnx

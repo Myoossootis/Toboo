@@ -100,6 +100,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private IReadOnlyList<ErrorSample> plotSamples = Array.Empty<ErrorSample>();
 
     public ObservableCollection<string> Events { get; } = [];
+    public ServoViewModel Servo { get; } = new();
     public ObservableCollection<CameraDevice> Cameras { get; } = [];
     public event Action? FramePresented;
     public bool CanConfigure => !IsRunning && !IsLoadingPreview;
@@ -121,7 +122,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _ => IsDrone ? IsDroneStream && DroneTrackingEnabled
             ? "自动捕获并用 CSRT 连续定位，周期检测校验；过期解除锁定并重新搜索。不识别机型或个体身份。"
             : "自动检测无人机，全部画框，取最高分目标。不区分机型，不保持目标身份。"
-            : IsFace ? "人脸检测支持正面与侧面；全部画框，以最大框计算中心。不识别身份。" : "检测固定字典中的标记 ID。"
+            : IsFace ? (SourceIndex == 1 ? "正面与侧面人脸检测；图片取最大框，不识别身份。"
+                : "连续确认并锁定人脸，黄十字为滤波中心。仅计算预览；角度与限位参数见 face-aim.json，常规控制滑块不用于人脸。")
+                : "检测固定字典中的标记 ID。"
     };
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
     public bool CanExport => !IsRunning && HasRun && File.Exists(Path.Combine(LastRunDirectory, "telemetry.csv"));
@@ -293,7 +296,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         PlotSamples = Array.Empty<ErrorSample>();
         displayClock.Restart();
         StateLabel = "正在启动";
-        AddEvent($"开始：{SourceLabel}，{(IsDrone ? DroneTrackingEnabled && IsDroneStream ? "无人机 / 检测与连续跟踪" : "无人机 / 逐帧检测" : IsFace ? "正面与侧面人脸 / 最大框" : IsAruco ? $"标记 ID {MarkerId}" : ((VideoAlgorithm)AlgorithmIndex).ToString())}。硬件输出保持关闭。");
+        AddEvent($"开始：{SourceLabel}，{(IsDrone ? DroneTrackingEnabled && IsDroneStream ? "无人机 / 检测与连续跟踪" : "无人机 / 逐帧检测" : IsFace ? SourceIndex == 1 ? "人脸 / 单帧最大框" : "人脸 / 连续确认与空间锁定" : IsAruco ? $"标记 ID {MarkerId}" : ((VideoAlgorithm)AlgorithmIndex).ToString())}。视觉会话仅计算请求。");
         cancellation = new();
         try
         {
@@ -375,6 +378,18 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             "drone_searching" => "未锁定无人机 · 正在重新搜索",
             "face_detected" => $"检测到 {frame.TargetCount} 张人脸 · 目标为最大框",
             "no_face_detected" => "未检测到人脸",
+            "face_confirming" => "正在连续确认人脸 · 暂不移动",
+            "face_lock_missing" => "原目标暂时丢失 · 保持位置",
+            "face_locked" => frame.FaceAim?.Readiness switch
+            {
+                "ready" => "人脸已锁定 · 平滑对准预览",
+                "camera_geometry_required" => "人脸已锁定 · 待配置相机视场或内参",
+                "mounting_directions_required" => "人脸已锁定 · 待确认舵机修正方向",
+                "request_reference_required" => "人脸已锁定 · 等待舵机请求参考，仅预览",
+                _ => "人脸已锁定 · 相机参数与画面不匹配，仅预览"
+            },
+            "face_stale_frame" => "人脸画面已过期 · 保持位置",
+            "face_repeated_frame" => "重复人脸画面 · 保持位置",
             "manual_initialization" => "人工首框 · 非自动识别",
             "tracker_reported_target" => "CSRT 报告有效 · 需核查漂移",
             "lost_reinitialize" => "CSRT 丢失 · 请重新框选",
@@ -386,8 +401,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         TargetPosition = observation.HasTarget ? $"({observation.CenterX:0.0}, {observation.CenterY:0.0}) px" : "—";
         ErrorX = Format(command.ErrorX);
         ErrorY = Format(command.ErrorY);
-        PanCommand = $"{command.PanDegrees:0.0}°";
-        TiltCommand = $"{command.TiltDegrees:0.0}°";
+        PanCommand = frame.FaceAim is { HasReference: false } ? "—" : $"{command.PanDegrees:0.0}°";
+        TiltCommand = frame.FaceAim is { HasReference: false } ? "—" : $"{command.TiltDegrees:0.0}°";
         ProcessingTime = $"{frame.AlgorithmMs:0.0} ms";
         ProcessingRate = $"{ProcessedFrames / Math.Max(0.01, displayClock.Elapsed.TotalSeconds):0.0} Hz";
         DetectionRate = $"{100.0 * detectedFrames / ProcessedFrames:0.0}%";
@@ -401,6 +416,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             TrackingState.Lost => "目标丢失 · 保持", TrackingState.Stale => "旧帧 · 保持",
             _ => "重新同步 · 保持"
         };
+        if (frame.FaceAim is { Observation.HasTarget: true, Readiness: not "ready" })
+            StateLabel = "人脸已锁定 · 仅预览";
         if (StateLabel != previous && command.State is TrackingState.Lost or TrackingState.Stale)
             AddEvent(StateLabel);
         history.Add(new(command.ErrorX, command.ErrorY));

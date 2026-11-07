@@ -126,16 +126,21 @@ public sealed class FaceTargetDetector : IDisposable
             .ThenBy(b => b.X).ThenBy(b => b.Y).ToArray();
     }
 
-    public static void DrawResult(Mat image, FaceDetectionResult result)
+    public static void DrawResult(Mat image, FaceDetectionResult result, FaceAimResult? aim = null)
     {
         for (var index = 0; index < result.Boxes.Length; index++)
         {
             var box = result.Boxes[index];
-            var color = index == 0 ? new Scalar(70, 190, 70) : new Scalar(220, 180, 40);
-            Cv2.Rectangle(image, box, color, index == 0 ? 3 : 2);
-            Cv2.PutText(image, index == 0 ? "face / largest" : "face",
+            var primary = aim is null ? index == 0 : aim.SelectedBox is { } selected &&
+                selected.X == box.X && selected.Y == box.Y && selected.Width == box.Width && selected.Height == box.Height;
+            var color = primary ? new Scalar(70, 190, 70) : new Scalar(220, 180, 40);
+            Cv2.Rectangle(image, box, color, primary ? 3 : 2);
+            Cv2.PutText(image, primary ? (aim is null ? "face / largest" : "face / locked") : "face",
                 new(box.X, Math.Max(18, box.Y - 6)), HersheyFonts.HersheySimplex, 0.55, color, 2, LineTypes.AntiAlias);
         }
+        if (aim?.FilteredX is { } x && aim.FilteredY is { } y)
+            Cv2.DrawMarker(image, new((int)Math.Round(x), (int)Math.Round(y)), new Scalar(0, 220, 255),
+                MarkerTypes.Cross, 20, 2);
     }
 
     public void Dispose() => network.Dispose();

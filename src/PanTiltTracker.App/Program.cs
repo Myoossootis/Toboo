@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using OpenCvSharp;
 using PanTiltTracker.Core;
+using PanTiltTracker.Shared;
 using PanTiltTracker.Vision;
 
 namespace PanTiltTracker.App;
@@ -19,6 +20,7 @@ internal static class Program
 
         try
         {
+            if (args[0] == "servo") return await RunServo(args[1..]);
             var options = Options.Parse(args);
             if (options.Mode == "evaluate-drone")
             {
@@ -122,6 +124,14 @@ internal static class Program
             Console.Error.WriteLine($"ERROR: {error.Message}");
             return 1;
         }
+    }
+
+    private static async Task<int> RunServo(string[] args)
+    {
+        var result = await ServoTool.RunAsync(args);
+        Console.Write(result.Output);
+        Console.Error.Write(result.Error);
+        return result.ExitCode;
     }
 
     private static void RunSimulation(Options options, ArucoTargetDetector detector,
@@ -285,7 +295,10 @@ internal static class Program
     }
 
     private static void PrintHelp() => Console.WriteLine("""
-        PanTiltTracker (.NET 8 / Windows x64) — no actuator output in this milestone
+        PanTiltTracker (.NET 8 / Windows x64) — vision modes do not drive actuators
+        servo    --port COM6 [--axis S1|S2] [--action status|center|move|disarm] [--angle 90] [--execute]
+        servo    --port COM6 --action home [--pan-home 90] [--tilt-home 88] --execute
+        servo    --port COM6 --axis S1|S2 --action sweep --execute   (single 45-to-90 degree sweep)
         simulate [--frames 300] [--out artifacts/simulate] [--preview]
         marker   [--id 7] [--size 600] [--out artifacts/marker-7.png]
         image    --input image.png [--out artifacts/image]

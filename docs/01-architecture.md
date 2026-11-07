@@ -21,7 +21,7 @@ camera：DirectShow → 最新帧缓冲 ───┘                       ↓
 - App：命令行参数、视频／相机读取、处理流程、预览和 CSV。当前以控制台验证算法，后续 UI 可以复用 Core 与 Vision。
 - Desktop：Avalonia 实验台，复用 Core 与 Vision，使用后台任务处理图像，在 UI 线程交接预览及指标；配置在单次运行期间固定。
 - Shared/RunLog.cs：命令行和桌面共同编译的日志写入代码，保持 CSV 与元数据字段一致。
-- firmware：未来由 STM32 接收 PC 指令，检查限位与独立通信超时，并控制亚博驱动板。
+- firmware：原 esp32_bench 保留无输出模拟；esp32_single_servo v0.4.0 提供双轴 S 曲线、独立超时、会话校验和限位。桌面手动回位与扫动经 Shared/ServoTool 调用串口工具。人脸对准框架负责锁定、滤波、相机角度与请求计算，尚未连接自动硬件输出。见 [人脸对准](17-face-aiming.md)、[硬件记录](16-single-servo-bringup.md) 和 [主控决策](decisions/0002-esp32-s3-controller.md)。
 
 ## 视觉约定
 
@@ -45,8 +45,8 @@ camera：DirectShow → 最新帧缓冲 ───┘                       ↓
 
 实时采集与处理使用容量为 1 的 LatestFrameBuffer。Publish 转移 Mat 所有权；新帧替换未处理旧帧时释放旧 Mat；Take 后由消费者释放。锁内完成提取和清空，避免清空掉生产者的新帧。不无限排队，不在图像采集回调内写 PNG。
 
-相机驱动可能阻塞 Read。当前有应用层无帧超时和有限关闭等待，但没有硬实时保证。实物阶段必须在 STM32 独立实现通信看门狗，不能依赖 PC 线程按时执行。
+相机驱动可能阻塞 Read。当前有应用层无帧超时和有限关闭等待，但没有硬实时保证。实物阶段必须在 ESP32-S3 独立实现通信超时处理，不能依赖 PC 线程按时执行。失联保持的是最后已发命令，不是动力断电或实测轴位；复位/重新连接不得自动执行旧目标。
 
 ## 后续接口
 
-先做手动小角度通信，再将 TrackingCommand 送到固件。PC→STM32 的项目协议与 STM32→亚博驱动板的厂商协议分开，见 firmware/。不把记录的命令当成实际轴角反馈。
+先做无执行器通信与独立超时检查，再做手动小角度通信，最后将 TrackingCommand 送到固件。PC→ESP32-S3 的项目协议与 ESP32-S3→亚博驱动板的厂商 UART 协议分开，见 firmware/。不把记录或 ACK 确认的命令当成实际轴角反馈。

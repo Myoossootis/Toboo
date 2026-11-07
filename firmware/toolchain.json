@@ -1,0 +1,9 @@
+{
+  "arduinoCliVersion": "1.5.1",
+  "arduinoCliWindowsUrl": "https://github.com/arduino/arduino-cli/releases/download/v1.5.1/arduino-cli_1.5.1_Windows_64bit.zip",
+  "arduinoCliWindowsSha256": "fabe42e0eb04d00e776a66178299ff95a46c623dbc260f997e58fd514853dd40",
+  "packageIndex": "https://espressif.github.io/arduino-esp32/package_esp32_index.json",
+  "core": "esp32:esp32@3.3.12",
+  "coreArchiveSha256": "87401004f279a206781e368b66098a8383b7cf87cce7811a6afd0163503fa78f",
+  "fqbn": "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,MSCOnBoot=default,DFUOnBoot=default,UploadMode=default,FlashSize=16M,FlashMode=qio,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB,EraseFlash=none,UploadSpeed=921600"
+}
