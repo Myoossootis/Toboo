@@ -4,7 +4,7 @@
         xmlns:controls="using:PanTiltTracker.Desktop.Controls"
         x:Class="PanTiltTracker.Desktop.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="UAVTrack · 视觉跟踪工作台"
+        Title="toboo · 桌面陪伴机器人"
         Width="1280" Height="860" MinWidth="980" MinHeight="700"
         WindowStartupLocation="CenterScreen">
   <!-- Preview brief (§2.1, §2.8, §3.3, §3.6, §8.4): image first; acquisition second;
@@ -19,8 +19,8 @@
               Stroke="White" StrokeThickness="1.6" Width="24" Height="24" Stretch="Uniform" />
       </Border>
       <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
-        <TextBlock Text="UAVTrack" FontSize="24" FontWeight="SemiBold" />
-        <TextBlock Text="视觉跟踪工作台" Classes="caption" />
+        <TextBlock Text="toboo" FontSize="24" FontWeight="SemiBold" />
+        <TextBlock Text="桌面陪伴机器人" Classes="caption" />
       </StackPanel>
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
         <Button x:Name="MarkerButton" Content="生成标记" Classes="tertiary" Click="SaveMarker" IsEnabled="{Binding CanConfigure}" />
@@ -77,12 +77,12 @@
                   <StackPanel Spacing="8" IsVisible="{Binding IsVideoSource}">
                     <TextBlock Text="视频算法" FontWeight="SemiBold" FontSize="12" />
                     <ComboBox x:Name="AlgorithmSelector" SelectedIndex="{Binding AlgorithmIndex}">
-                      <ComboBoxItem Content="目标检测（标记 / 人脸 / 无人机）" />
+                      <ComboBoxItem Content="目标检测（标记 / 人脸）" />
                       <ComboBoxItem Content="CSRT · 人工首框" />
                       <ComboBoxItem Content="帧差 · 运动候选" />
                     </ComboBox>
                     <TextBlock Text="{Binding AlgorithmDescription}" Classes="caption" TextWrapping="Wrap" LineHeight="18" />
-                    <Button Content="载入无人机示例" Command="{Binding LoadExampleCommand}" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                    <Button Content="载入示例录像" Command="{Binding LoadExampleCommand}" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
                     <Button x:Name="LoadFrameButton" Content="载入首帧 / 重新框选" Command="{Binding LoadFirstFrameCommand}" IsVisible="{Binding IsCsrt}" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
                     <TextBlock Text="{Binding RegionLabel}" IsVisible="{Binding CanSelectRegion}" Classes="caption" TextWrapping="Wrap" />
                   </StackPanel>
@@ -92,20 +92,8 @@
                     <ComboBox x:Name="TargetSelector" SelectedIndex="{Binding TargetIndex}">
                       <ComboBoxItem Content="ArUco 标记" />
                       <ComboBoxItem Content="人脸（正面 / 侧面）" />
-                      <ComboBoxItem Content="无人机（实验模型）" />
                     </ComboBox>
                     <TextBlock Text="{Binding AlgorithmDescription}" Classes="caption" TextWrapping="Wrap" LineHeight="18" />
-                  </StackPanel>
-
-                  <StackPanel x:Name="DroneModelPanel" Spacing="8" IsVisible="{Binding IsDrone}">
-                    <TextBlock Text="无人机模型" FontWeight="SemiBold" FontSize="12" />
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
-                      <TextBox Text="{Binding DroneModelPath}" Watermark="选择已核验 ONNX" MinWidth="0" />
-                      <Button Grid.Column="1" Content="…" Padding="8,4" Click="PickDroneModel" Classes="quiet" ToolTip.Tip="选择无人机 ONNX 模型" />
-                    </Grid>
-                    <TextBlock Text="实验权重单独准备，未随包附带。" Classes="caption" TextWrapping="Wrap" />
-                    <CheckBox x:Name="DroneTrackingToggle" Content="连续跟踪与重新捕获" IsChecked="{Binding DroneTrackingEnabled}"
-                              IsVisible="{Binding IsDroneStream}" FontSize="12" />
                   </StackPanel>
 
                   <StackPanel Spacing="8" IsVisible="{Binding IsAruco}">

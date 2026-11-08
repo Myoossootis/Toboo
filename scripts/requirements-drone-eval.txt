@@ -1,4 +1,0 @@
-# Offline annotation conversion only; not an application/runtime dependency.
-mcos-decoder==0.1.0
-numpy==2.3.4
-scipy==1.16.3

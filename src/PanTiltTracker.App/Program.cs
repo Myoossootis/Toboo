@@ -22,13 +22,6 @@ internal static class Program
         {
             if (args[0] == "servo") return await RunServo(args[1..]);
             var options = Options.Parse(args);
-            if (options.Mode == "evaluate-drone")
-            {
-                var fps = double.Parse(options.Required("fps"), CultureInfo.InvariantCulture);
-                DroneEvaluation.Run(options.Required("reference"), options.Required("telemetry"), fps,
-                    options.Text("out", "artifacts/drone-evaluation"));
-                return 0;
-            }
             if (options.Mode is "inspect" or "prepare-video")
             {
                 var input = options.Required("input");
@@ -70,13 +63,6 @@ internal static class Program
             Console.CancelKeyPress += onCancel;
             try
             {
-                if (options.Mode == "detect-drone")
-                {
-                    DroneVideoExperiment.Run(options.Required("input"), options.Text("out", "artifacts/drone-detection"),
-                        VideoAlgorithm.Aruco, null, settings, options.Integer("frames", int.MaxValue), cancellation.Token,
-                        options.Required("model"), options.Has("tracking"));
-                    return 0;
-                }
                 if (options.Mode == "track-video")
                 {
                     var algorithm = options.Text("algorithm", "csrt") switch
@@ -93,7 +79,7 @@ internal static class Program
                         var values = parts.Select(p => int.Parse(p, CultureInfo.InvariantCulture)).ToArray();
                         region = new(values[0], values[1], values[2], values[3]);
                     }
-                    DroneVideoExperiment.Run(options.Required("input"), options.Text("out", "artifacts/drone-csrt"),
+                    VideoTrackingExperiment.Run(options.Required("input"), options.Text("out", "artifacts/video-csrt"),
                         algorithm, region, settings, options.Integer("frames", int.MaxValue), cancellation.Token);
                     return 0;
                 }
@@ -306,10 +292,8 @@ internal static class Program
         camera   [--index 0] [--frames 300] [--preview]
         inspect  --input clip.mp4 [--out artifacts/video-inspection]
         prepare-video --input original.mp4 --out prepared-1080p.mp4
-        track-video --input clip.mp4 --algorithm csrt --roi x,y,width,height [--out artifacts/drone-csrt]
-        detect-drone --input clip.mp4 --model models/drone/best.onnx [--tracking] [--frames 300] [--out artifacts/drone-detection]
-        evaluate-drone --reference labels.csv --telemetry telemetry.csv --fps 30 [--out artifacts/drone-evaluation]
-        track-video --input clip.mp4 --algorithm frame-diff [--out artifacts/drone-motion]
+        track-video --input clip.mp4 --algorithm csrt --roi x,y,width,height [--out artifacts/video-csrt]
+        track-video --input clip.mp4 --algorithm frame-diff [--out artifacts/video-motion]
         All detection modes: --id 7 --config config/tracker.json --out <directory>
         """);
 
@@ -333,9 +317,9 @@ internal static class Program
 
         public static Options Parse(string[] args)
         {
-            if (args[0] is not ("simulate" or "marker" or "image" or "video" or "camera" or "inspect" or "prepare-video" or "track-video" or "detect-drone" or "evaluate-drone"))
+            if (args[0] is not ("simulate" or "marker" or "image" or "video" or "camera" or "inspect" or "prepare-video" or "track-video"))
                 throw new ArgumentException($"Unknown mode: {args[0]}");
-            string[] known = ["out", "id", "size", "input", "index", "frames", "fps", "config", "preview", "algorithm", "roi", "model", "reference", "telemetry", "tracking"];
+            string[] known = ["out", "id", "size", "input", "index", "frames", "fps", "config", "preview", "algorithm", "roi"];
             var values = new Dictionary<string, string>(StringComparer.Ordinal);
             for (var index = 1; index < args.Length; index++)
             {
@@ -343,7 +327,7 @@ internal static class Program
                     throw new ArgumentException($"Unknown option: {args[index]}");
                 var key = args[index][2..];
                 if (values.ContainsKey(key)) throw new ArgumentException($"Duplicate --{key}.");
-                if (key is "preview" or "tracking") { values.Add(key, "true"); continue; }
+                if (key == "preview") { values.Add(key, "true"); continue; }
                 if (++index >= args.Length || args[index].StartsWith("--", StringComparison.Ordinal))
                     throw new ArgumentException($"Missing value after --{key}.");
                 values.Add(key, args[index]);

@@ -27,8 +27,8 @@ if ($BaseZipPath) {
     }
     Write-Host "PASS: applied $($manifest.baseVersion) -> $($manifest.targetVersion); all target file hashes match."
 }
-$executable = Join-Path $appPath 'PanTiltTracker.Desktop.exe'
-$runtimeConfig = Get-Content -LiteralPath (Join-Path $appPath 'PanTiltTracker.Desktop.runtimeconfig.json') -Raw | ConvertFrom-Json
+$executable = Join-Path $appPath 'toboo.exe'
+$runtimeConfig = Get-Content -LiteralPath (Join-Path $appPath 'toboo.runtimeconfig.json') -Raw | ConvertFrom-Json
 if (!$runtimeConfig.runtimeOptions.includedFrameworks -or $runtimeConfig.runtimeOptions.framework) {
     throw 'Expected a self-contained runtime configuration.'
 }

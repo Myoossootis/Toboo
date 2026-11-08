@@ -1,5 +1,7 @@
 # Windows 便携版覆盖更新
 
+> 历史 UAVTrack v0.1.x 资料。旧包及对应脚本请使用 `codex/archive-drone-recognition-20261109`；当前 toboo 的源码启动方式见仓库 README。
+
 完整便携 ZIP 用于首次运行或不确定基础版本时。覆盖包文件名中的 `update-from-X` 指定唯一支持的基础版本；当前 `v0.1.3` 的 `update-from-0.1.2` 覆盖包适用于官方 `v0.1.2` Windows x64 便携版（包括由官方上一版覆盖包升级得到的 v0.1.2）。
 
 ## 操作

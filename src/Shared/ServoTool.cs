@@ -32,7 +32,7 @@ internal static class ServoTool
         var checkout = new DirectoryInfo(AppContext.BaseDirectory);
         while (checkout is not null && !File.Exists(Path.Combine(checkout.FullName, "firmware", "tools", "single_servo.py")))
             checkout = checkout.Parent;
-        if (checkout is null) throw new InvalidOperationException("舵机工具需要从 UAVTrack 源码目录运行。");
+        if (checkout is null) throw new InvalidOperationException("舵机工具需要从 toboo 源码目录运行。");
         var python = Path.Combine(checkout.FullName, "tmp", "esp32-tools", "host", "Scripts", "python.exe");
         if (!File.Exists(python)) throw new InvalidOperationException("请先按 firmware/README.md 安装舵机串口环境。");
 

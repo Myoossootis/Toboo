@@ -31,20 +31,10 @@ public sealed class WorkbenchPreviewTests
                 Assert.True(File.Exists(recorded), "Requested preview recording does not exist.");
                 model.SourceIndex = 2;
                 model.InputPath = recorded;
-                var droneModel = Environment.GetEnvironmentVariable("UAVTRACK_PREVIEW_DRONE_MODEL");
-                if (!string.IsNullOrEmpty(droneModel))
-                {
-                    model.TargetIndex = 2;
-                    model.DroneModelPath = droneModel;
-                    model.DroneTrackingEnabled = Environment.GetEnvironmentVariable("UAVTRACK_PREVIEW_DRONE_TRACKING") == "1";
-                }
-                else
-                {
-                    model.AlgorithmIndex = 1;
-                    await model.LoadFirstFrameAsync();
-                    // This optional local preview uses the project's documented drone sample.
-                    model.SetInitialRegion(new(770, 435, 590, 150));
-                }
+                model.AlgorithmIndex = 1;
+                await model.LoadFirstFrameAsync();
+                model.SetInitialRegion(new(model.PreviewWidth/4, model.PreviewHeight/4,
+                    model.PreviewWidth/2, model.PreviewHeight/2));
             }
             running = model.StartAsync();
             var until = DateTime.UtcNow.AddSeconds(20);
@@ -57,7 +47,7 @@ public sealed class WorkbenchPreviewTests
             // Reserve at least half a VGA frame's height at the supported 700px window
             // height, including the extra toolbar controls visible during simulation.
             Assert.True(preview.Bounds.Height >= 240, $"Image height is only {preview.Bounds.Height}.");
-            Save(model.IsDrone ? model.DroneTrackingEnabled ? "drone-hybrid" : "drone-detection" : string.IsNullOrEmpty(recorded) ? "simulation" : "recorded-video");
+            Save(string.IsNullOrEmpty(recorded) ? "simulation" : "recorded-video");
 
             var analysis = window.FindControl<Expander>("AnalysisExpander")!;
             Assert.True(analysis.IsEffectivelyVisible);

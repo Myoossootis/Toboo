@@ -50,18 +50,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsFileSource), nameof(IsCameraSource), nameof(IsSimulation),
         nameof(CanOcclude), nameof(SourceDescription), nameof(SourceLabel), nameof(IsVideoSource), nameof(IsAruco), nameof(IsCsrt),
-        nameof(CanChooseTarget), nameof(IsFace), nameof(IsDrone), nameof(IsDroneStream), nameof(AlgorithmDescription))]
+        nameof(CanChooseTarget), nameof(IsFace), nameof(AlgorithmDescription))]
     private int sourceIndex;
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsCsrt), nameof(IsAruco), nameof(AlgorithmDescription), nameof(CanSelectRegion), nameof(CanChooseTarget), nameof(IsFace), nameof(IsDrone), nameof(IsDroneStream))]
+    [NotifyPropertyChangedFor(nameof(IsCsrt), nameof(IsAruco), nameof(AlgorithmDescription), nameof(CanSelectRegion), nameof(CanChooseTarget), nameof(IsFace))]
     private int algorithmIndex;
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsFace), nameof(IsDrone), nameof(IsDroneStream), nameof(IsAruco), nameof(AlgorithmDescription))]
+    [NotifyPropertyChangedFor(nameof(IsFace), nameof(IsAruco), nameof(AlgorithmDescription))]
     private int targetIndex;
-    [ObservableProperty] private string droneModelPath = DroneTargetDetector.DefaultModelPath;
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(AlgorithmDescription))]
-    private bool droneTrackingEnabled;
     [ObservableProperty] private string regionLabel = "尚未框选";
     [ObservableProperty] private string inputPath = "";
     [ObservableProperty] private int cameraIndex;
@@ -127,9 +123,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public bool IsCsrt => IsVideoSource && AlgorithmIndex == 1;
     public bool CanChooseTarget => !IsSimulation && (!IsVideoSource || AlgorithmIndex == 0);
     public bool IsFace => CanChooseTarget && TargetIndex == 1;
-    public bool IsDrone => CanChooseTarget && TargetIndex == 2;
-    public bool IsDroneStream => IsDrone && SourceIndex is 2 or 3;
-    public bool IsAruco => !IsFace && !IsDrone && (!IsVideoSource || AlgorithmIndex == 0);
+    public bool IsAruco => !IsFace && (!IsVideoSource || AlgorithmIndex == 0);
     public bool CanSelectRegion => CanConfigure && IsCsrt && preparedVideoPath == InputPath && HasPreview;
     public OpenCvSharp.Rect? InitialRegion => initialRegion;
     public int PreviewWidth => previewWidth;
@@ -137,11 +131,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public string AlgorithmDescription => (IsVideoSource ? AlgorithmIndex : 0) switch
     {
         1 => "载入首帧，在画面上拖框，再开始。丢失后需停止并重新载入。",
-        2 => "帧差与形态学：取最大运动区域，不判断无人机类别。",
-        _ => IsDrone ? IsDroneStream && DroneTrackingEnabled
-            ? "自动捕获并用 CSRT 连续定位，周期检测校验；过期解除锁定并重新搜索。不识别机型或个体身份。"
-            : "自动检测无人机，全部画框，取最高分目标。不区分机型，不保持目标身份。"
-            : IsFace ? (SourceIndex == 1 ? "正面与侧面人脸检测；图片取最大框，不识别身份。"
+        2 => "帧差与形态学：取最大运动区域，不进行类别识别。",
+        _ => IsFace ? (SourceIndex == 1 ? "正面与侧面人脸检测；图片取最大框，不识别身份。"
                 : "连续确认并锁定人脸，黄十字为滤波中心。绿色「开始跟随」转动云台；「仅预览」只看画面。角度和方向在「对准」页设置。")
                 : "检测固定字典中的标记 ID。"
     };
@@ -169,8 +160,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public MainViewModel(string? workspace = null)
     {
         this.workspace = workspace ?? FindWorkspace();
-        var localDroneModel = Path.Combine(this.workspace, "models", "drone", "best.onnx");
-        if (File.Exists(localDroneModel)) DroneModelPath = localDroneModel;
         var config = Path.Combine(AppContext.BaseDirectory, "tracker.json");
         initialSettings = File.Exists(config)
             ? JsonSerializer.Deserialize<ControllerSettings>(File.ReadAllText(config),
@@ -189,7 +178,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(FollowStartHint));
             }
         };
-        AddEvent("实验台已准备好。选择合成场景即可开始。");
+        AddEvent("toboo 已准备好。可选择摄像头人脸模式或离线实验。");
     }
 
     private void ServoChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
@@ -215,8 +204,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     partial void OnInputPathChanged(string value) { if (!IsRunning) ResetPresentation(); }
     partial void OnAlgorithmIndexChanged(int value) { if (!IsRunning) ResetPresentation(); }
     partial void OnTargetIndexChanged(int value) { if (!IsRunning) ResetPresentation(); }
-    partial void OnDroneModelPathChanged(string value) { if (!IsRunning && IsDrone) ResetPresentation(); }
-    partial void OnDroneTrackingEnabledChanged(bool value) { if (!IsRunning && IsDrone) ResetPresentation(); }
     partial void OnSelectedCameraChanged(CameraDevice? value) { if (value is not null) CameraIndex = value.Index; }
 
     [RelayCommand(CanExecute = nameof(CanConfigure))]
@@ -239,7 +226,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         SourceIndex = 2;
         AlgorithmIndex = 1;
-        InputPath = Path.Combine(workspace, "data", "processed", "drone-11204831-1080p30.mp4");
+        InputPath = Path.Combine(workspace, "data", "processed", "example.mp4");
         await LoadFirstFrameAsync();
     }
 
@@ -311,11 +298,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             ReportError("CSRT 需要先载入首帧，并在画面上拖框选择目标。");
             return;
         }
-        if (IsDrone && !File.Exists(DroneModelPath))
-        {
-            ReportError("请选择无人机 best.onnx 模型；开发环境先运行 scripts/prepare-drone-model.ps1。模型未随包附带。");
-            return;
-        }
         var settings = initialSettings with
         {
             PanGain = PanGain, TiltGain = TiltGain, MaxSpeedDegreesPerSecond = MaxSpeed,
@@ -345,8 +327,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 1 => new(1280, 720, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW),
                 2 => new(1920, 1080, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW),
                 _ => new(640, 480, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW)
-            }, DetectFaces: IsFace, DroneModelPath: IsDrone ? DroneModelPath : null,
-            TrackDrones: IsDroneStream && DroneTrackingEnabled, FaceAim: activeFaceSettings);
+            }, DetectFaces: IsFace, FaceAim: activeFaceSettings);
         IsRunning = true;
         ResetPresentation();
         HasRun = true;
@@ -357,7 +338,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         PlotSamples = Array.Empty<ErrorSample>();
         displayClock.Restart();
         StateLabel = "正在启动";
-        AddEvent($"开始：{SourceLabel}，{(IsDrone ? DroneTrackingEnabled && IsDroneStream ? "无人机 / 检测与连续跟踪" : "无人机 / 逐帧检测" : IsFace ? SourceIndex == 1 ? "人脸 / 单帧最大框" : "人脸 / 连续确认与空间锁定" : IsAruco ? $"标记 ID {MarkerId}" : ((VideoAlgorithm)AlgorithmIndex).ToString())}。视觉会话仅计算请求。");
+        AddEvent($"开始：{SourceLabel}，{(IsFace ? SourceIndex == 1 ? "人脸 / 单帧最大框" : "人脸 / 连续确认与空间锁定" : IsAruco ? $"标记 ID {MarkerId}" : ((VideoAlgorithm)AlgorithmIndex).ToString())}。视觉会话仅计算请求。");
         cancellation = new();
         sessionFinished = new(TaskCreationOptions.RunContinuationsAsynchronously);
         FaceServoSession? transport = null;
@@ -462,12 +443,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (observation.HasTarget) detectedFrames++;
         DetectionLabel = frame.VisionStatus switch
         {
-            "drone_detected" => $"无人机候选 {frame.TargetCount} 个 · 最高分 {frame.TargetScore:0.00}",
-            "no_drone_detected" => "未检测到无人机",
-            "drone_acquired" => $"自动捕获无人机候选 · 分数 {frame.TargetScore:0.00}",
-            "drone_verified" => $"检测器重新确认 · 分数 {frame.TargetScore:0.00}",
-            "drone_tracked" => "CSRT 连续定位 · 本帧未重新分类",
-            "drone_searching" => "未锁定无人机 · 正在重新搜索",
             "face_detected" => $"检测到 {frame.TargetCount} 张人脸 · 目标为最大框",
             "no_face_detected" => "未检测到人脸",
             "face_confirming" => "正在连续确认人脸 · 暂不移动",

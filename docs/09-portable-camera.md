@@ -1,5 +1,7 @@
 # UAVTrack Windows 便携版：摄像头测试
 
+> 历史 UAVTrack v0.1.x 资料。旧包及对应脚本请使用 `codex/archive-drone-recognition-20261109`；当前 toboo 的源码启动方式见仓库 README。
+
 本文便携包操作说明对应 v0.1.3，包含 YuNet 正面/侧面检测，见 [当前人脸检测](10-face-detection.md)。v0.1.2 用户可使用对应覆盖包升级；旧版 ZIP 不会因源码更新而自动改变。
 
 适用于 Windows 10/11 **x64**。ZIP 包含 .NET 与本机图像运行库，无需 Visual Studio、.NET SDK 或单独安装 .NET。必须完整解压，不能只复制 EXE 或直接在压缩包里运行。

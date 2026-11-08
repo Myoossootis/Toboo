@@ -51,7 +51,7 @@ foreach ($file in $changed) {
     targetCommit = $target.commit; changedFiles = $changed; targetFiles = $targetFiles
 } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $patchPath 'update-manifest.json') -Encoding UTF8
 Copy-Item -LiteralPath (Join-Path $repositoryPath 'docs/11-portable-update.md') -Destination (Join-Path $patchPath 'UPDATE-README.md')
-$name = "UAVTrack-$($target.version)-update-from-$($base.version)-win-x64.zip"
+$name = "toboo-$($target.version)-update-from-$($base.version)-win-x64.zip"
 $output = Join-Path (Split-Path -Parent $targetPath) $name
 if (Test-Path -LiteralPath $output) { throw "Output already exists: $output" }
 Add-Type -AssemblyName System.IO.Compression.FileSystem

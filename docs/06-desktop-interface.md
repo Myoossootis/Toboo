@@ -29,4 +29,4 @@
 
 ## 无标记视频模式
 
-视频来源可选择 CSRT 或帧差对照；具体操作见 [无人机跟踪基线](08-drone-tracking-baseline.md)。新增 2 个尺寸下的首帧载入、鼠标拖框、连续跟踪与日志测试，以及 1 个留白、反向拖动和小框拒绝测试。它们使用合成录像，不作为无人机精度证据。
+视频来源可选择 CSRT 或帧差对照；具体操作见 [无人机跟踪基线](https://github.com/Myoossootis/UAVTrack/blob/codex/archive-drone-recognition-20261109/docs/08-drone-tracking-baseline.md)。新增 2 个尺寸下的首帧载入、鼠标拖框、连续跟踪与日志测试，以及 1 个留白、反向拖动和小框拒绝测试。它们使用合成录像，不作为无人机精度证据。

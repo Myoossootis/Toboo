@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 $repositoryPath = Split-Path -Parent $PSScriptRoot
 Push-Location -LiteralPath $repositoryPath
 try {
+    & (Join-Path $PSScriptRoot 'verify-product-boundary.ps1')
     function Invoke-DotNet {
         param([string[]]$Arguments)
         & dotnet @Arguments

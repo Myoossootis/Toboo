@@ -44,7 +44,7 @@
 
 日志位于 artifacts/esp32-single/2026-11-07，主要文件为 dual-build.log、dual-pc-verify.log、dual-flash.log、dual-after-flash.jsonl、dual-powered-s2-only.jsonl 和 dual-powered-sequential.jsonl。
 
-## UAVTrack 手动回位
+## toboo 手动回位
 
 新增 `PanTiltTracker.App` 的 `servo` 命令。实物测试先通过 COM6 只读查询 S1/S2，确认两轴停发。用户重新接通 5V 并复位 ESP32 后，通过该命令请求 `home`。S1、S2 依次各发送一条 90° 目标帧，最终状态为 DISARMED。用户确认动作正常，观察后拔掉 5V，之后指出 90° 对应的俯仰姿态并非机构中点。S2 的机械中点与摄像头水平位仍待标定，实际轴角未测量。日志为 uavtrack-home-powered-start.jsonl 和 uavtrack-home-powered.jsonl。
 
