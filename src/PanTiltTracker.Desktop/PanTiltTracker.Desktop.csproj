@@ -4,6 +4,7 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="PanTiltTracker.Desktop.Tests" />
     <ProjectReference Include="../PanTiltTracker.Core/PanTiltTracker.Core.csproj" />
     <ProjectReference Include="../PanTiltTracker.Vision/PanTiltTracker.Vision.csproj" />
     <PackageReference Include="Avalonia" Version="11.3.22" />

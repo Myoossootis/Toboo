@@ -7,6 +7,8 @@ public sealed record FaceAimSettings
     public bool DirectionsConfirmed { get; init; }
     public int PanDirection { get; init; } = 1;
     public int TiltDirection { get; init; } = 1;
+    public bool PanEnabled { get; init; } = true;
+    public bool TiltEnabled { get; init; } = true;
     public double PanMinDegrees { get; init; } = 30;
     public double PanMaxDegrees { get; init; } = 175;
     public double TiltMinDegrees { get; init; } = 35;
@@ -16,9 +18,9 @@ public sealed record FaceAimSettings
     public double FilterTimeConstantSeconds { get; init; } = 0.10;
     public double DeadZoneEnterDegrees { get; init; } = 1;
     public double DeadZoneExitDegrees { get; init; } = 1.8;
-    public double GainPerSecond { get; init; } = 2;
-    public double MaxSpeedDegreesPerSecond { get; init; } = 15;
-    public double MaxAccelerationDegreesPerSecondSquared { get; init; } = 60;
+    public double GainPerSecond { get; init; } = 3;
+    public double MaxSpeedDegreesPerSecond { get; init; } = 20;
+    public double MaxAccelerationDegreesPerSecondSquared { get; init; } = 80;
     public double MaxFrameAgeSeconds { get; init; } = 0.2;
     public double MaxUpdateGapSeconds { get; init; } = 0.15;
 

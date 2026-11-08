@@ -26,7 +26,7 @@
         <Button x:Name="MarkerButton" Content="生成标记" Classes="tertiary" Click="SaveMarker" IsEnabled="{Binding CanConfigure}" />
         <Button x:Name="ExportButton" Content="导出 CSV" Classes="quiet" Click="ExportCsv" IsEnabled="{Binding CanExport}" />
         <Border Background="{StaticResource SubtleBrush}" CornerRadius="6" Padding="12,8" Margin="8,0,0,0" VerticalAlignment="Center">
-          <TextBlock Text="视觉跟踪 · 独立于舵机" FontSize="12" />
+          <TextBlock Text="{Binding OutputLabel}" FontSize="12" />
         </Border>
       </StackPanel>
     </Grid>
@@ -40,7 +40,10 @@
             <TextBlock Text="选择输入与检测目标" Classes="caption" />
           </StackPanel>
           <TabControl x:Name="SettingsTabs" Grid.Row="1" SelectedIndex="0">
-            <TabItem Header="采集设置">
+            <TabControl.Styles>
+              <Style Selector="TabItem"><Setter Property="Padding" Value="8,8" /></Style>
+            </TabControl.Styles>
+            <TabItem Header="采集">
               <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="24" Margin="0,16,4,0" IsEnabled="{Binding CanConfigure}">
                   <StackPanel Spacing="8">
@@ -141,7 +144,7 @@
               </ScrollViewer>
             </TabItem>
 
-            <TabItem Header="控制参数">
+            <TabItem Header="参数">
               <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="24" Margin="0,16,4,0">
                   <TextBlock Text="参数在下一次开始时生效。" Classes="caption" TextWrapping="Wrap" />
@@ -201,25 +204,35 @@
                   <CheckBox Content="5V 已接，机构可动" IsChecked="{Binding Ready}" IsEnabled="{Binding !Busy}" FontSize="12" />
                   <TextBlock Text="{Binding Status}" TextWrapping="Wrap" FontSize="12" />
                   <TextBlock Text="{Binding LastRequests}" Classes="caption" TextWrapping="Wrap" />
-                  <TextBlock Text="矩形 + 交叉对角线" FontWeight="SemiBold" FontSize="12" />
-                  <CheckBox Content="已检查完整扫动路径" IsChecked="{Binding SweepReady}" IsEnabled="{Binding CanControl}" FontSize="12" />
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
-                    <Button x:Name="ServoPatternButton" Content="开启扫动" Command="{Binding PatternCommand}" IsEnabled="{Binding CanPattern}" Classes="quiet" />
-                    <Button x:Name="ServoStopSweep" Grid.Column="1" Content="停止运动" Command="{Binding StopSweepCommand}" IsEnabled="{Binding CanStopSweep}" Classes="quiet" />
-                  </Grid>
+                  <TextBlock Text="{Binding WorkingBoundsLabel}" Classes="caption" TextWrapping="Wrap" />
                   <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="4" RowSpacing="6">
                     <TextBlock Text="S1 水平" FontSize="12" VerticalAlignment="Center" />
                     <Button x:Name="ServoPanDown" Grid.Column="1" Content="−1°" Command="{Binding PanDownCommand}" IsEnabled="{Binding CanPanDown}" Classes="quiet" />
                     <Button Grid.Column="2" Content="+1°" Command="{Binding PanUpCommand}" IsEnabled="{Binding CanPanUp}" Classes="quiet" />
                     <TextBlock Grid.Row="1" Text="S2 俯仰" FontSize="12" VerticalAlignment="Center" />
                     <Button x:Name="ServoTiltDown" Grid.Row="1" Grid.Column="1" Content="−1°" Command="{Binding TiltDownCommand}" IsEnabled="{Binding CanTiltDown}" Classes="quiet" />
-                    <Button Grid.Row="1" Grid.Column="2" Content="+1°" Command="{Binding TiltUpCommand}" IsEnabled="{Binding CanTiltUp}" Classes="quiet" />
+                    <Button x:Name="ServoTiltUp" Grid.Row="1" Grid.Column="2" Content="+1°" Command="{Binding TiltUpCommand}" IsEnabled="{Binding CanTiltUp}" Classes="quiet" />
+                  </Grid>
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                    <Button x:Name="ServoTiltReference" Content="S2 定位 45°" Command="{Binding InitializeTiltCommand}" IsEnabled="{Binding CanInitializeTilt}" IsVisible="{Binding ShowTiltReference}" Classes="quiet" />
+                    <Button Grid.Column="1" Content="重新校准 S2" Command="{Binding BeginTiltCalibrationCommand}" IsEnabled="{Binding !Busy}" Classes="quiet" />
+                  </Grid>
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                    <Button x:Name="ServoTiltLower" Content="记为 S2 下限" Command="{Binding CaptureTiltFloorCommand}" IsEnabled="{Binding CanCaptureTilt}" Classes="quiet" />
+                    <Button x:Name="ServoTiltUpper" Grid.Column="1" Content="记为 S2 上限" Command="{Binding CaptureTiltCeilingCommand}" IsEnabled="{Binding CanCaptureTilt}" Classes="quiet" />
                   </Grid>
                   <TextBlock Text="{Binding CenterLabel}" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
                   <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
-                    <Button x:Name="ServoHomeButton" Content="平滑回中心" Command="{Binding HomeCommand}" IsEnabled="{Binding CanControl}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                    <Button x:Name="ServoHomeButton" Content="平滑回中心" Command="{Binding HomeCommand}" IsEnabled="{Binding CanCalibratedMotion}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
                     <Button Grid.Column="1" Content="保存边界" Command="{Binding SaveCalibrationCommand}" IsEnabled="{Binding !Busy}"
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Classes="quiet" />
+                  </Grid>
+                  <TextBlock Text="{Binding TiltCalibrationHint}" Classes="caption" TextWrapping="Wrap" />
+                  <TextBlock Text="矩形 + 交叉对角线" FontWeight="SemiBold" FontSize="12" />
+                  <CheckBox Content="已检查完整扫动路径" IsChecked="{Binding SweepReady}" IsEnabled="{Binding CanControl}" FontSize="12" />
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                    <Button x:Name="ServoPatternButton" Content="开启扫动" Command="{Binding PatternCommand}" IsEnabled="{Binding CanPattern}" Classes="quiet" />
+                    <Button x:Name="ServoStopSweep" Grid.Column="1" Content="停止运动" Command="{Binding StopSweepCommand}" IsEnabled="{Binding CanStopSweep}" Classes="quiet" />
                   </Grid>
                   <Expander Header="矩形边界设置" FontSize="12">
                     <StackPanel Spacing="6" Margin="0,8,0,0" IsEnabled="{Binding !Busy}">
@@ -230,8 +243,8 @@
                       </Grid>
                       <TextBlock Text="S2 下边界 / 上边界" Classes="caption" />
                       <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
-                        <NumericUpDown Value="{Binding TiltFloor}" Minimum="35" Maximum="65" Increment="1" FormatString="0" MinWidth="0" />
-                        <NumericUpDown Grid.Column="1" Value="{Binding TiltCeiling}" Minimum="35" Maximum="65" Increment="1" FormatString="0" MinWidth="0" />
+                        <NumericUpDown Value="{Binding TiltFloor}" Minimum="0" Maximum="180" Increment="1" FormatString="0" MinWidth="0" />
+                        <NumericUpDown Grid.Column="1" Value="{Binding TiltCeiling}" Minimum="0" Maximum="180" Increment="1" FormatString="0" MinWidth="0" />
                       </Grid>
                       <TextBlock Text="中心自动取边界中点，半度向上取整。首次初始化无位置反馈。遇到卡住或持续嗡鸣请拔掉 5V。" Classes="caption" TextWrapping="Wrap" />
                     </StackPanel>
@@ -239,12 +252,83 @@
                 </StackPanel>
               </ScrollViewer>
             </TabItem>
+            <TabItem Header="对准">
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <StackPanel IsEnabled="{Binding CanConfigure}" Spacing="10" Margin="0,12,4,0">
+                  <StackPanel DataContext="{Binding FaceAim}" x:DataType="vm:FaceAimViewModel" Spacing="10">
+                    <TextBlock Text="相机角度模型" FontWeight="SemiBold" FontSize="12" />
+                    <ComboBox x:Name="FaceGeometryMode" SelectedIndex="{Binding GeometryMode}">
+                      <ComboBoxItem Content="未配置 · 只看目标位置" />
+                      <ComboBoxItem Content="水平 / 垂直视场角估算" />
+                      <ComboBoxItem Content="针孔内参 fx / fy / cx / cy" />
+                    </ComboBox>
+                    <TextBlock Text="参数对应的画面宽 / 高" Classes="caption" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                      <NumericUpDown Value="{Binding CalibrationWidth}" Minimum="1" Maximum="8192" FormatString="0" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding CalibrationHeight}" Minimum="1" Maximum="8192" FormatString="0" />
+                    </Grid>
+                    <StackPanel IsVisible="{Binding UseFov}" Spacing="6">
+                      <TextBlock Text="水平 / 垂直视场角（°）" Classes="caption" />
+                      <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                        <NumericUpDown Value="{Binding HorizontalFov}" Minimum="1" Maximum="169" Increment="1" FormatString="0.0" />
+                        <NumericUpDown Grid.Column="1" Value="{Binding VerticalFov}" Minimum="1" Maximum="169" Increment="1" FormatString="0.0" />
+                      </Grid>
+                      <TextBlock Text="填写本摄像头参数，不是对角视场角。示例 60° / 45° 未经实测。" Classes="caption" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel IsVisible="{Binding UseIntrinsics}" Spacing="6">
+                      <TextBlock Text="fx / fy（像素）" Classes="caption" />
+                      <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                        <NumericUpDown Value="{Binding Fx}" Minimum="1" Maximum="100000" Increment="1" FormatString="0.00" />
+                        <NumericUpDown Grid.Column="1" Value="{Binding Fy}" Minimum="1" Maximum="100000" Increment="1" FormatString="0.00" />
+                      </Grid>
+                      <TextBlock Text="cx / cy（像素）" Classes="caption" />
+                      <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                        <NumericUpDown Value="{Binding Cx}" Minimum="0" Maximum="8191" FormatString="0.00" />
+                        <NumericUpDown Grid.Column="1" Value="{Binding Cy}" Minimum="0" Maximum="8191" FormatString="0.00" />
+                      </Grid>
+                      <CheckBox Content="内参来自相机标定" IsChecked="{Binding IntrinsicsCalibrated}" FontSize="12" />
+                    </StackPanel>
+                    <TextBlock Text="人脸在画面右侧时，S1 应" Classes="caption" />
+                    <ComboBox SelectedIndex="{Binding PanDirectionIndex}">
+                      <ComboBoxItem Content="增大角度（+）" /><ComboBoxItem Content="减小角度（−）" />
+                    </ComboBox>
+                    <TextBlock Text="人脸在画面下方时，S2 应" Classes="caption" />
+                    <ComboBox SelectedIndex="{Binding TiltDirectionIndex}">
+                      <ComboBoxItem Content="增大角度（+）" /><ComboBoxItem Content="减小角度（−）" />
+                    </ComboBox>
+                    <CheckBox Content="已检查画面坐标与修正方向" IsChecked="{Binding DirectionsConfirmed}" FontSize="12" />
+                    <TextBlock Text="进入 / 退出对准区（°）" Classes="caption" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                      <NumericUpDown Value="{Binding DeadZoneEnter}" Minimum="0" Maximum="10" Increment="0.1" FormatString="0.0" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding DeadZoneExit}" Minimum="0.1" Maximum="15" Increment="0.1" FormatString="0.0" />
+                    </Grid>
+                    <TextBlock Text="跟随速度上限（°/s）" Classes="caption" />
+                    <NumericUpDown Value="{Binding SpeedLimit}" Minimum="1" Maximum="20" Increment="1" FormatString="0" />
+                    <TextBlock Text="参与跟随的轴" Classes="caption" />
+                    <ComboBox SelectedIndex="{Binding FollowAxesIndex}">
+                      <ComboBoxItem Content="仅 S1 水平" /><ComboBoxItem Content="仅 S2 俯仰" /><ComboBoxItem Content="S1 + S2 双轴" />
+                    </ComboBox>
+                    <CheckBox Content="限制在启动参考附近试跟随" IsChecked="{Binding TrialRangeEnabled}" FontSize="12" />
+                    <TextBlock Text="试跟随半范围（±°）" Classes="caption" />
+                    <NumericUpDown Value="{Binding TrialHalfRange}" Minimum="2" Maximum="10" Increment="1" FormatString="0" />
+                    <Button Content="保存对准参数" Command="{Binding SaveCommand}" Classes="quiet" />
+                    <TextBlock Text="{Binding Status}" Classes="caption" TextWrapping="Wrap" />
+                  </StackPanel>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
           </TabControl>
 
           <StackPanel Grid.Row="2" Spacing="8">
+            <Button x:Name="FaceFollowButton" Content="开始跟随（转动云台）" Command="{Binding StartFollowCommand}"
+                    IsVisible="{Binding IsFace}" IsEnabled="{Binding CanStartFollow}" Classes="primary"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+            <TextBlock IsVisible="{Binding IsFace}" Text="{Binding FollowStartHint}"
+                       Classes="caption" TextWrapping="Wrap" />
             <TextBlock Text="运行中，设置已锁定" Classes="caption" IsVisible="{Binding IsRunning}" />
             <Grid ColumnDefinitions="*,80" ColumnSpacing="8">
-              <Button x:Name="StartButton" Content="开始实验" Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding StartCommand}" />
+              <Button x:Name="StartButton" Content="{Binding PreviewStartLabel}" Classes.primary="{Binding !IsFace}" Classes.quiet="{Binding IsFace}"
+                      HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding StartCommand}" />
               <Button x:Name="StopButton" Grid.Column="1" Content="停止" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding StopCommand}" />
             </Grid>
           </StackPanel>
@@ -253,9 +337,14 @@
 
       <!-- The readings column gives its width back to the image (§2.1, §3.3). -->
       <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="12">
-        <Border Background="#FBEDE8" CornerRadius="6" Padding="12" IsVisible="{Binding HasError}">
-          <TextBlock x:Name="ErrorBanner" Text="{Binding ErrorMessage}" Foreground="#9A4331" TextWrapping="Wrap" />
-        </Border>
+        <StackPanel Spacing="6">
+          <Border Background="#FBEDE8" CornerRadius="6" Padding="12" IsVisible="{Binding HasError}">
+            <TextBlock x:Name="ErrorBanner" Text="{Binding ErrorMessage}" Foreground="#9A4331" TextWrapping="Wrap" />
+          </Border>
+          <Border Background="#FFF4D6" CornerRadius="6" Padding="12" IsVisible="{Binding HasServoNotice}">
+            <TextBlock x:Name="ServoNoticeBanner" Text="{Binding ServoNotice}" Foreground="#805A16" TextWrapping="Wrap" />
+          </Border>
+        </StackPanel>
 
         <Border Grid.Row="1" Classes="card" ClipToBounds="True">
           <Grid RowDefinitions="Auto,*,Auto">
@@ -284,7 +373,7 @@
                         Width="32" Height="32" Stretch="Uniform" Stroke="#CCD9DA" StrokeThickness="1.5" HorizontalAlignment="Center" />
                   <StackPanel Spacing="8">
                     <TextBlock Text="准备好，开始一次跟踪" FontSize="20" Foreground="{StaticResource StageTextBrush}" HorizontalAlignment="Center" />
-                    <TextBlock Text="从左侧选择图像来源，再点击「开始实验」" FontSize="12" Foreground="{StaticResource StageTextBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="从左侧选择图像来源，再选择启动方式" FontSize="12" Foreground="{StaticResource StageTextBrush}" HorizontalAlignment="Center" />
                   </StackPanel>
                 </StackPanel>
               </Grid>
@@ -293,6 +382,11 @@
             <Grid Grid.Row="2" Margin="16,12" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="24">
               <StackPanel Spacing="4" VerticalAlignment="Center">
                 <TextBlock Text="{Binding DetectionLabel}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <StackPanel IsVisible="{Binding IsFace}" Spacing="3">
+                  <TextBlock x:Name="FaceSightText" Text="{Binding FaceSightError}" FontSize="12" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding FaceAlignment}" Classes="caption" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding FaceCorrection}" Classes="caption" TextWrapping="Wrap" />
+                </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <TextBlock Text="目标中心" Classes="caption" />
                   <TextBlock Text="{Binding TargetPosition}" Classes="caption" />

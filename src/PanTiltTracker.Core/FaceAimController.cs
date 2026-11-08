@@ -88,9 +88,9 @@ public sealed class FaceAimController
             panVelocity = tiltVelocity = 0;
             return Result(timingGap ? TrackingState.TimingGap : TrackingState.Waiting, false);
         }
-        MoveAxis(ref pan, ref panVelocity, ref panSettled, angles!.HorizontalDegrees,
+        if (settings.PanEnabled) MoveAxis(ref pan, ref panVelocity, ref panSettled, angles!.HorizontalDegrees,
             settings.PanDirection, settings.PanMinDegrees, settings.PanMaxDegrees, dt);
-        MoveAxis(ref tilt, ref tiltVelocity, ref tiltSettled, angles.VerticalDegrees,
+        if (settings.TiltEnabled) MoveAxis(ref tilt, ref tiltVelocity, ref tiltSettled, angles!.VerticalDegrees,
             settings.TiltDirection, settings.TiltMinDegrees, settings.TiltMaxDegrees, dt);
         return Result(panSettled && tiltSettled && panVelocity == 0 && tiltVelocity == 0
             ? TrackingState.Centered : TrackingState.Tracking, dt > 0);
@@ -98,6 +98,17 @@ public sealed class FaceAimController
         FaceAimResult Result(TrackingState state, bool permit) => new(observation,
             new(pan, tilt, state, normalizedX, normalizedY), selected, filteredX, filteredY, angles,
             panVelocity, tiltVelocity, targetLock.Status, readiness, targetLock.Epoch, permit, hasReference);
+    }
+
+    /// <summary>After an explicit transport hold, discard any unexecuted request lead. This is UART state, not shaft feedback.</summary>
+    public void SynchronizeHeldRequest(AimReference reference)
+    {
+        if (!hasReference || !double.IsFinite(reference.PanDegrees) || !double.IsFinite(reference.TiltDegrees) ||
+            reference.PanDegrees < settings.PanMinDegrees || reference.PanDegrees > settings.PanMaxDegrees ||
+            reference.TiltDegrees < settings.TiltMinDegrees || reference.TiltDegrees > settings.TiltMaxDegrees)
+            throw new ArgumentException("Invalid held request reference.", nameof(reference));
+        pan = reference.PanDegrees; tilt = reference.TiltDegrees;
+        panVelocity = tiltVelocity = 0;
     }
 
     private void MoveAxis(ref double angle, ref double velocity, ref bool settled,

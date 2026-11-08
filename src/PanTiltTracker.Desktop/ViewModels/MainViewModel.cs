@@ -25,6 +25,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly List<ErrorSample> history = [];
     private CancellationTokenSource? cancellation;
     private Task? activeSession;
+    private TaskCompletionSource? sessionFinished;
     private readonly Stopwatch displayClock = new();
     private long detectedFrames;
     private bool disposed;
@@ -84,6 +85,23 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private string stateLabel = "准备就绪";
     [ObservableProperty] private string detectionLabel = "等待图像";
     [ObservableProperty] private string targetPosition = "—";
+    [ObservableProperty] private string faceSightError = "等待锁定人脸";
+    [ObservableProperty] private string faceCorrection = "仅预览，不发送舵机指令";
+    [ObservableProperty] private string faceAlignment = "绿框：进入对准区；橙框：离开后恢复修正";
+    private FaceAimSettings? activeFaceSettings;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(OutputLabel))] private bool isFollowing;
+    public string OutputLabel => IsFollowing ? "人脸实物跟随 · 请求角度" : "视觉预览 · 独立于舵机";
+    public bool CanStartFollow => CanStart && IsFace && IsCameraSource && Servo.CanFollow && FaceAim.DirectionsConfirmed;
+    public string PreviewStartLabel => IsFace ? "仅预览（不转动）" : "开始实验";
+    public string FollowStartHint => IsRunning
+        ? IsFollowing ? "正在控制舵机；停止后可继续跟随。" : "当前仅预览，不转动。停止后点绿色「开始跟随」。"
+        : Servo.CanFollow && !FaceAim.DirectionsConfirmed ? "请先在「对准」页确认两轴修正方向。"
+        : Servo.CanFollow ? "已就绪：绿色按钮控制舵机，灰色按钮仅预览。"
+        : !Servo.Ready ? "先在「舵机」页读状态，并勾选「5V 已接，机构可动」。"
+        : $"跟随尚未就绪：{Servo.FollowReadiness}";
+    private string faceBoundaryMessage = "";
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasServoNotice))] private string servoNotice = "";
+    public bool HasServoNotice => !string.IsNullOrWhiteSpace(ServoNotice);
     [ObservableProperty] private string errorX = "—";
     [ObservableProperty] private string errorY = "—";
     [ObservableProperty] private string panCommand = "—";
@@ -101,6 +119,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<string> Events { get; } = [];
     public ServoViewModel Servo { get; } = new();
+    public FaceAimViewModel FaceAim { get; } = new();
     public ObservableCollection<CameraDevice> Cameras { get; } = [];
     public event Action? FramePresented;
     public bool CanConfigure => !IsRunning && !IsLoadingPreview;
@@ -123,7 +142,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             ? "自动捕获并用 CSRT 连续定位，周期检测校验；过期解除锁定并重新搜索。不识别机型或个体身份。"
             : "自动检测无人机，全部画框，取最高分目标。不区分机型，不保持目标身份。"
             : IsFace ? (SourceIndex == 1 ? "正面与侧面人脸检测；图片取最大框，不识别身份。"
-                : "连续确认并锁定人脸，黄十字为滤波中心。仅计算预览；角度与限位参数见 face-aim.json，常规控制滑块不用于人脸。")
+                : "连续确认并锁定人脸，黄十字为滤波中心。绿色「开始跟随」转动云台；「仅预览」只看画面。角度和方向在「对准」页设置。")
                 : "检测固定字典中的标记 ID。"
     };
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
@@ -159,7 +178,31 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             : new();
         initialSettings.Validate();
         ApplySettings(initialSettings);
+        Servo.PropertyChanged += ServoChanged;
+        FaceAim.PropertyChanged += FaceAimChanged;
+        PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is nameof(CanConfigure) or nameof(IsFace) or nameof(IsCameraSource) or nameof(IsRunning))
+            {
+                OnPropertyChanged(nameof(CanStartFollow));
+                OnPropertyChanged(nameof(PreviewStartLabel));
+                OnPropertyChanged(nameof(FollowStartHint));
+            }
+        };
         AddEvent("实验台已准备好。选择合成场景即可开始。");
+    }
+
+    private void ServoChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(Servo.CanFollow)) OnPropertyChanged(nameof(CanStartFollow));
+        if (args.PropertyName is nameof(Servo.CanFollow) or nameof(Servo.Status) or nameof(Servo.FollowReadiness)) OnPropertyChanged(nameof(FollowStartHint));
+    }
+
+    private void FaceAimChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName != nameof(FaceAim.DirectionsConfirmed)) return;
+        OnPropertyChanged(nameof(CanStartFollow));
+        OnPropertyChanged(nameof(FollowStartHint));
     }
 
     partial void OnSourceIndexChanged(int value)
@@ -242,10 +285,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand(CanExecute = nameof(CanStart))]
-    public async Task StartAsync()
+    public Task StartAsync() => RunSessionAsync(false);
+
+    [RelayCommand]
+    public Task StartFollowAsync() => CanStartFollow ? RunSessionAsync(true) : Task.CompletedTask;
+
+    private async Task RunSessionAsync(bool follow)
     {
         if (!CanStart) return;
         ErrorMessage = "";
+        ServoNotice = "";
         if ((IsAruco && (MarkerId is < 0 or >= 50)) || CameraIndex < 0)
         {
             ErrorMessage = "标记 ID 应为 0–49，相机编号应为非负整数。";
@@ -274,6 +323,18 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         };
         try { settings.Validate(); }
         catch (ArgumentException) { ErrorMessage = "参数无效，请检查增益、速度和死区。"; return; }
+        try { activeFaceSettings = IsFace ? FaceAim.Snapshot() : null; }
+        catch (ArgumentException error) { ReportError($"人脸对准参数无效：{error.Message}"); return; }
+        if (activeFaceSettings is not null && Servo.TiltCalibrationSaved)
+            activeFaceSettings = activeFaceSettings with { PanMinDegrees = Servo.PanMin, PanMaxDegrees = Servo.PanMax,
+                TiltMinDegrees = Servo.TiltFloor, TiltMaxDegrees = Servo.TiltCeiling };
+        if (follow)
+        {
+            if (activeFaceSettings?.Camera is null || !activeFaceSettings.DirectionsConfirmed)
+            { ReportError("请先配置相机参数，并在微调验证后确认两轴方向。"); return; }
+            if (FaceAim.FollowAxesIndex is < 0 or > 2) { ReportError("请选择跟随测试轴。"); return; }
+            if (!Servo.ReserveFollow()) return;
+        }
 
         LastRunDirectory = Path.Combine(workspace, "artifacts", "desktop",
             DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmssfff", CultureInfo.InvariantCulture) + "Z");
@@ -285,7 +346,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 2 => new(1920, 1080, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW),
                 _ => new(640, 480, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW)
             }, DetectFaces: IsFace, DroneModelPath: IsDrone ? DroneModelPath : null,
-            TrackDrones: IsDroneStream && DroneTrackingEnabled);
+            TrackDrones: IsDroneStream && DroneTrackingEnabled, FaceAim: activeFaceSettings);
         IsRunning = true;
         ResetPresentation();
         HasRun = true;
@@ -298,17 +359,37 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         StateLabel = "正在启动";
         AddEvent($"开始：{SourceLabel}，{(IsDrone ? DroneTrackingEnabled && IsDroneStream ? "无人机 / 检测与连续跟踪" : "无人机 / 逐帧检测" : IsFace ? SourceIndex == 1 ? "人脸 / 单帧最大框" : "人脸 / 连续确认与空间锁定" : IsAruco ? $"标记 ID {MarkerId}" : ((VideoAlgorithm)AlgorithmIndex).ToString())}。视觉会话仅计算请求。");
         cancellation = new();
+        sessionFinished = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FaceServoSession? transport = null;
+        FaceFollowOutputGuard? guardedOutput = null;
+        var normalStop = false;
+        IsFollowing = follow;
         try
         {
+            if (follow)
+            {
+                transport = await FaceServoSession.OpenAsync(Servo.Port.Trim().ToUpperInvariant(), Servo.FollowBounds,
+                    FaceAim.FollowAxesIndex switch { 0 => "S1", 1 => "S2", _ => "both" }, cancellation.Token);
+                if (FaceAim.TrialRangeEnabled) transport.RestrictTrialRange(FaceAim.TrialHalfRange);
+                var bounds = transport.Bounds;
+                activeFaceSettings = activeFaceSettings! with { PanMinDegrees = bounds[0], PanMaxDegrees = bounds[1],
+                    TiltMinDegrees = bounds[2], TiltMaxDegrees = bounds[3] };
+                options = options with { FaceAimReference = transport.Reference, FaceAim = activeFaceSettings };
+                guardedOutput = new(transport.UpdateAsync, transport.DisposeAsync, () => transport.Reference, () => transport.LimitNotice);
+                AddEvent($"本轮请求边界：S1 {bounds[0]}–{bounds[1]}°，S2 {bounds[2]}–{bounds[3]}°。");
+                AddEvent("实物跟随已启用。只有新鲜且确认的人脸可更新目标；停止不会切断 5V。");
+            }
             activeSession = TrackingSession.RunAsync(options, frame =>
                 Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     if (!disposed) Present(frame);
-                }).GetTask(), () => HideTarget, cancellation.Token);
+                }).GetTask(), () => HideTarget, cancellation.Token, guardedOutput is null ? null : guardedOutput.UpdateAsync);
             await activeSession;
+            normalStop = true;
             StateLabel = "处理完成";
         }
-        catch (OperationCanceledException) { StateLabel = "已停止"; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        { normalStop = true; StateLabel = "已停止"; }
         catch (Exception error)
         {
             ErrorMessage = error.Message;
@@ -318,6 +399,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         finally
         {
+            if (transport is not null)
+            {
+                try { await transport.DisposeAsync(); }
+                catch (Exception error) { normalStop = false; AddEvent($"停止串口：{error.Message}"); }
+            }
+            if (follow) await Servo.ReleaseFollowAsync(normalStop && transport is not null && guardedOutput?.Suspended != true);
+            if (guardedOutput?.Suspended != true) ServoNotice = "";
+            IsFollowing = false;
             displayClock.Stop();
             cancellation.Dispose();
             cancellation = null;
@@ -327,6 +416,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             AddEvent(File.Exists(Path.Combine(LastRunDirectory, "telemetry.csv"))
                 ? $"结束：已处理 {ProcessedFrames} 帧，日志已保存。"
                 : $"结束：已处理 {ProcessedFrames} 帧，未生成日志。");
+            sessionFinished.TrySetResult();
         }
     }
 
@@ -334,12 +424,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public async Task StopAsync()
     {
         cancellation?.Cancel();
-        if (activeSession is not null)
-        {
-            try { await activeSession; }
-            catch (OperationCanceledException) { }
-            catch (Exception) { /* StartAsync reports the session error in the UI. */ }
-        }
+        if (sessionFinished is not null) await sessionFinished.Task;
     }
 
     [RelayCommand(CanExecute = nameof(CanConfigure))]
@@ -361,10 +446,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         while (Events.Count > 20) Events.RemoveAt(Events.Count - 1);
     }
 
-    private void Present(SessionFrame frame)
+    internal void Present(SessionFrame frame)
     {
+        if (frame.OutputSuspended && IsFollowing)
+        {
+            IsFollowing = false;
+            Servo.SuspendFollow(frame.OutputNotice ?? "舵机通信中断，已停发；画面继续。");
+            AddEvent(Servo.Status);
+        }
         var observation = frame.Observation;
         var command = frame.Command;
+        PresentFaceAim(frame.FaceAim);
         if (frame.CaptureSummary is not null) CaptureSummary = frame.CaptureSummary;
         ProcessedFrames++;
         if (observation.HasTarget) detectedFrames++;
@@ -386,6 +478,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 "camera_geometry_required" => "人脸已锁定 · 待配置相机视场或内参",
                 "mounting_directions_required" => "人脸已锁定 · 待确认舵机修正方向",
                 "request_reference_required" => "人脸已锁定 · 等待舵机请求参考，仅预览",
+                "servo_output_suspended" => "人脸已锁定 · 舵机停发，画面继续",
                 _ => "人脸已锁定 · 相机参数与画面不匹配，仅预览"
             },
             "face_stale_frame" => "人脸画面已过期 · 保持位置",
@@ -418,12 +511,69 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         };
         if (frame.FaceAim is { Observation.HasTarget: true, Readiness: not "ready" })
             StateLabel = "人脸已锁定 · 仅预览";
+        if (IsFollowing && faceBoundaryMessage.Length > 0) StateLabel = faceBoundaryMessage;
+        ServoNotice = frame.OutputSuspended ? frame.OutputNotice ?? "舵机通信中断，已停发；画面继续。"
+            : faceBoundaryMessage.Length > 0
+                ? $"目标超出当前可达范围：{faceBoundaryMessage}。该轴保持边界，画面与其余跟随继续。"
+                : frame.OutputNotice ?? "";
+        if (frame.OutputSuspended)
+        {
+            StateLabel = "通信中断 · 画面继续";
+            FaceCorrection = "舵机已停发；停止预览后读状态，再重新启动跟随";
+        }
         if (StateLabel != previous && command.State is TrackingState.Lost or TrackingState.Stale)
             AddEvent(StateLabel);
         history.Add(new(command.ErrorX, command.ErrorY));
         if (history.Count > 180) history.RemoveAt(0);
         PlotSamples = history.ToArray();
         UpdatePreview(frame.Pixels, frame.Width, frame.Height);
+    }
+
+    internal void PresentFaceAim(FaceAimResult? aim)
+    {
+        faceBoundaryMessage = "";
+        if (aim?.SightError is not { } error)
+        {
+            FaceSightError = aim?.Readiness == "camera_geometry_mismatch" ? "相机参数与画面比例不匹配" : "等待新鲜目标及相机参数";
+            FaceCorrection = "保持 · 不生成修正";
+            FaceAlignment = "绿框：进入对准区；橙框：离开后恢复修正";
+            return;
+        }
+        FaceSightError = $"水平 {error.HorizontalDegrees:+0.00;-0.00;0.00}° / 垂直 {error.VerticalDegrees:+0.00;-0.00;0.00}°";
+        var settings = activeFaceSettings ?? FaceAim.Snapshot();
+        FaceCorrection = settings.DirectionsConfirmed
+            ? $"修正方向 · S1 {(settings.PanEnabled ? Sign(error.HorizontalDegrees, settings.PanDirection) : "保持")} / S2 {(settings.TiltEnabled ? Sign(error.VerticalDegrees, settings.TiltDirection) : "保持")} · {(IsFollowing ? "实物跟随" : "仅预览") }"
+            : "视线正方向：右 / 下；舵机修正方向待确认";
+        FaceAlignment = Math.Abs(error.HorizontalDegrees) <= settings.DeadZoneEnterDegrees &&
+            Math.Abs(error.VerticalDegrees) <= settings.DeadZoneEnterDegrees ? "人脸位于绿色对准区"
+            : Math.Abs(error.HorizontalDegrees) > settings.DeadZoneExitDegrees || Math.Abs(error.VerticalDegrees) > settings.DeadZoneExitDegrees
+                ? "人脸位于橙色区外 · 需要修正" : "滞回过渡区 · 避免反复启停";
+        if (IsFollowing)
+        {
+            faceBoundaryMessage = BoundaryMessage(aim, settings);
+            if (faceBoundaryMessage.Length > 0) FaceAlignment = faceBoundaryMessage + " · 当前转动受边界限制";
+        }
+        string Sign(double value, int direction) => Math.Abs(value) <= settings.DeadZoneEnterDegrees ? "保持"
+            : value * direction > 0 ? "+ 增大角度" : "− 减小角度";
+    }
+
+    internal static string BoundaryMessage(FaceAimResult aim, FaceAimSettings settings)
+    {
+        if (aim.SightError is not { } error || !aim.Observation.HasTarget || aim.Readiness != "ready") return "";
+        var limits = new List<string>();
+        Add("水平", settings.PanEnabled, aim.Command.PanDegrees, error.HorizontalDegrees * settings.PanDirection,
+            settings.PanMinDegrees, settings.PanMaxDegrees);
+        Add("俯仰", settings.TiltEnabled, aim.Command.TiltDegrees, error.VerticalDegrees * settings.TiltDirection,
+            settings.TiltMinDegrees, settings.TiltMaxDegrees);
+        return string.Join(" / ", limits);
+        void Add(string axis, bool enabled, double request, double correction, double min, double max)
+        {
+            if (!enabled) return;
+            if (request >= max - 0.001 && correction > settings.DeadZoneEnterDegrees)
+                limits.Add($"{axis}请求已达 {max:0.##}° 上限");
+            else if (request <= min + 0.001 && correction < -settings.DeadZoneEnterDegrees)
+                limits.Add($"{axis}请求已达 {min:0.##}° 下限");
+        }
     }
 
     private void UpdatePreview(byte[] pixels, int width, int height)
@@ -471,6 +621,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ErrorX = ErrorY = PanCommand = TiltCommand = ProcessingTime = ProcessingRate = DetectionRate = "—";
         DetectionLabel = "等待图像";
         TargetPosition = "—";
+        FaceSightError = "等待锁定人脸";
+        FaceCorrection = "仅预览，不发送舵机指令";
         StateLabel = "准备就绪";
         Elapsed = "00:00.0";
         history.Clear();
@@ -492,6 +644,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (disposed) return;
         disposed = true;
+        Servo.PropertyChanged -= ServoChanged;
+        FaceAim.PropertyChanged -= FaceAimChanged;
         cancellation?.Cancel();
         Preview?.Dispose();
         FramePresented = null;

@@ -5,6 +5,118 @@ namespace PanTiltTracker.Tests;
 
 public sealed class FaceAimTests
 {
+    [Fact]
+    public void NewTiltWindowTracksBeyondOld65LimitAndHoldsWithin50To150()
+    {
+        var settings=Ready with { PanDirection=-1,TiltDirection=-1,PanEnabled=true,TiltEnabled=true,
+            PanMinDegrees=30,PanMaxDegrees=175,TiltMinDegrees=50,TiltMaxDegrees=150 };
+        var controller=new FaceAimController(settings,new(103,100));
+        FaceAimResult result=null!;
+        for(var frame=0;frame<600;frame++)
+        {
+            result=Step(controller,frame,Face(320,380));
+            Assert.InRange(result.Command.TiltDegrees,50,150);
+        }
+        Assert.Equal(50,result.Command.TiltDegrees);
+        for(var frame=600;frame<1200;frame++)
+        {
+            result=Step(controller,frame,Face(320,100));
+            Assert.InRange(result.Command.TiltDegrees,50,150);
+        }
+        Assert.Equal(150,result.Command.TiltDegrees);
+        Assert.Equal(103,result.Command.PanDegrees);
+        var held=Step(controller,1200);
+        Assert.Equal(150,held.Command.TiltDegrees);
+        Assert.False(held.RequestPermitted);
+    }
+
+    [Fact]
+    public void FasterProfileCorrectsModerateErrorsSoonerWithinFirmwareEnvelope()
+    {
+        var fasterSettings = Ready with { ConfirmationFrames = 1, PanDirection = -1, TiltEnabled = false };
+        var faster = Controller(fasterSettings);
+        var previous = Controller(fasterSettings with { GainPerSecond = 2,
+            MaxSpeedDegreesPerSecond = 15, MaxAccelerationDegreesPerSecondSquared = 60 });
+        var last = Step(faster, 0, AtAngle(4));
+        var oldLast = Step(previous, 0, AtAngle(4));
+        for (var frame = 1; frame <= 15; frame++)
+        {
+            var next = Step(faster, frame, AtAngle(4));
+            oldLast = Step(previous, frame, AtAngle(4));
+            Assert.InRange(Math.Abs(next.PanVelocity), 0, 20.000001);
+            var dt = (next.Observation.CapturedAt - last.Observation.CapturedAt).TotalSeconds;
+            Assert.InRange(Math.Abs(next.PanVelocity - last.PanVelocity) / dt, 0, 80.000001);
+            Assert.InRange(next.Command.PanDegrees, 30, 175);
+            Assert.Equal(50, next.Command.TiltDegrees);
+            last = next;
+        }
+        Assert.True(103 - last.Command.PanDegrees > 103 - oldLast.Command.PanDegrees);
+    }
+
+    [Fact]
+    public void BothNegativePolarityAxesConvergeInAnIdealSyntheticPlant()
+    {
+        var controller = Controller(Ready with { PanDirection = -1, TiltDirection = -1 });
+        var pan = 103.0; var tilt = 50.0;
+        var panError = 8.0; var tiltError = 5.0;
+        for (var frame = 0; frame < 240; frame++)
+        {
+            // Ideal instant plant with negative mounting polarity; not a shaft measurement.
+            panError = 8 + (pan - 103);
+            tiltError = 5 + (tilt - 50);
+            var nx = Math.Tan(panError * Math.PI / 180);
+            var x = Camera.Cx + Camera.Fx * nx;
+            var y = Camera.Cy + Camera.Fy * Math.Tan(tiltError * Math.PI / 180) * Math.Sqrt(1 + nx * nx);
+            var result = Step(controller, frame, Face(x, y));
+            pan = result.Command.PanDegrees; tilt = result.Command.TiltDegrees;
+        }
+        Assert.InRange(Math.Abs(panError), 0, 1.8);
+        Assert.InRange(Math.Abs(tiltError), 0, 1.8);
+        Assert.True(pan < 103 && tilt < 50);
+    }
+
+    [Fact]
+    public void ScreenRightTargetRequestsDecreasingPanForTheObservedNegativeMounting()
+    {
+        var settings = Ready with { PanDirection = -1, TiltDirection = -1, TiltEnabled = false };
+        var controller = Controller(settings);
+        FaceAimResult? result = null;
+        for (var i = 0; i < 20; i++) result = Step(controller, i, Face(430, 280));
+        Assert.True(result!.SightError!.HorizontalDegrees > 0);
+        Assert.True(result.PanVelocity < 0);
+        Assert.True(result.Command.PanDegrees < 103);
+        Assert.Equal(50, result.Command.TiltDegrees);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void DisabledAxisKeepsItsReference(bool panEnabled, bool tiltEnabled)
+    {
+        var controller = Controller(Ready with { PanEnabled = panEnabled, TiltEnabled = tiltEnabled });
+        FaceAimResult? result = null;
+        for (var i = 0; i < 50; i++) result = Step(controller, i, Face(470, 330));
+        if (!panEnabled) { Assert.Equal(103, result!.Command.PanDegrees); Assert.Equal(0, result.PanVelocity); }
+        else Assert.True(result!.Command.PanDegrees > 103);
+        if (!tiltEnabled) { Assert.Equal(50, result!.Command.TiltDegrees); Assert.Equal(0, result.TiltVelocity); }
+        else Assert.True(result!.Command.TiltDegrees > 50);
+    }
+
+    [Fact]
+    public void HoldRebasesUnexecutedLeadWithoutPreventingReacquisition()
+    {
+        var controller = Controller();
+        for (var i = 0; i < 20; i++) Step(controller, i, Face());
+        Step(controller, 20);
+        controller.SynchronizeHeldRequest(new(104, 50));
+        var resume = Step(controller, 21, Face());
+        Assert.False(resume.RequestPermitted);
+        Assert.Equal(104, resume.Command.PanDegrees);
+        controller.SynchronizeHeldRequest(new(104, 50));
+        Assert.True(Step(controller, 22, Face()).RequestPermitted);
+        Assert.Throws<ArgumentException>(() => controller.SynchronizeHeldRequest(new(104, 70)));
+    }
+
     private static readonly CameraAngleModel Camera = CameraAngleModel.FromFieldOfView(640, 480, 60, 45);
     private static FaceAimSettings Ready => new() { Camera = Camera, DirectionsConfirmed = true };
     private static FaceRegion Face(double centerX = 470, double centerY = 240, double size = 80) =>
@@ -218,7 +330,8 @@ public sealed class FaceAimTests
         for (var i = 10; i < 12; i++)
             controller.Step([Face()], i, TimeSpan.FromSeconds(5 + (i - 9) / 30.0), 640, 480, TimeSpan.FromSeconds(5 + (i - 9) / 30.0));
         var resumed = controller.Step([Face()], 12, TimeSpan.FromSeconds(5.1), 640, 480, TimeSpan.FromSeconds(5.1));
-        Assert.InRange(resumed.Command.PanDegrees - previous.Command.PanDegrees, 0, 0.04);
+        Assert.InRange(resumed.Command.PanDegrees - previous.Command.PanDegrees, 0,
+            Ready.MaxAccelerationDegreesPerSecondSquared / (2 * 30 * 30) + 0.000001);
         var missing = controller.Step([], 13, TimeSpan.FromSeconds(5.13), 640, 480, TimeSpan.FromSeconds(5.13));
         Assert.Equal(resumed.Command.PanDegrees, missing.Command.PanDegrees);
         Assert.Null(missing.SightError);

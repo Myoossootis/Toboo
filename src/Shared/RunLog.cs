@@ -10,7 +10,7 @@ internal sealed class RunLog : IDisposable
     private readonly StreamWriter csv;
 
     public RunLog(string directory, string mode, int markerId, ControllerSettings settings,
-        string algorithm = "aruco", object? experiment = null)
+        string algorithm = "aruco", object? experiment = null, string hardwareOutput = "disabled")
     {
         Directory.CreateDirectory(directory);
         csv = new StreamWriter(Path.Combine(directory, "telemetry.csv"));
@@ -20,7 +20,7 @@ internal sealed class RunLog : IDisposable
             startedUtc = DateTimeOffset.UtcNow,
             mode,
             simulated = mode == "simulate",
-            hardwareOutput = "disabled",
+            hardwareOutput,
             algorithm,
             dictionary = algorithm == "aruco" ? "DICT_4X4_50" : null,
             markerId = algorithm == "aruco" ? (int?)markerId : null,

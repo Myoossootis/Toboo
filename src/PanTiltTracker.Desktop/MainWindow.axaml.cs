@@ -136,7 +136,7 @@ public sealed partial class MainWindow : Avalonia.Controls.Window
     {
         base.OnClosing(args);
         if (closing) return;
-        if (ViewModel.Servo.Busy)
+        if (ViewModel.Servo.Busy && !ViewModel.IsFollowing)
         {
             args.Cancel = true;
             return;

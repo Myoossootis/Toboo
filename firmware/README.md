@@ -1,6 +1,6 @@
 # ESP32-S3 台架与舵机固件
 
-**当前板内版本（2026-11-07）**为 esp32_single_servo / v0.4.0。支持双轴同步 S 曲线插补，硬件限位 S1 30–175°、S2 35–65°。默认停发，显式操作后才发 UART。细节见 [协议](protocol-single-s1.md) 和 [实物记录](../docs/16-single-servo-bringup.md)。
+**当前板内版本（2026-11-08）**为 esp32_single_servo / v0.5.0，已烧录、写入哈希校验及只读核对，启动两轴 UART 帧计数为 0。新增独立的连续目标跟随模式，保留同步 S 曲线回位及扫动。硬件限位 S1 30–175°、S2 35–65°；默认停发。真实闭环跟随尚待现场验收。细节见 [协议](protocol-single-s1.md)、[人脸对准](../docs/17-face-aiming.md) 和 [实物记录](../docs/16-single-servo-bringup.md)。
 
 ## 手动操作
 

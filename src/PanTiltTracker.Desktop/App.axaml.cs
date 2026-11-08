@@ -16,6 +16,18 @@ public sealed partial class App : Application
         {
             var window = new MainWindow();
             desktop.MainWindow = window;
+            if (desktop.Args?.Contains("--servo-calibration", StringComparer.Ordinal) == true)
+            {
+                window.ViewModel.SourceIndex = 3;
+                window.ViewModel.TargetIndex = 1;
+                window.FindControl<TabControl>("SettingsTabs")!.SelectedIndex = 2;
+            }
+            if (desktop.Args?.Contains("--face-preview", StringComparer.Ordinal) == true)
+            {
+                window.ViewModel.SourceIndex = 3;
+                window.ViewModel.TargetIndex = 1;
+                window.Opened += async (_, _) => await window.ViewModel.RefreshCamerasAsync();
+            }
             if (desktop.Args?.Contains("--smoke-test-ui", StringComparer.Ordinal) == true)
                 window.Opened += async (_, _) =>
                 {

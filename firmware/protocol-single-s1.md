@@ -1,5 +1,31 @@
 # 台架舵机协议
 
+## v0.5.3 新 S2 逐度校准与独立保存
+
+- S2 手动协议范围为 0–180°，这是请求范围，不是装机后的安全机械范围。首次仍须显式 `CENTER_S2 ... 45`。在已观察的 45–90°外，单轴 `MOVE_S2` 每条请求最多改变 1°，否则 `ERR,CALIBRATION_STEP`；运动间隔仍至少 200ms。主机也在 ARM 前执行同一检查。
+- `reference --axis S2 --execute` 只为 S2 发 45°定位请求；`nudge` 的 `--tilt-floor` 和 `--tilt-ceiling` 限制单步边界。inspect 返回固件允许的各通道请求范围。启动和读取不发动作。
+- 新应用用独立的 S2 舵机配置标识，旧 S2 下限、上限、中心和对准确认不再沿用，S1 有效边界与相机参数保留。初始校准区间 45–90°来自用户实物观察，不视为机械极限。
+- 校准时只使用 S2 ±1°，观察后记录上下边界，留出碰撞和卡住前的余量。保存后中心取新边界中点，退出校准模式，手动按钮受保存边界约束。新 S2 方向需要重新确认。
+- 双轴及跟随的协议上限相应支持 S2 0–180°；应用仅在新 S2 边界已保存时允许这些模式，跟随 ARM 仍必须显式传入收窄后的边界，并要求两轴已有范围内的请求参考。S1 范围不变。独立超时、会话、序号和默认停发保持不变。
+
+## v0.5.2 新 S2 舵机单轴校准
+
+- 仅单轴 S2 的手动请求上限从 65°扩至 90°，下限仍为 35°；首次显式定位仍为 45°。后续按 1°/200ms 移动，不循环、不自动回位。
+- S1、S3 范围不变。双轴回位/扫动及人脸跟随的 S2 上限仍为 65°；若单轴校准后 S2 请求高于 65°，拒绝启用双轴模式，须先人工确认并移回原范围。
+- 新蓝色 SG90 的请求角度与旧舵机机构姿态不同，旧边界和中心不能当作新舵机校准结果。当前实物只确认 45°、50°姿态可用；90°待用户观察验证。UART ACK/发送计数不代表实际轴位。
+- 原有开机/ARM 无动作、500ms 失联关闭 UART、会话/序号检查保持不变。
+
+## v0.5.0 可更新目标的人脸跟随
+
+- 保留 v0.4.0 的回位、扫动和单轴微调。`HELLO` 版本变为 `0.5.0`，启动仍为 DISARMED、两轴请求参考未知、GPIO17/18 输入态，没有上电动作。
+- `ARM_FOLLOW,session,seq,panMin,panMax,tiltMin,tiltMax` 单独进入 `ARMED_FOLLOW`。限位只能收窄 S1 30–175°、S2 35–65°，两轴已有末次请求且在新边界内才允许启用。ARM 不发送角度，不替代回位。
+- `FOLLOW_BOTH,session,seq,panCentiDegrees,tiltCentiDegrees` 接受百分之一度的主机目标表示，运动中可覆盖目标。实际驱动板 UART 仍只有整数度。独立 20ms 更新，误差比例系数 6/s，内部名义速度上限 20°/s、加速度上限 80°/s²；边界和显式 HOLD 优先于加速度渐变。
+- `HOLD_BOTH,session,seq` 丢弃目标和未发出的亚度累积，停在两轴末次整数请求，无 UART 帧。不是实际轴位或断电确认。
+- FOLLOW 目标有效期 **150ms**。`KEEP_FOLLOW,session,seq` 只续期通信许可，不能延长旧目标；目标过期自动 HOLD。500ms 无有效控制命令、超过 100ms 固件调度停顿、UART 失败均关闭输出。停发更换 session，旧指令失效。
+- 跟随与原双轴/单轴模式互斥；越界、旧序号、旧会话及格式错误不续期。双轴整条目标先校验后接受，部分 UART 输出失败转 FAULT。
+- `face_follow.py --execute` 使用逐行 JSON 管道，打开只读检查，显式 `start` 才启用；无自动初始化。`start` 包含 `bounds:[panMin,panMax,tiltMin,tiltMax]`、`reference:[pan,tilt]` 和 `axes:S1|S2|both`。`frame` 包含 `permit:boolean,age_ms:number,pan:number,tilt:number`。未许可或帧龄 >200ms 只 HOLD。250ms 无主机输入、EOF、停止及异常均尝试 DISARM。进程被杀仍有 MCU 独立超时。
+- 状态 `reference` 是已发 UART 请求，不是编码器反馈。发生 HOLD 后主机同步回该参考，放弃未执行的请求超前量。主机仅允许实时摄像头人脸输入驱动实物，不允许录像、合成或图片接输出。
+
 ## v0.4.0 双轴 S 曲线插补
 
 - 硬件指令范围为 S1 30–175°、S2 35–65°。`ARM_BOTH,session,seq` 启用双轴 UART，`KEEP_BOTH,session,seq` 续期 500ms 许可。`DISARM`、超时、UART 失败和超过 100ms 的调度停顿取消两轴未完成目标。旧单轴微调入口继续保留。
@@ -93,3 +119,22 @@ ARM/CENTER/MOVE/KEEP 最后一次有效请求后 500ms 失效，先取消目标�
 测试脚本 `firmware/tests/serial_single_servo_test.py` 会发实际 UART 字节，仅限舵机板、舵机及外置动力均断开的 MCU 裸板。必须带 --outputs-disconnected；这表示操作前条件，不是程序能检测到外设已断开。
 
 官方 API 依据：[Arduino-ESP32 UART](https://docs.espressif.com/projects/arduino-esp32/en/latest/api/serial.html)、[ESP32-S3 随机数源](https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/system/random.html)。
+
+## v0.5.1: independent S3 replacement-servo bench channel
+
+S3 is a separate manual test channel, restricted to requests 30–90°. It does
+not change the S1/S2 pair or face-follow channel mapping. `STATUS_S3` is read
+only. `ARM_S3`, `CENTER_S3`, `MOVE_S3`, and `KEEP_S3` use the existing session
+and sequence rules; an armed single channel rejects actions on other channels.
+The only first `CENTER_S3` request is 60°. Its starting physical position is
+unknown, so this first request cannot be slew limited. Later `MOVE_S3` requests
+advance by at most 1° per 200 ms. Driver output uses `$Cxxx#` at 9600 baud.
+Boot/ARM emit no angle. The 500 ms watchdog, DISARM, replay protection and UART
+fault handling apply unchanged. DISARM stops new UART commands; it does not
+cut driver power or stop the driver's existing servo PWM.
+
+With external driver 5V disconnected, compile and flash first. After power and
+mechanical clearance are checked, initialize S3 explicitly at 60°, observe it,
+then use `single_servo.py --port COM6 --axis S3 --action sweep --execute` for
+30° → 90° at approximately 5°/s. This is a one-shot test, with no automatic
+return or repetition. All reported angles are requests, not measured positions.

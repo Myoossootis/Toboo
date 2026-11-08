@@ -2,10 +2,10 @@
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from single_servo import FIRMWARE_LIMITS, home, nudge, sweep, coordinated, rectangle_center, rectangle_path  # noqa: E402
+from single_servo import FIRMWARE_LIMITS, home, nudge, sweep, coordinated, rectangle_center, rectangle_path, once, reference  # noqa: E402
 
 
 class FakeLink:
@@ -14,7 +14,7 @@ class FakeLink:
 
     def __init__(self, pan, tilt):
         self.axis = "S1"
-        self.positions = {"S1": pan, "S2": tilt}
+        self.positions = {"S1": pan, "S2": tilt, "S3": -1}
         self.frames = 0
         self.state = "DISARMED"
         self.boot = "boot"
@@ -37,6 +37,86 @@ class FakeLink:
 
 
 class ServoHomeTest(unittest.TestCase):
+    def test_new_rectangle_and_both_diagonals_use_verified_50_to_150_window(self):
+        link = PairLink(-1,-1)
+        link.version="0.5.3"; link.limits=FIRMWARE_LIMITS[("UAVTRACK_PANTILT",link.version)]
+        path=rectangle_path(rectangle_center(30,175,50,150),30,175,50,150,tilt_limits=(0,180))
+        self.assertEqual(path,[(103,100),(30,150),(30,50),(175,50),(175,150),(30,150),
+                              (175,50),(175,150),(30,50),(30,150),(103,100)])
+        with patch("single_servo.time.sleep"):
+            report=coordinated(link,path)
+        self.assertEqual(report["path"],[list(point) for point in path])
+        self.assertEqual(report["axes"]["S2"]["last_requested"],100)
+        self.assertEqual(report["axes"]["S3"]["last_requested"],-1)
+
+    def test_missing_s2_reference_never_initializes_at_45_outside_new_window(self):
+        link=PairLink(103,-1)
+        link.version="0.5.3"; link.limits=FIRMWARE_LIMITS[("UAVTRACK_PANTILT",link.version)]
+        with patch("single_servo.once") as output:
+            with self.assertRaisesRegex(RuntimeError,"Reset ESP32"):
+                coordinated(link,[(103,100)])
+        output.assert_not_called()
+        self.assertEqual(link.commands,[])
+
+    def test_calibration_cannot_jump_beyond_observed_interval(self):
+        link = Mock(version="0.5.3", axis="S2", angle_limits=(0, 180))
+        link.status.return_value = dict(state="DISARMED", last=90)
+        with self.assertRaisesRegex(ValueError, "one-degree"):
+            once(link, "move", 95)
+        link.request.assert_not_called()
+
+    def test_s2_reference_does_not_initialize_other_channels(self):
+        link = FakeLink(-1, -1)
+        link.version = "0.5.3"; link.limits = FIRMWARE_LIMITS[("UAVTRACK_PANTILT", link.version)]
+        link.axis = "S2"
+        with patch("single_servo.once", link.request_home):
+            result = reference(link)
+        self.assertEqual(link.commands, [("S2", "center", 45)])
+        self.assertEqual(result["axes"]["S1"]["last_requested"], -1)
+        self.assertEqual(result["axes"]["S3"]["last_requested"], -1)
+
+    def test_explicit_home_initializes_only_missing_pan_reference_after_s2_calibration(self):
+        link = PairLink(-1, 90)
+        link.version = "0.5.3"; link.limits = FIRMWARE_LIMITS[("UAVTRACK_PANTILT", link.version)]
+        with patch("single_servo.once", link.request_home), patch("single_servo.time.sleep"):
+            report = coordinated(link, [(103, 68)])
+        self.assertIn(("S1", "center", 103), link.commands)
+        self.assertFalse(any(isinstance(c, tuple) and c[0] == "S2" for c in link.commands))
+        self.assertEqual(report["axes"]["S2"]["last_requested"], 68)
+    def test_manual_s2_can_return_from_90_on_new_firmware(self):
+        link = Mock(version="0.5.2", axis="S2", angle_limits=(35, 90))
+        initial = dict(state="DISARMED", session="boot-1", sequence=0, last=90, target=90, frames=1)
+        done = initial | dict(state="ARMED_S2", last=89, target=89, frames=2)
+        link.status.side_effect = [initial, done]
+        self.assertEqual(once(link, "move", 89)["last"], 89)
+        self.assertEqual(link.request.call_args.args[:4], ("MOVE_S2", initial, 2, 89))
+        link.disarm.assert_called_once()
+
+    def test_manual_s2_rejects_request_above_90_before_arming(self):
+        link = Mock(version="0.5.2", axis="S2", angle_limits=(35, 90))
+        link.status.return_value = dict(state="DISARMED", last=50)
+        with self.assertRaises(ValueError):
+            once(link, "move", 91)
+        link.request.assert_not_called()
+
+    def test_s2_extension_does_not_expand_rectangle_tracking_bounds(self):
+        self.assertEqual(FIRMWARE_LIMITS[("UAVTRACK_PANTILT", "0.5.2")]["S2"], (35, 90))
+        with self.assertRaises(ValueError):
+            rectangle_path((103, 60), 30, 175, 35, 90)
+
+    def test_s3_replacement_sweep_is_isolated_and_uses_30_to_90(self):
+        link = FakeLink(-1, -1)
+        link.version = "0.5.1"
+        link.limits = FIRMWARE_LIMITS[("UAVTRACK_PANTILT", link.version)]
+        link.positions["S3"] = -1
+        link.axis = "S3"
+        with patch("single_servo.once", link.request_home), patch("single_servo.time.sleep"):
+            result = sweep(link)
+        self.assertEqual(link.commands, [("S3", "center", 60), ("S3", "move", 30), ("S3", "move", 90)])
+        self.assertEqual(link.positions["S1"], -1)
+        self.assertEqual(link.positions["S2"], -1)
+        self.assertEqual(result["sweep"]["uart_frames_sent"], 60)
+
     def test_fresh_boot_and_referenced_axis_use_different_commands(self):
         link = FakeLink(-1, 90)
         with patch("single_servo.once", link.request_home), patch("single_servo.time.sleep") as pause:
@@ -238,7 +318,7 @@ class PairLink(FakeLink):
         elif fields[0] in ("INIT_BOTH", "MOVE_BOTH"):
             if self.fail_move:
                 raise RuntimeError("injected send failure")
-            self.positions = dict(zip(("S1", "S2"), map(int, fields[3:])))
+            self.positions.update(zip(("S1", "S2"), map(int, fields[3:])))
             self.frames += 2
         return f"ACK,{self.sequence},{fields[0]},REQUEST_ONLY"
 

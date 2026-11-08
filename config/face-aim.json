@@ -12,9 +12,9 @@
   "filterTimeConstantSeconds": 0.10,
   "deadZoneEnterDegrees": 1.0,
   "deadZoneExitDegrees": 1.8,
-  "gainPerSecond": 2.0,
-  "maxSpeedDegreesPerSecond": 15.0,
-  "maxAccelerationDegreesPerSecondSquared": 60.0,
+  "gainPerSecond": 3.0,
+  "maxSpeedDegreesPerSecond": 20.0,
+  "maxAccelerationDegreesPerSecondSquared": 80.0,
   "maxFrameAgeSeconds": 0.2,
   "maxUpdateGapSeconds": 0.15
 }

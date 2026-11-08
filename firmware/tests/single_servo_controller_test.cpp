@@ -41,9 +41,123 @@ void pairRequest(Controller& c, const std::string& verb, uint32_t seq, uint32_t 
 }
 
 int main() {
+  assert(single_servo::validServoFrame("$B000#", 6));
+  assert(single_servo::validServoFrame("$B180#", 6));
+  FakeOutput calibrateOut;
+  Controller calibrate(calibrateOut); calibrate.start(61, 62);
+  command(calibrate, "ARM_S2", 1, 0);
+  command(calibrate, "CENTER_S2", 2, 0, "ACK,", "45");
+  command(calibrate, "MOVE_S2", 3, 0, "ERR,CALIBRATION_STEP", "43");
+  assert(calibrate.frames == 1 && calibrate.target(1) == 45);
+  uint32_t calibrateSeq = 2, calibrateTime = 0;
+  for (int angle = 44; angle >= 0; --angle) {
+    char value[4]; snprintf(value, sizeof(value), "%d", angle);
+    command(calibrate, "MOVE_S2", ++calibrateSeq, calibrateTime, "ACK,", value);
+    tickThrough(calibrate, calibrateTime, calibrateTime + 200);
+    calibrateTime += 200;
+    assert(calibrate.last(1) == angle);
+  }
+  command(calibrate, "MOVE_S2", ++calibrateSeq, calibrateTime, "ERR,NUMBER", "-1");
+  command(calibrate, "MOVE_S2", calibrateSeq, calibrateTime, "ERR,CALIBRATION_STEP", "2");
+  assert(calibrateOut.sent.back() == "$B000#");
+  assert(calibrate.last(0) == -1 && calibrate.last(2) == -1);
+  expectRaw(calibrate, "DISARM", calibrateTime, "ACK,DISARM");
+
+  // Only manual S2 testing may use the replacement-servo extension to 90 degrees.
+  FakeOutput extendedOut;
+  Controller extended(extendedOut); extended.start(51, 52);
+  command(extended, "ARM_S2", 1, 0);
+  command(extended, "CENTER_S2", 2, 0, "ACK,", "45");
+  command(extended, "MOVE_S2", 3, 0, "ERR,RANGE", "181");
+  command(extended, "MOVE_S2", 3, 0, "ERR,CALIBRATION_STEP", "91");
+  command(extended, "MOVE_S2", 3, 0, "ACK,", "90");
+  uint32_t extendedSeq = 3;
+  for (uint32_t now = 20; now <= 9000; now += 20) {
+    if (now % 200 == 0) command(extended, "KEEP_S2", ++extendedSeq, now);
+    else extended.tick(now);
+  }
+  assert(extended.last(1) == 90 && extended.frames == 46);
+  for (size_t i = 0; i < extendedOut.sent.size(); ++i) {
+    char expected[8]; snprintf(expected, sizeof(expected), "$B%03d#", 45 + int(i));
+    assert(extendedOut.sent[i] == expected);
+  }
+  assert(extended.last(0) == -1 && extended.last(2) == -1);
+  expectRaw(extended, "DISARM", 9000, "ACK,DISARM");
+  ++extendedSeq;
+  pairRequest(extended, "ARM_FOLLOW", extendedSeq, 9000, ",30,175,35,90", "ERR,REFERENCE");
+  command(extended, "ARM_S2", extendedSeq, 9000);
+  command(extended, "MOVE_S2", ++extendedSeq, 9000, "ACK,", "91");
+  tickThrough(extended, 9000, 9200);
+  assert(extended.last(1) == 91);
+  command(extended, "MOVE_S2", ++extendedSeq, 9200, "ERR,CALIBRATION_STEP", "93");
+  command(extended, "MOVE_S2", extendedSeq, 9200, "ACK,", "90");
+  tickThrough(extended, 9200, 9400);
+  assert(extended.last(1) == 90);
+  extended.tick(9700);
+  assert(extended.state == State::TimedOut && !extendedOut.enabled);
+
+  // Reproduce the replacement-servo sequence: initialize, DISARM, re-arm, move.
+  // These are generated UART bytes, not proof of driver reception or shaft angle.
+  FakeOutput replacementOut;
+  Controller replacement(replacementOut); replacement.start(41, 42);
+  command(replacement, "ARM_S2", 1, 0);
+  command(replacement, "CENTER_S2", 2, 0, "ACK,", "45");
+  expectRaw(replacement, "DISARM", 10, "ACK,DISARM");
+  tickThrough(replacement, 10, 810);
+  command(replacement, "ARM_S2", 3, 810);
+  assert(replacementOut.sent.size() == 1); // Re-arm must not repeat initialization.
+  command(replacement, "MOVE_S2", 4, 810, "ACK,", "50");
+  uint32_t replacementSeq = 4;
+  for (uint32_t now = 830; now <= 1830; now += 20) {
+    if ((now - 810) % 80 == 0) command(replacement, "KEEP_S2", ++replacementSeq, now);
+    else replacement.tick(now);
+  }
+  const std::vector<std::string> replacementExpected = {
+    "$B045#", "$B046#", "$B047#", "$B048#", "$B049#", "$B050#"};
+  assert(replacementOut.sent == replacementExpected);
+  assert(replacement.last(0) == -1 && replacement.last(2) == -1);
+  assert(replacement.last(1) == 50 && replacement.target(1) == 50);
+  expectRaw(replacement, "DISARM", 1830, "ACK,DISARM");
+  tickThrough(replacement, 1830, 2830);
+  assert(replacementOut.sent == replacementExpected && !replacementOut.enabled);
+
+  // Isolated S3 replacement-servo test. Pair/follow still own S1/S2 only.
+  assert(single_servo::validServoFrame("$C030#", 6));
+  assert(single_servo::validServoFrame("$C090#", 6));
+  FakeOutput thirdOut;
+  Controller third(thirdOut); third.start(31, 32);
+  expectRaw(third, "STATUS_S3", 0, "STATUS,DISARMED,");
+  command(third, "ARM_S3", 1, 0);
+  assert(thirdOut.sent.empty());
+  command(third, "MOVE_S3", 2, 0, "ERR,REFERENCE", "30");
+  command(third, "CENTER_S3", 2, 0, "ERR,FIRST_S3_RANGE", "90");
+  command(third, "CENTER_S3", 2, 0, "ACK,", "60");
+  command(third, "MOVE_S3", 3, 0, "ERR,RANGE", "29");
+  command(third, "MOVE_S3", 3, 0, "ERR,RANGE", "91");
+  command(third, "MOVE_S1", 3, 0, "ERR,AXIS", "100");
+  command(third, "MOVE_S2", 3, 0, "ERR,AXIS", "50");
+  command(third, "MOVE_S3", 3, 0, "ACK,", "30");
+  uint32_t thirdSeq = 3;
+  for (uint32_t now = 20; now <= 6000; now += 20) {
+    if (now % 200 == 0) command(third, "KEEP_S3", ++thirdSeq, now);
+    else third.tick(now);
+  }
+  assert(third.last(2) == 30 && third.frames == 31);
+  command(third, "MOVE_S3", ++thirdSeq, 6000, "ACK,", "90");
+  for (uint32_t now = 6020; now <= 18000; now += 20) {
+    if (now % 200 == 0) command(third, "KEEP_S3", ++thirdSeq, now);
+    else third.tick(now);
+  }
+  assert(third.last(2) == 90 && third.frames == 91);
+  assert(third.last(0) == -1 && third.last(1) == -1);
+  for (const auto& frame : thirdOut.sent) assert(frame[1] == 'C');
+  third.tick(18500);
+  assert(third.state == State::TimedOut && !thirdOut.enabled);
+  assert(third.frames == 91);
+
   assert(single_servo::validServoFrame("$A030#", 6) && single_servo::validServoFrame("$A175#", 6));
   assert(single_servo::validServoFrame("$B035#", 6) && single_servo::validServoFrame("$B065#", 6));
-  for (const char* frame : {"$A029#", "$A176#", "$B034#", "$B066#", "$C090#", "$A09x#", "$A090!"}) {
+  for (const char* frame : {"$A029#", "$A176#", "$B181#", "$C091#", "$C029#", "$D060#", "$A09x#", "$A090!"}) {
     assert(!single_servo::validServoFrame(frame, 6));
   }
   assert(!single_servo::validServoFrame("$A09", 4));
@@ -116,7 +230,7 @@ int main() {
 
   FakeOutput dualOut;
   Controller dual(dualOut); dual.start(11, 12);
-  expectRaw(dual, "HELLO", 0, "HELLO,UAVTRACK_PANTILT,0.4.0,");
+  expectRaw(dual, "HELLO", 0, "HELLO,UAVTRACK_PANTILT,0.5.3,");
   command(dual, "ARM_S1", 1, 0);
   command(dual, "CENTER_S1", 2, 0);
   expectRaw(dual, "DISARM", 10, "ACK,DISARM");
@@ -128,8 +242,8 @@ int main() {
   command(dual, "CENTER_S2", 4, 20, "ERR,FIRST_TILT_RANGE", "46");
   command(dual, "CENTER_S2", 4, 20, "ACK,", "45");
   assert(dualOut.sent.back() == "$B045#" && dual.last() == 90 && dual.last(1) == 45);
-  command(dual, "MOVE_S2", 5, 20, "ERR,RANGE", "34");
-  command(dual, "MOVE_S2", 5, 20, "ERR,RANGE", "66");
+  command(dual, "MOVE_S2", 5, 20, "ERR,CALIBRATION_STEP", "34");
+  command(dual, "MOVE_S2", 5, 20, "ERR,RANGE", "181");
   command(dual, "MOVE_S1", 5, 20, "ERR,AXIS", "80");
   command(dual, "MOVE_S2", 5, 20, "ACK,", "47");
   tickThrough(dual, 20, 210);
@@ -137,7 +251,7 @@ int main() {
   dual.tick(220); assert(dualOut.sent.back() == "$B046#");
   command(dual, "KEEP_S2", 6, 220);
   tickThrough(dual, 220, 420); assert(dualOut.sent.back() == "$B047#");
-  command(dual, "MOVE_S2", 7, 420, "ACK,", "40");
+  command(dual, "MOVE_S2", 7, 420, "ACK,", "45");
   tickThrough(dual, 420, 900);
   command(dual, "KEEP_S1", 8, 900, "ERR,AXIS");
   dual.tick(920); assert(dual.state == State::TimedOut && !dualOut.enabled);
@@ -235,7 +349,7 @@ int main() {
   pairRequest(pair, "INIT_BOTH", 2, 0, ",103,50");
   assert(pairOut.sent.size() == 2 && pairOut.sent[0] == "$A103#" && pairOut.sent[1] == "$B050#");
   pairRequest(pair, "MOVE_BOTH", 3, 0, ",29,50", "ERR,RANGE");
-  pairRequest(pair, "MOVE_BOTH", 3, 0, ",175,66", "ERR,RANGE");
+  pairRequest(pair, "MOVE_BOTH", 3, 0, ",175,181", "ERR,RANGE");
   pairRequest(pair, "MOVE_BOTH", 3, 0, ",133,65");
   uint32_t pairSeq = 3;
   for (uint32_t now = 10; now <= 1880; now += 10) {
@@ -268,6 +382,57 @@ int main() {
   pair.tick(4120);
   assert(pair.state == State::TimedOut && !pairOut.enabled);
   assert(pair.target() == pair.last() && pair.target(1) == pair.last(1));
+
+  FakeOutput followOut;
+  Controller follow(followOut); follow.start(31, 32);
+  pairRequest(follow, "ARM_FOLLOW", 1, 0, ",95,110,45,55", "ERR,REFERENCE");
+  assert(!followOut.enabled && followOut.sent.empty());
+  pairRequest(follow, "ARM_BOTH", 1, 0);
+  pairRequest(follow, "INIT_BOTH", 2, 0, ",103,50");
+  expectRaw(follow, "DISARM", 0, "ACK,DISARM");
+  pairRequest(follow, "ARM_FOLLOW", 3, 0, ",30,175,0,181", "ERR,RANGE");
+  pairRequest(follow, "ARM_FOLLOW", 3, 0, ",104,110,45,55", "ERR,REFERENCE");
+  const auto initializedFrames = follow.frames;
+  pairRequest(follow, "ARM_FOLLOW", 3, 0, ",95,110,45,55");
+  assert(!strcmp(follow.stateName(), "ARMED_FOLLOW") && follow.frames == initializedFrames);
+  pairRequest(follow, "FOLLOW_BOTH", 4, 0, ",11001,5000", "ERR,RANGE");
+  pairRequest(follow, "FOLLOW_BOTH", 4, 0, ",10550,5100");
+  pairRequest(follow, "MOVE_BOTH", 5, 0, ",103,50", "ERR,STATE");
+  command(follow, "MOVE_S1", 5, 0, "ERR,AXIS", "104");
+  uint32_t followSeq = 4;
+  for (uint32_t now = 10; now <= 400; now += 10) {
+    int beforePan = follow.last(), beforeTilt = follow.last(1);
+    if (now % 80 == 0) pairRequest(follow, "FOLLOW_BOTH", ++followSeq, now, ",10550,5100");
+    else follow.tick(now);
+    assert(abs(follow.last() - beforePan) <= 1 && abs(follow.last(1) - beforeTilt) <= 1);
+  }
+  assert(follow.last() > 103 && follow.last(1) == 51);
+  // Retarget while moving is accepted; there is no BUSY/restarted fixed-duration curve.
+  pairRequest(follow, "FOLLOW_BOTH", ++followSeq, 400, ",9500,4500");
+  for (uint32_t now = 410; now <= 800; now += 10) {
+    if (now % 80 == 0) pairRequest(follow, "FOLLOW_BOTH", ++followSeq, now, ",9500,4500");
+    else follow.tick(now);
+  }
+  assert(follow.last() < 105 && follow.last(1) < 51);
+  pairRequest(follow, "HOLD_BOTH", ++followSeq, 800);
+  auto holdFrames = follow.frames;
+  tickThrough(follow, 800, 900);
+  assert(follow.frames == holdFrames);
+  pairRequest(follow, "FOLLOW_BOTH", ++followSeq, 900, ",11000,5500");
+  tickThrough(follow, 900, 1050);
+  holdFrames = follow.frames;
+  for (uint32_t now = 1060; now <= 1300; now += 10) {
+    if (now % 50 == 0) pairRequest(follow, "KEEP_FOLLOW", ++followSeq, now);
+    else follow.tick(now);
+  }
+  assert(follow.frames == holdFrames && follow.state == State::Armed); // Heartbeats cannot revive expired targets.
+  assert(follow.target() == follow.last() && follow.target(1) == follow.last(1));
+  pairRequest(follow, "FOLLOW_BOTH", ++followSeq, 1300, ",11000,5500");
+  follow.tick(1410); // Scheduler stall cancels rather than catches up.
+  assert(follow.state == State::TimedOut && !followOut.enabled && follow.frames == holdFrames);
+  auto staleSession = std::string(follow.session());
+  expectRaw(follow, "DISARM", 1420, "ACK,DISARM");
+  expectRaw(follow, "ARM_FOLLOW," + staleSession + ",999,95,110,45,55", 1420, "ERR,SESSION");
 
   single_servo::LineReader reader;
   using Event = single_servo::LineReader::Event;
