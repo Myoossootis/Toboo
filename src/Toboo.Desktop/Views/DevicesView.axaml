@@ -1,5 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:Toboo.Desktop.ViewModels" xmlns:icons="using:Toboo.Desktop.Controls"
+             xmlns:vm="using:Toboo.Desktop.ViewModels" xmlns:icons="using:Toboo.Desktop.Controls" xmlns:views="using:Toboo.Desktop.Views"
              x:Class="Toboo.Desktop.Views.DevicesView" x:DataType="vm:CompanionShellViewModel">
   <ScrollViewer x:Name="DeviceScroll" HorizontalScrollBarVisibility="Disabled">
     <StackPanel Spacing="24" Margin="32,24">
@@ -31,9 +31,10 @@
               </Grid>
               <TextBlock Text="{Binding CameraState}" Classes="caption" TextWrapping="Wrap" />
               <TextBlock Text="{Binding SourceCaption}" Classes="caption" IsVisible="{Binding Tracking.HasPreview}" />
+              <TextBlock Text="{Binding Tracking.CameraModelLabel}" Classes="caption" IsVisible="{Binding Tracking.HasPreview}" TextWrapping="Wrap" />
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                <Button x:Name="StartVisionButton" Content="开启视觉感知" Classes="primary" Command="{Binding StartVisionCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsVisible="{Binding !Tracking.IsRunning}" />
-                <Button x:Name="StopVisionButton" Content="停止感知" Classes="quiet" Command="{Binding Tracking.StopCommand}" IsVisible="{Binding Tracking.IsRunning}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                <Button x:Name="StartVisionButton" Content="开启视觉感知" Classes.primary="{Binding !CanFollow}" Classes.quiet="{Binding CanFollow}" Command="{Binding StartVisionCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsVisible="{Binding !Tracking.IsRunning}" />
+                <Button x:Name="StopVisionButton" Content="{Binding StopLabel}" Classes="quiet" Command="{Binding Tracking.StopCommand}" IsVisible="{Binding Tracking.IsRunning}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
                 <Button Grid.Column="1" Content="图片 / 录像" Classes="textlink" Command="{Binding OpenAdvancedCommand}" />
               </Grid>
               <CheckBox x:Name="DeviceExpressionToggle" Content="本地表情识别" IsChecked="{Binding Tracking.ExpressionEnabled}" IsEnabled="{Binding Tracking.CanConfigure}" />
@@ -56,18 +57,30 @@
           <Border Classes="shellcard">
             <StackPanel Spacing="16">
               <StackPanel Orientation="Horizontal" Spacing="12"><icons:AppIcon Kind="Robot" /><TextBlock Text="机器人" Classes="section" /></StackPanel>
-              <Image Source="avares://toboo/Assets/toboo-companion.png" Height="144" RenderTransformOrigin="50%,50%"><Image.RenderTransform><ScaleTransform ScaleX="1.4" ScaleY="1.4" /></Image.RenderTransform></Image>
+              <Image Source="avares://toboo/Assets/toboo-companion.png" Height="96" IsVisible="{Binding !CalibrationExpanded}" />
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBlock Text="云台状态" Classes="muted" /><TextBlock Grid.Column="1" Text="{Binding RobotConnection}" FontWeight="Medium" /></Grid>
               <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
               <TextBlock Text="云台控制" FontSize="16" FontWeight="SemiBold" />
+              <StackPanel DataContext="{Binding Tracking.Servo}" x:DataType="vm:ServoViewModel" Spacing="8">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                  <ComboBox x:Name="DeviceServoPortSelector" ItemsSource="{Binding AvailablePorts}" SelectedItem="{Binding Port, Mode=TwoWay}" PlaceholderText="选择 ESP32 串口" IsEnabled="{Binding !Busy}" HorizontalAlignment="Stretch" />
+                  <Button Grid.Column="1" Content="刷新" Command="{Binding RefreshPortsCommand}" Classes="quiet" />
+                  <Button x:Name="DeviceReadServoButton" Grid.Column="2" Content="连接" Command="{Binding InspectCommand}" IsEnabled="{Binding !Busy}" Classes="quiet" />
+                </Grid>
+                <TextBlock Text="{Binding Status}" Classes="caption" TextWrapping="Wrap" />
+                <CheckBox Content="5V 已接，机构可动" IsChecked="{Binding Ready}" IsEnabled="{Binding !Busy}" />
+              </StackPanel>
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                 <Button x:Name="DeviceHomeButton" Content="回到中心" Command="{Binding Tracking.Servo.HomeCommand}" IsEnabled="{Binding Tracking.Servo.CanCalibratedMotion}" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
-                <Button Grid.Column="1" Content="校准" Command="{Binding OpenCalibrationCommand}" Classes="quiet" />
+                <Button Grid.Column="1" Content="快速准备" Command="{Binding OpenCalibrationCommand}" Classes="quiet" />
               </Grid>
-              <Button x:Name="DeviceFollowButton" Content="开启实物跟随" Command="{Binding Tracking.StartFollowCommand}" IsEnabled="{Binding CanFollow}" Classes="quiet" IsVisible="{Binding !Tracking.IsFollowing}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+              <Button x:Name="DeviceFollowButton" Content="{Binding FollowActionLabel}" Command="{Binding Tracking.StartFollowCommand}" IsEnabled="{Binding CanFollow}" Classes="primary" IsVisible="{Binding !Tracking.IsFollowing}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
               <Button Content="停止实物跟随" Command="{Binding Tracking.StopCommand}" Classes="quiet" IsVisible="{Binding Tracking.IsFollowing}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
               <TextBlock Text="{Binding FollowState}" FontWeight="Medium" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" />
-              <TextBlock Text="{Binding Tracking.Servo.FollowReadiness}" Classes="caption" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding PreparationHint}" Classes="caption" TextWrapping="Wrap" />
+              <Expander x:Name="RobotSetupExpander" Header="首次准备 / 重新设置" IsExpanded="{Binding CalibrationExpanded, Mode=TwoWay}" HorizontalAlignment="Stretch" Background="{StaticResource SurfaceBrush}">
+                <views:RobotCalibrationView />
+              </Expander>
               <Border Background="#FFF4D6" Padding="12" CornerRadius="8" IsVisible="{Binding Tracking.HasServoNotice}"><TextBlock Text="{Binding Tracking.ServoNotice}" Foreground="#805A16" TextWrapping="Wrap" /></Border>
             </StackPanel>
           </Border>
@@ -81,7 +94,12 @@
                 </Border>
               </Border>
               <TextBlock Text="{Binding Tracking.Lcd.Status}" FontWeight="Medium" TextWrapping="Wrap" />
-              <TextBox x:Name="LcdPortInput" Text="{Binding Tracking.Lcd.Port}" Watermark="Uno 端口，例如 COM7" IsEnabled="{Binding Tracking.Lcd.CanConnect}" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <ComboBox x:Name="LcdPortSelector" ItemsSource="{Binding Tracking.Lcd.AvailablePorts}" SelectedItem="{Binding Tracking.Lcd.Port, Mode=TwoWay}"
+                          PlaceholderText="选择 Uno 串口" HorizontalAlignment="Stretch" IsEnabled="{Binding Tracking.Lcd.CanConnect}" />
+                <Button x:Name="RefreshLcdPortsButton" Grid.Column="1" Content="刷新" Command="{Binding Tracking.Lcd.RefreshPortsCommand}" Classes="quiet" />
+              </Grid>
+              <TextBlock Text="{Binding Tracking.Lcd.PortsHint}" Classes="caption" TextWrapping="Wrap" />
               <Button x:Name="ConnectLcdButton" Content="连接表情屏" Command="{Binding Tracking.Lcd.ConnectCommand}" Classes="quiet" IsVisible="{Binding !Tracking.Lcd.IsConnected}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
               <Button Content="断开表情屏" Command="{Binding Tracking.Lcd.DisconnectCommand}" Classes="quiet" IsVisible="{Binding Tracking.Lcd.CanDisconnect}" />
               <TextBlock Text="连接已烧录 LCD 固件的 Uno；开启本地视觉感知后同步表情。屏幕预览为最近已确认的发送内容。" Classes="caption" TextWrapping="Wrap" />

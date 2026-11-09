@@ -87,7 +87,7 @@ public sealed class ServoFollowRestartTests
         var file = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
         File.WriteAllText(file, JsonSerializer.Serialize(new { Pan = 103, Tilt = 68, PanFloor = 30, PanCeiling = 175,
             TiltFloor = 45, TiltCeiling = 90, TiltProfile = ServoViewModel.TiltProfileId, TiltConfirmed = true }));
-        var model = new ServoViewModel(run, file);
+        var model = new ServoViewModel(run, file, () => ["COM6"]);
         File.Delete(file);
         return model;
     }

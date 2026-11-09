@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Toboo.Core;
 using Toboo.Runtime;
+using Toboo.Desktop.Services;
 
 namespace Toboo.Desktop.ViewModels;
 
@@ -21,9 +22,11 @@ public sealed partial class SensorViewModel : ObservableObject, IDisposable
     private bool disposed;
     private bool stopping;
     private double lastEventMilliseconds;
-    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(DemoCommand), nameof(ConnectCommand), nameof(StopCommand), nameof(ResumeCommand))]
+    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(DemoCommand), nameof(ConnectCommand), nameof(StopCommand), nameof(ResumeCommand), nameof(RefreshPortsCommand))]
     private bool busy;
     [ObservableProperty] private string port = "";
+    [ObservableProperty] private string[] availablePorts = [];
+    [ObservableProperty] private string portsHint = "请选择传感器 Uno 串口。";
     [ObservableProperty] private string source = "未连接 · 融合预览不控制舵机";
     [ObservableProperty] private string acceleration = "等待加速度";
     [ObservableProperty] private string distance = "等待距离";
@@ -38,6 +41,23 @@ public sealed partial class SensorViewModel : ObservableObject, IDisposable
     {
         timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         timer.Tick += Tick;
+        RefreshPorts();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStart))]
+    private void RefreshPorts()
+    {
+        if (!CanStart()) return;
+        var selected = Port;
+        try
+        {
+            var ports = SerialPortCatalog.List();
+            AvailablePorts = ports;
+            Port = ports.FirstOrDefault(value => value == selected) ?? "";
+            PortsHint = ports.Length == 0 ? "未发现串口，请连接传感器 Uno 后刷新。" : "请选择传感器 Uno；同一个端口不能同时连接 LCD。";
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        { AvailablePorts = []; Port = ""; PortsHint = "无法读取串口列表，请刷新重试。"; }
     }
 
     public void ObserveFace(bool confirmed)
@@ -92,7 +112,7 @@ public sealed partial class SensorViewModel : ObservableObject, IDisposable
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(Port)) throw new ArgumentException("请填写设备管理器中已确认的 UNO 端口。不要选择舵机 ESP32 端口。");
+            if (string.IsNullOrWhiteSpace(Port)) throw new ArgumentException("请先选择传感器 Uno 串口。");
             var start = ServoTool.CreateStartInfo("sensor_telemetry.py", ["--port", Port.Trim()]);
             Begin(true);
             process = Process.Start(start) ?? throw new IOException("无法启动采集进程。");

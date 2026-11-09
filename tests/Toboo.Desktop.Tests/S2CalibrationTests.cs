@@ -18,7 +18,7 @@ public sealed class S2CalibrationTests
             File.WriteAllText(file, JsonSerializer.Serialize(new { Pan=103,Tilt=100,PanFloor=30,PanCeiling=175,
                 TiltFloor=50,TiltCeiling=150,TiltProfile=ServoViewModel.TiltProfileId,TiltConfirmed=true }));
             var model = new ServoViewModel((arguments, _) =>
-            { actions.Add(arguments.ToArray()); return Task.FromResult(Report(103,100)); },file);
+            { actions.Add(arguments.ToArray()); return Task.FromResult(Report(103,100)); },file, () => ["COM6"]);
             model.Ready=true;
             await model.InspectCommand.ExecuteAsync(null);
             Assert.Equal(100,model.CenterTilt);
@@ -54,7 +54,7 @@ public sealed class S2CalibrationTests
         try
         {
             File.WriteAllText(file, """{"Pan":95,"Tilt":50,"PanFloor":40,"PanCeiling":150,"TiltFloor":35,"TiltCeiling":65}""");
-            var model = new ServoViewModel((_, _) => Task.FromResult(Report(95, 90)), file);
+            var model = new ServoViewModel((_, _) => Task.FromResult(Report(95, 90)), file, () => ["COM6"]);
             Assert.Equal(40, model.PanMin); Assert.Equal(150, model.PanMax);
             Assert.Equal(45, model.TiltFloor); Assert.Equal(90, model.TiltCeiling);
             Assert.True(model.TiltCalibrating); Assert.False(model.TiltCalibrationSaved);
@@ -87,7 +87,7 @@ public sealed class S2CalibrationTests
                 var from = tilt;
                 tilt += int.Parse(args[Array.IndexOf(args, "--delta") + 1]);
                 return Task.FromResult(Report(103, tilt, new { axis = "S2", from, to = tilt, uart_frames_sent = 1 }));
-            }, file);
+            }, file, () => ["COM6"]);
             model.Ready = true;
             await model.InspectCommand.ExecuteAsync(null);
             await model.TiltUpCommand.ExecuteAsync(null);
@@ -102,7 +102,7 @@ public sealed class S2CalibrationTests
             model.SaveCalibrationCommand.Execute(null);
             Assert.True(model.TiltCalibrationSaved); Assert.False(model.TiltCalibrating);
             Assert.Equal(68, model.CenterTilt);
-            var restored = new ServoViewModel((_, _) => Task.FromResult(Report(103, 90)), file);
+            var restored = new ServoViewModel((_, _) => Task.FromResult(Report(103, 90)), file, () => ["COM6"]);
             Assert.True(restored.TiltCalibrationSaved); Assert.False(restored.TiltCalibrating);
             Assert.Equal(45, restored.TiltFloor); Assert.Equal(90, restored.TiltCeiling);
             restored.Ready = true;
@@ -111,7 +111,7 @@ public sealed class S2CalibrationTests
             restored.TiltCeiling = 95;
             Assert.False(restored.CanFollow); // Edited boundaries must be confirmed by saving again.
             restored.BeginTiltCalibrationCommand.Execute(null);
-            var pending = new ServoViewModel((_, _) => Task.FromResult(Report(103, 90)), file);
+            var pending = new ServoViewModel((_, _) => Task.FromResult(Report(103, 90)), file, () => ["COM6"]);
             Assert.True(pending.TiltCalibrating); Assert.False(pending.TiltCalibrationSaved);
             Assert.Equal(30, pending.PanMin); Assert.Equal(175, pending.PanMax);
             Assert.Equal(2, commands.Count(a => a.Contains("nudge")));
@@ -127,7 +127,7 @@ public sealed class S2CalibrationTests
         try
         {
             var model = new ServoViewModel((args, _) =>
-            { commands.Add(args.ToArray()); return Task.FromResult(Report(-1, 45)); }, file);
+            { commands.Add(args.ToArray()); return Task.FromResult(Report(-1, 45)); }, file, () => ["COM6"]);
             await model.InitializeTiltCommand.ExecuteAsync(null);
             Assert.Empty(commands);
             await model.InspectCommand.ExecuteAsync(null);

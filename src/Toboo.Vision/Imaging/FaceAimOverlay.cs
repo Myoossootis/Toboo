@@ -6,7 +6,7 @@ namespace Toboo.Vision;
 /// <summary>Guides use the same projection as the controller, including a non-centred optical axis.</summary>
 public static class FaceAimOverlay
 {
-    public static void Draw(Mat image, FaceAimSettings settings, FaceAimResult? aim)
+    public static void Draw(Mat image, FaceAimSettings settings, FaceAimResult? aim, bool drawCaption = true)
     {
         if (settings.Camera is not { } camera) return;
         try { camera.Project(0, 0, image.Width, image.Height); }
@@ -18,7 +18,7 @@ public static class FaceAimOverlay
         Cv2.DrawMarker(image, center, new Scalar(255, 255, 255), MarkerTypes.Cross, 24, 2);
         if (aim?.FilteredX is { } x && aim.FilteredY is { } y)
             Cv2.Line(image, center, new((int)Math.Round(x), (int)Math.Round(y)), new Scalar(0, 220, 255), 1, LineTypes.AntiAlias);
-        Cv2.PutText(image, camera.Approximate ? "Approximate camera / angle guides" : "Pinhole intrinsics / angle guides",
+        if (drawCaption) Cv2.PutText(image, camera.Approximate ? "Approximate camera / angle guides" : "Pinhole intrinsics / angle guides",
             new(12, image.Height - 14), HersheyFonts.HersheySimplex, 0.45, new Scalar(235, 235, 235), 1, LineTypes.AntiAlias);
 
         void Contour(double degrees, Scalar color)

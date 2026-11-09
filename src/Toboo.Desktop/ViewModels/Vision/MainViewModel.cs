@@ -86,14 +86,20 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string faceAlignment = "绿框：进入对准区；橙框：离开后恢复修正";
     private FaceAimSettings? activeFaceSettings;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(OutputLabel))] private bool isFollowing;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanConfigure), nameof(CanStart), nameof(CanStartFollow))]
+    [NotifyCanExecuteChangedFor(nameof(StartCommand), nameof(RefreshCamerasCommand), nameof(LoadFirstFrameCommand), nameof(LoadExampleCommand), nameof(ResetParametersCommand))]
+    private bool isChangingMode;
+    [ObservableProperty] private string cameraModelLabel = "相机角度模型：待配置，可先预览表情。";
     public string OutputLabel => IsFollowing ? "人脸实物跟随 · 请求角度" : "视觉预览 · 独立于舵机";
-    public bool CanStartFollow => CanStart && IsFace && IsCameraSource && Servo.CanFollow && FaceAim.DirectionsConfirmed;
+    public bool CanStartFollow => !IsChangingMode && !IsFollowing && IsFace && IsCameraSource &&
+        Servo.CanFollow && FaceAim.DirectionsConfirmed && (CanStart || (IsRunning && !cameraFaulted));
     public string PreviewStartLabel => IsFace ? "仅预览（不转动）" : "开始实验";
     public string FollowStartHint => IsRunning
-        ? IsFollowing ? "正在控制舵机；停止后可继续跟随。" : "当前仅预览，不转动。停止后点绿色「开始跟随」。"
-        : Servo.CanFollow && !FaceAim.DirectionsConfirmed ? "请先在「对准」页确认两轴修正方向。"
+        ? IsFollowing ? "正在控制舵机；可随时停止跟随。" : "当前仅预览；准备就绪后可直接开启跟随。"
+        : Servo.CanFollow && !FaceAim.DirectionsConfirmed ? "请先在设备页的「快速准备」中确认两轴方向。"
         : Servo.CanFollow ? "已就绪：绿色按钮控制舵机，灰色按钮仅预览。"
-        : !Servo.Ready ? "先在「舵机」页读状态，并勾选「5V 已接，机构可动」。"
+        : !Servo.Ready ? "先连接云台并读状态，确认「5V 已接，机构可动」。"
         : $"跟随尚未就绪：{Servo.FollowReadiness}";
     private string faceBoundaryMessage = "";
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasServoNotice))] private string servoNotice = "";
@@ -114,13 +120,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private IReadOnlyList<ErrorSample> plotSamples = Array.Empty<ErrorSample>();
 
     public ObservableCollection<string> Events { get; } = [];
-    public ServoViewModel Servo { get; } = new();
-    public FaceAimViewModel FaceAim { get; } = new();
+    public ServoViewModel Servo { get; }
+    public FaceAimViewModel FaceAim { get; }
     public LcdViewModel Lcd { get; }
     public bool LiveFaceConfirmed { get; private set; }
     public ObservableCollection<CameraDevice> Cameras { get; } = [];
     public event Action? FramePresented;
-    public bool CanConfigure => !IsRunning && !IsLoadingPreview;
+    public bool CanConfigure => !IsRunning && !IsLoadingPreview && !IsChangingMode;
+    private bool CanBeginSession => !IsRunning && !IsLoadingPreview && !(IsCameraSource && cameraFaulted);
     public bool IsVideoSource => SourceIndex == 2;
     public bool IsCsrt => IsVideoSource && AlgorithmIndex == 1;
     public bool CanChooseTarget => !IsSimulation && (!IsVideoSource || AlgorithmIndex == 0);
@@ -159,8 +166,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _ => "读取运行本程序的电脑上的摄像头。先刷新设备；未检测到标记也可正常预览。"
     };
 
-    public MainViewModel(string? workspace = null)
+    public MainViewModel(string? workspace = null, ServoViewModel? servo = null, FaceAimViewModel? faceAim = null)
     {
+        Servo = servo ?? new();
+        FaceAim = faceAim ?? new();
         Lcd = new(CaptureExpressionCue);
         this.workspace = workspace ?? FindWorkspace();
         var config = Path.Combine(AppContext.BaseDirectory, "tracker.json");
@@ -175,7 +184,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         InitializeExpressionPresentation();
         PropertyChanged += (_, args) =>
         {
-            if (args.PropertyName is nameof(CanConfigure) or nameof(IsFace) or nameof(IsCameraSource) or nameof(IsRunning))
+            if (args.PropertyName is nameof(CanConfigure) or nameof(IsFace) or nameof(IsCameraSource) or nameof(IsRunning) or nameof(IsFollowing))
             {
                 OnPropertyChanged(nameof(CanStartFollow));
                 OnPropertyChanged(nameof(PreviewStartLabel));
@@ -275,15 +284,44 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         FramePresented?.Invoke();
     }
 
+    internal void UsePreviewDimensionsForCalibration()
+    {
+        if (IsFollowing || IsChangingMode) return;
+        if (!HasPreview || previewWidth < 1 || previewHeight < 1)
+        { FaceAim.Status = "请先开启预览，取得摄像头实际画面尺寸。"; return; }
+        if (FaceAim.GeometryMode != 1)
+        { FaceAim.Status = "仅视场角估算可直接使用画面尺寸；内参请使用对应标定尺寸。"; return; }
+        FaceAim.CalibrationWidth = previewWidth;
+        FaceAim.CalibrationHeight = previewHeight;
+        FaceAim.Status = "已填入实际画面尺寸；视场角仍需按本摄像头核对。";
+    }
+
     [RelayCommand(CanExecute = nameof(CanStart))]
     public Task StartAsync() => RunSessionAsync(false);
 
     [RelayCommand]
-    public Task StartFollowAsync() => CanStartFollow ? RunSessionAsync(true) : Task.CompletedTask;
-
-    private async Task RunSessionAsync(bool follow)
+    public async Task StartFollowAsync()
     {
-        if (!CanStart) return;
+        if (!CanStartFollow) return;
+        IsChangingMode = true;
+        try
+        {
+            await PreviewFollowTransition.RunAsync(
+                () => IsRunning ? StopAsync() : Task.CompletedTask,
+                () => CanBeginSession && IsCameraSource && IsFace && Servo.CanFollow && FaceAim.DirectionsConfirmed,
+                () =>
+                {
+                    var run = RunSessionAsync(true, switching: true);
+                    IsChangingMode = false; // The new session has acquired ownership before yielding.
+                    return run;
+                });
+        }
+        finally { IsChangingMode = false; }
+    }
+
+    private async Task RunSessionAsync(bool follow, bool switching = false)
+    {
+        if (!(switching ? CanBeginSession : CanStart)) return;
         ErrorMessage = "";
         ServoNotice = "";
         if ((IsAruco && (MarkerId is < 0 or >= 50)) || CameraIndex < 0)
@@ -311,6 +349,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         catch (ArgumentException) { ErrorMessage = "参数无效，请检查增益、速度和死区。"; return; }
         try { activeFaceSettings = IsFace ? FaceAim.Snapshot() : null; }
         catch (ArgumentException error) { ReportError($"人脸对准参数无效：{error.Message}"); return; }
+        CameraModelLabel = activeFaceSettings?.Camera is { } cameraModel
+            ? cameraModel.Approximate ? "相机角度模型：估算参数，非实测标定。" : "相机角度模型：针孔内参。"
+            : "相机角度模型：待配置，可先预览表情。";
         if (activeFaceSettings is not null && Servo.TiltCalibrationSaved)
             activeFaceSettings = activeFaceSettings with { PanMinDegrees = Servo.PanMin, PanMaxDegrees = Servo.PanMax,
                 TiltMinDegrees = Servo.TiltFloor, TiltMaxDegrees = Servo.TiltCeiling };

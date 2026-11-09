@@ -128,6 +128,10 @@ public sealed class FaceAimWorkbenchTests
         using var wrongAspect = new Mat(360, 640, MatType.CV_8UC3, Scalar.Black);
         FaceAimOverlay.Draw(wrongAspect, settings, null);
         Assert.Equal(0, Cv2.CountNonZero(wrongAspect.Reshape(1)));
+        using var cleanPreview = new Mat(480, 640, MatType.CV_8UC3, Scalar.Black);
+        FaceAimOverlay.Draw(cleanPreview, settings, null, drawCaption: false);
+        using var footer = new Mat(cleanPreview, new Rect(0, 440, 640, 40));
+        Assert.Equal(0, Cv2.CountNonZero(footer.Reshape(1))); // Metadata moved to readable UI outside the image.
     }
 
     [AvaloniaTheory]

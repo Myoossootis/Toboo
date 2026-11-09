@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Toboo.Runtime;
+using Toboo.Desktop.Services;
 
 namespace Toboo.Desktop.ViewModels;
 
@@ -15,6 +16,7 @@ public sealed partial class ServoViewModel : ObservableObject
     [ObservableProperty] private int panMax = PanUpperLimit;
     private readonly string calibrationFile;
     private readonly Func<IEnumerable<string>, CancellationToken, Task<ServoTool.Result>> runTool;
+    private readonly Func<string[]> getPorts;
     private bool readyFirmware;
     private bool followFirmware;
     private int firmwareTiltMin = 35, firmwareTiltMax = 90, pairedTiltMin = 35, pairedTiltMax = 65;
@@ -22,6 +24,8 @@ public sealed partial class ServoViewModel : ObservableObject
     private int? panLast, tiltLast;
 
     [ObservableProperty] private string port = "COM6";
+    [ObservableProperty] private string[] availablePorts = [];
+    [ObservableProperty] private string portsHint = "请选择 ESP32 串口。";
     [ObservableProperty] private bool ready;
     [ObservableProperty] private bool busy;
     [ObservableProperty] private bool sweepReady;
@@ -32,6 +36,8 @@ public sealed partial class ServoViewModel : ObservableObject
     [ObservableProperty] private string status = "先读取串口状态。";
 
     public bool CanControl => readyFirmware && Ready && !Busy;
+    public bool FirmwareReady => readyFirmware;
+    public bool CanRefreshPorts => !Busy;
     public bool CanCalibratedMotion => CanControl && TiltCalibrationSaved && !TiltCalibrating &&
         TiltFloor >= pairedTiltMin && TiltCeiling <= pairedTiltMax;
     public bool CanFollow => CanCalibratedMotion && followFirmware &&
@@ -99,9 +105,11 @@ public sealed partial class ServoViewModel : ObservableObject
     public ServoViewModel() : this(ServoTool.RunAsync) { }
 
     internal ServoViewModel(Func<IEnumerable<string>, CancellationToken, Task<ServoTool.Result>> runTool,
-        string? calibrationFile = null)
+        string? calibrationFile = null, Func<string[]>? getPorts = null)
     {
         this.runTool = runTool;
+        this.getPorts = getPorts ?? SerialPortCatalog.List;
+        RefreshPorts();
         this.calibrationFile = calibrationFile ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "PanTiltTracker", "servo.json");
         try
@@ -151,6 +159,22 @@ public sealed partial class ServoViewModel : ObservableObject
     }
 
     [RelayCommand] private Task InspectAsync() => SendAsync("inspect", [], "已读取两轴指令状态。");
+
+    [RelayCommand(CanExecute = nameof(CanRefreshPorts))]
+    private void RefreshPorts()
+    {
+        if (Busy) return;
+        var selected = Port;
+        try
+        {
+            var ports = SerialPortCatalog.Normalize(getPorts());
+            AvailablePorts = ports;
+            Port = ports.FirstOrDefault(value => value == selected) ?? "";
+            PortsHint = ports.Length == 0 ? "未发现串口，请连接 ESP32 后刷新。" : "请选择 ESP32 串口，不要选择 LCD 的 Uno。";
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        { AvailablePorts = []; Port = ""; PortsHint = "无法读取串口列表，请刷新重试。"; }
+    }
 
     [RelayCommand]
     private Task HomeAsync()
@@ -347,6 +371,9 @@ public sealed partial class ServoViewModel : ObservableObject
 
     private void RefreshControls()
     {
+        OnPropertyChanged(nameof(FirmwareReady));
+        OnPropertyChanged(nameof(CanRefreshPorts));
+        RefreshPortsCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanControl));
         OnPropertyChanged(nameof(CanCalibratedMotion));
         OnPropertyChanged(nameof(CanFollow));

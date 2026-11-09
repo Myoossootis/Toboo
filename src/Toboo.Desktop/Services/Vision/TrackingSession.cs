@@ -253,10 +253,8 @@ public static class TrackingSession
         }
         if (tracked is not null) VideoTargetTracker.DrawResult(color, tracked);
         if (faces is not null) FaceTargetDetector.DrawResult(color, faces, aim);
-        if (faces is not null && faceAimSettings is not null) FaceAimOverlay.Draw(color, faceAimSettings, aim);
-        if (expressionResult is { } cue)
-            Cv2.PutText(color, $"Expression: {cue.Estimate.Label} | {cue.Estimate.Reason}",
-                new(10, Math.Max(18, image.Height - 12)), HersheyFonts.HersheySimplex, 0.45, new Scalar(255, 220, 80), 1, LineTypes.AntiAlias);
+        // Metadata is shown outside the image, where it remains readable at small preview sizes.
+        if (faces is not null && faceAimSettings is not null) FaceAimOverlay.Draw(color, faceAimSettings, aim, drawCaption: false);
         var center = new Point(image.Width / 2, image.Height / 2);
         Cv2.DrawMarker(color, center, new Scalar(120, 130, 140), MarkerTypes.Cross, 32, 1);
         if (observation.HasTarget)

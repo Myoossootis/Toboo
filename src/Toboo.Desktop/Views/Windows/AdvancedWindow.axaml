@@ -186,9 +186,11 @@
               <ScrollViewer DataContext="{Binding Servo}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <StackPanel x:DataType="vm:ServoViewModel" Spacing="8" Margin="0,12,4,0">
                   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4" IsEnabled="{Binding !Busy}">
-                    <TextBox Text="{Binding Port}" Watermark="串口号" MinWidth="0" AutomationProperties.Name="舵机串口" />
-                    <Button Grid.Column="1" Content="读状态" Command="{Binding InspectCommand}" Classes="quiet" />
+                    <ComboBox ItemsSource="{Binding AvailablePorts}" SelectedItem="{Binding Port, Mode=TwoWay}" PlaceholderText="选择 ESP32 串口" HorizontalAlignment="Stretch" AutomationProperties.Name="舵机串口" />
+                    <Button Grid.Column="1" Content="刷新" Command="{Binding RefreshPortsCommand}" Classes="quiet" />
                   </Grid>
+                  <Button Content="连接并读状态" Command="{Binding InspectCommand}" IsEnabled="{Binding !Busy}" Classes="quiet" />
+                  <TextBlock Text="{Binding PortsHint}" Classes="caption" TextWrapping="Wrap" />
                   <TextBlock Text="5V 重接后先按 ESP32 的 RST。" Classes="caption" TextWrapping="Wrap" />
                   <CheckBox Content="5V 已接，机构可动" IsChecked="{Binding Ready}" IsEnabled="{Binding !Busy}" FontSize="12" />
                   <TextBlock Text="{Binding Status}" TextWrapping="Wrap" FontSize="12" />

@@ -10,37 +10,61 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
 {
     private readonly Func<ChatExpression?> capture;
     private readonly Func<string, CancellationToken, Task<ILcdConnection>> connect;
+    private readonly Func<string[]> getPorts;
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private ILcdConnection? connection;
     private CancellationTokenSource? lifetime;
     private bool sending, disposed;
-    [ObservableProperty] private string port = "";
+    [ObservableProperty] private string? port;
+    [ObservableProperty] private string[] availablePorts = [];
+    [ObservableProperty] private string portsHint = "";
     [ObservableProperty] private string status = "未连接 · I²C LCD1602";
     [ObservableProperty] private string displayFace = "(?)";
     [ObservableProperty] private string displayLabel = "No valid cue";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanConnect), nameof(CanDisconnect))]
-    [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(DisconnectCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(DisconnectCommand), nameof(RefreshPortsCommand))]
     private bool connecting;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanConnect), nameof(CanDisconnect))]
-    [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(DisconnectCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(DisconnectCommand), nameof(RefreshPortsCommand))]
     private bool isConnected;
     public bool CanConnect => !disposed && !Connecting && !IsConnected;
     public bool CanDisconnect => Connecting || IsConnected;
 
     internal LcdViewModel(Func<ChatExpression?> capture,
-        Func<string, CancellationToken, Task<ILcdConnection>>? connect = null)
+        Func<string, CancellationToken, Task<ILcdConnection>>? connect = null, Func<string[]>? getPorts = null)
     {
         this.capture = capture; this.connect = connect ?? LcdConnection.OpenAsync;
+        this.getPorts = getPorts ?? SerialPortCatalog.List;
         timer.Tick += Tick;
+        RefreshPorts();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanConnect))]
+    private void RefreshPorts()
+    {
+        if (!CanConnect) return;
+        var selected = Port;
+        try
+        {
+            var ports = SerialPortCatalog.Normalize(getPorts());
+            AvailablePorts = ports;
+            Port = ports.FirstOrDefault(value => string.Equals(value, selected, StringComparison.OrdinalIgnoreCase));
+            PortsHint = ports.Length == 0 ? "未发现串口，请连接 Uno 后刷新。" : "请选择连接 LCD 的 Uno 串口。";
+        }
+        catch (Exception error) when (IsConnectionError(error))
+        {
+            AvailablePorts = []; Port = null;
+            PortsHint = "无法读取串口列表，请刷新重试。";
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanConnect))]
     private async Task ConnectAsync()
     {
         if (!CanConnect) return;
-        if (string.IsNullOrWhiteSpace(Port)) { Status = "请填写已确认的 Uno COM 端口。"; return; }
+        if (string.IsNullOrWhiteSpace(Port)) { Status = "请先选择 Uno 串口。"; return; }
         Connecting = true;
         lifetime = new();
         var token = lifetime.Token;

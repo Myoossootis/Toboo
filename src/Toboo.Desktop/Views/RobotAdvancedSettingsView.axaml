@@ -1,0 +1,88 @@
+<!-- Constraint brief: connection/readiness first; explicit motion and verified bounds second;
+     camera/direction confirmation third. Reuse light/teal tokens, caption/section roles,
+     spacing 8/12/16/24. Save/setup actions are secondary; following remains the primary action.
+     Group related fields (§3.6); disclose advanced intrinsics only when selected (§2.1). -->
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Toboo.Desktop.ViewModels" x:Class="Toboo.Desktop.Views.RobotAdvancedSettingsView"
+             x:DataType="vm:CompanionShellViewModel">
+  <StackPanel Spacing="24" IsEnabled="{Binding CanPrepareRobot}">
+    <StackPanel DataContext="{Binding Tracking.Servo}" x:DataType="vm:ServoViewModel" Spacing="12">
+      <TextBlock Text="工作边界" Classes="section" />
+      <TextBlock Text="首次使用或更换舵机后校准；已验证的边界可继续复用。" Classes="caption" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding LastRequests}" TextWrapping="Wrap" />
+      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+        <Button x:Name="SetupPanDown" Content="S1 −1°" Command="{Binding PanDownCommand}" IsEnabled="{Binding CanPanDown}" Classes="quiet" />
+        <Button Grid.Column="1" Content="S1 +1°" Command="{Binding PanUpCommand}" IsEnabled="{Binding CanPanUp}" Classes="quiet" />
+        <Button x:Name="SetupTiltDown" Grid.Row="1" Content="S2 −1°" Command="{Binding TiltDownCommand}" IsEnabled="{Binding CanTiltDown}" Classes="quiet" />
+        <Button Grid.Row="1" Grid.Column="1" Content="S2 +1°" Command="{Binding TiltUpCommand}" IsEnabled="{Binding CanTiltUp}" Classes="quiet" />
+      </Grid>
+      <StackPanel IsEnabled="{Binding !Busy}" Spacing="8">
+        <TextBlock Text="S1 左 / 右边界（请求角度）" Classes="caption" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+          <NumericUpDown x:Name="SetupPanMin" Value="{Binding PanMin}" Minimum="30" Maximum="175" FormatString="0" MinWidth="0" />
+          <NumericUpDown Grid.Column="1" Value="{Binding PanMax}" Minimum="30" Maximum="175" FormatString="0" MinWidth="0" />
+        </Grid>
+        <TextBlock Text="S2 下 / 上边界（请求角度）" Classes="caption" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+          <NumericUpDown Value="{Binding TiltFloor}" Minimum="0" Maximum="180" FormatString="0" MinWidth="0" />
+          <NumericUpDown Grid.Column="1" Value="{Binding TiltCeiling}" Minimum="0" Maximum="180" FormatString="0" MinWidth="0" />
+        </Grid>
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+          <Button Content="记为 S2 下限" Command="{Binding CaptureTiltFloorCommand}" IsEnabled="{Binding CanCaptureTilt}" Classes="quiet" />
+          <Button Grid.Column="1" Content="记为 S2 上限" Command="{Binding CaptureTiltCeilingCommand}" IsEnabled="{Binding CanCaptureTilt}" Classes="quiet" />
+        </Grid>
+        <Button x:Name="SetupSaveBounds" Content="保存已验证的边界" Command="{Binding SaveCalibrationCommand}" Classes="quiet" />
+        <Button Content="重新校准 S2" Command="{Binding BeginTiltCalibrationCommand}" Classes="textlink" />
+      </StackPanel>
+      <TextBlock Text="{Binding CenterLabel}" FontWeight="Medium" TextWrapping="Wrap" />
+      <TextBlock Text="边界是请求值，不是轴位测量。首次没有参考时，可在保存边界后显式回中心；确认机构空间，异常时切断动力。" Classes="caption" TextWrapping="Wrap" />
+      <Button Content="停止运动" Command="{Binding StopSweepCommand}" IsEnabled="{Binding CanStopSweep}" Classes="quiet" />
+    </StackPanel>
+    <StackPanel DataContext="{Binding Tracking.FaceAim}" x:DataType="vm:FaceAimViewModel" Spacing="12">
+      <TextBlock Text="相机与修正方向" Classes="section" />
+      <ComboBox x:Name="SetupCameraModel" SelectedIndex="{Binding GeometryMode}" HorizontalAlignment="Stretch">
+        <ComboBoxItem Content="待配置 · 仅预览" /><ComboBoxItem Content="水平 / 垂直视场角估算" /><ComboBoxItem Content="已标定的针孔内参" />
+      </ComboBox>
+      <TextBlock Text="参数对应的画面宽 / 高" Classes="caption" />
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+        <NumericUpDown Value="{Binding CalibrationWidth}" Minimum="1" Maximum="8192" FormatString="0" MinWidth="0" />
+        <NumericUpDown Grid.Column="1" Value="{Binding CalibrationHeight}" Minimum="1" Maximum="8192" FormatString="0" MinWidth="0" />
+      </Grid>
+      <StackPanel IsVisible="{Binding UseFov}" Spacing="8">
+        <TextBlock Text="水平 / 垂直视场角（°）" Classes="caption" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+          <NumericUpDown Value="{Binding HorizontalFov}" Minimum="1" Maximum="169" FormatString="0.0" MinWidth="0" />
+          <NumericUpDown Grid.Column="1" Value="{Binding VerticalFov}" Minimum="1" Maximum="169" FormatString="0.0" MinWidth="0" />
+        </Grid>
+        <TextBlock Text="默认 60° / 45° 只是示例，请填写本摄像头参数；估算不等于实测标定。" Classes="caption" TextWrapping="Wrap" />
+      </StackPanel>
+      <StackPanel IsVisible="{Binding UseIntrinsics}" Spacing="8">
+        <TextBlock Text="fx / fy / cx / cy（像素）" Classes="caption" />
+        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+          <NumericUpDown Value="{Binding Fx}" Minimum="1" Maximum="100000" FormatString="0.00" MinWidth="0" />
+          <NumericUpDown Grid.Column="1" Value="{Binding Fy}" Minimum="1" Maximum="100000" FormatString="0.00" MinWidth="0" />
+          <NumericUpDown Grid.Row="1" Value="{Binding Cx}" Minimum="0" Maximum="8191" FormatString="0.00" MinWidth="0" />
+          <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding Cy}" Minimum="0" Maximum="8191" FormatString="0.00" MinWidth="0" />
+        </Grid>
+        <CheckBox Content="内参来自相机标定" IsChecked="{Binding IntrinsicsCalibrated}" />
+      </StackPanel>
+      <TextBlock Text="目标在右侧时 S1 应增大还是减小？" Classes="caption" TextWrapping="Wrap" />
+      <ComboBox SelectedIndex="{Binding PanDirectionIndex}" HorizontalAlignment="Stretch"><ComboBoxItem Content="S1 增大角度（+）" /><ComboBoxItem Content="S1 减小角度（−）" /></ComboBox>
+      <TextBlock Text="目标在下方时 S2 应增大还是减小？" Classes="caption" TextWrapping="Wrap" />
+      <ComboBox SelectedIndex="{Binding TiltDirectionIndex}" HorizontalAlignment="Stretch"><ComboBoxItem Content="S2 增大角度（+）" /><ComboBoxItem Content="S2 减小角度（−）" /></ComboBox>
+      <CheckBox x:Name="SetupDirectionsConfirmed" Content="已通过微调检查画面与修正方向" IsChecked="{Binding DirectionsConfirmed}" />
+      <Expander Header="跟随范围与速度">
+        <StackPanel Spacing="8" Margin="0,12,0,0">
+          <ComboBox SelectedIndex="{Binding FollowAxesIndex}" HorizontalAlignment="Stretch"><ComboBoxItem Content="只跟随 S1" /><ComboBoxItem Content="只跟随 S2" /><ComboBoxItem Content="S1 / S2 两轴跟随" /></ComboBox>
+          <CheckBox Content="先在当前参考附近小范围试跟随" IsChecked="{Binding TrialRangeEnabled}" />
+          <NumericUpDown Value="{Binding TrialHalfRange}" Minimum="2" Maximum="10" FormatString="0" />
+          <TextBlock Text="速度上限（°/s）" Classes="caption" />
+          <NumericUpDown Value="{Binding SpeedLimit}" Minimum="1" Maximum="20" FormatString="0" />
+        </StackPanel>
+      </Expander>
+      <Button x:Name="SetupSaveDirection" Content="保存相机与方向" Command="{Binding SaveCommand}" Classes="quiet" />
+      <TextBlock Text="{Binding Status}" Classes="caption" TextWrapping="Wrap" />
+    </StackPanel>
+    <Button Content="使用当前预览尺寸（视场角模式）" Command="{Binding UsePreviewDimensionsCommand}" Classes="quiet" />
+  </StackPanel>
+</UserControl>

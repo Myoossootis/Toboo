@@ -95,6 +95,39 @@ public sealed class LcdTests
         Assert.False(model.Servo.Ready); Assert.False(model.IsFollowing);
     }
 
+    [AvaloniaFact]
+    public async Task PortListRefreshPreservesSelectionClearsRemovedPortsAndLocksDuringConnection()
+    {
+        string[] ports = ["COM10", "COM7", "COM6", "COM7"];
+        var scans = 0;
+        var transport = new FakeConnection();
+        var pending = new TaskCompletionSource<ILcdConnection>();
+        using var model = new LcdViewModel(() => null, (_, _) => pending.Task, () => { scans++; return ports; });
+        Assert.Equal(["COM6", "COM7", "COM10"], model.AvailablePorts);
+        Assert.Null(model.Port); // Never guess which board is the LCD.
+        model.Port = "COM7";
+        model.RefreshPortsCommand.Execute(null);
+        Assert.Equal("COM7", model.Port);
+        ports = ["COM6"];
+        model.RefreshPortsCommand.Execute(null);
+        Assert.Null(model.Port);
+        await model.ConnectCommand.ExecuteAsync(null);
+        Assert.Contains("选择", model.Status);
+        model.Port = "COM6";
+        var connecting = model.ConnectCommand.ExecuteAsync(null);
+        Assert.False(model.RefreshPortsCommand.CanExecute(null));
+        var before = scans;
+        model.RefreshPortsCommand.Execute(null);
+        Assert.Equal(before, scans);
+        pending.SetResult(transport); await connecting;
+        Assert.False(model.CanConnect); Assert.False(model.RefreshPortsCommand.CanExecute(null));
+        model.DisconnectCommand.Execute(null);
+        Assert.True(model.RefreshPortsCommand.CanExecute(null));
+        ports = [];
+        model.RefreshPortsCommand.Execute(null);
+        Assert.Null(model.Port); Assert.Empty(model.AvailablePorts); Assert.Contains("未发现串口", model.PortsHint);
+    }
+
     [AvaloniaTheory]
     [InlineData(1440, 900)]
     [InlineData(980, 700)]
@@ -108,7 +141,9 @@ public sealed class LcdTests
             await Task.Delay(50);
             var devices = window.FindControl<DevicesView>("DevicesView")!;
             Assert.True(devices.FindControl<Button>("ConnectLcdButton")!.IsEffectivelyEnabled);
-            Assert.Equal("", model.Lcd.Port); Assert.False(model.Lcd.IsConnected);
+            var ports = devices.FindControl<ComboBox>("LcdPortSelector")!;
+            Assert.Null(ports.SelectedItem); Assert.Null(model.Lcd.Port); Assert.False(model.Lcd.IsConnected);
+            Assert.True(devices.FindControl<Button>("RefreshLcdPortsButton")!.IsEffectivelyEnabled);
             Assert.False(model.IsRunning); Assert.False(model.Servo.Ready);
             devices.FindControl<ScrollViewer>("DeviceScroll")!.ScrollToEnd();
             await Task.Delay(50);

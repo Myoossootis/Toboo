@@ -30,6 +30,7 @@ public sealed partial class FaceAimViewModel : ObservableObject
     [ObservableProperty] private bool trialRangeEnabled;
     [ObservableProperty] private int trialHalfRange = 5;
     [ObservableProperty] private string status = "先预览。视场角默认值只是示例，需填写本摄像头参数。";
+    [ObservableProperty] private bool lastSaveSucceeded;
     public bool UseFov => GeometryMode == 1;
     public bool UseIntrinsics => GeometryMode == 2;
 
@@ -110,6 +111,7 @@ public sealed partial class FaceAimViewModel : ObservableObject
     [RelayCommand]
     private void Save()
     {
+        LastSaveSucceeded = false;
         try
         {
             var snapshot = Snapshot();
@@ -120,6 +122,7 @@ public sealed partial class FaceAimViewModel : ObservableObject
             File.WriteAllText(temporary, saved.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             File.Move(temporary, settingsFile, overwrite: true);
             baseline = snapshot;
+            LastSaveSucceeded = true;
             Status = "已保存，下次开始生效。相机型号、裁剪或安装改变后需重新确认。";
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException)

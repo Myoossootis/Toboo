@@ -24,7 +24,8 @@ public sealed partial class App : Application
             {
                 window.ViewModel.SourceIndex = 3;
                 window.ViewModel.TargetIndex = 1;
-                window.Opened += (_, _) => window.ShowAdvanced(2);
+                window.Shell.PageIndex = 1;
+                window.Shell.CalibrationExpanded = true;
             }
             if (desktop.Args?.Contains("--smoke-test-ui", StringComparer.Ordinal) != true)
             {
