@@ -28,6 +28,8 @@ if ($BaseZipPath) {
     Write-Host "PASS: applied $($manifest.baseVersion) -> $($manifest.targetVersion); all target file hashes match."
 }
 $executable = Join-Path $appPath 'toboo.exe'
+$buildInfo = Get-Content -LiteralPath (Join-Path $appPath 'build-info.json') -Raw | ConvertFrom-Json
+if ($buildInfo.workingTreeDirty -or $buildInfo.commit -notmatch '^[0-9a-f]{40}$') { throw 'Release must identify a clean source commit.' }
 foreach ($required in @('README-portable-zh-CN.md', 'docs/harness.md', 'scripts/install-toboo-harness.ps1', 'integrations/toboo-harness/index.mjs', 'integrations/toboo-harness/engine.mjs', 'integrations/toboo-harness/server.mjs', 'integrations/toboo-harness/lock.mjs')) {
     if (!(Test-Path -LiteralPath (Join-Path $appPath $required))) { throw "Missing packaged feature dependency: $required" }
 }

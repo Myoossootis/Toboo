@@ -15,6 +15,10 @@ if ((Test-Path -LiteralPath $outputPath) -or (Test-Path -LiteralPath $zipPath)) 
 }
 Push-Location -LiteralPath $repositoryPath
 try {
+    if (& git status --porcelain --untracked-files=normal) {
+        throw 'Publish from a clean commit or an isolated clean worktree.'
+    }
+    & "$PSScriptRoot/verify-public-tree.ps1"
     & "$PSScriptRoot/prepare-vc-runtime.ps1"
     & dotnet publish src/Toboo.Desktop -c Release -r win-x64 --self-contained true -p:RestoreLockedMode=true `
         "-p:Version=$Version" "-p:RuntimeFrameworkVersion=$runtimeVersion" `
