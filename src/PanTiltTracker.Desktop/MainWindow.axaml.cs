@@ -12,6 +12,7 @@ namespace PanTiltTracker.Desktop;
 public sealed partial class MainWindow : Avalonia.Controls.Window
 {
     private bool closing;
+    private SensorWindow? sensorWindow;
     private Avalonia.Point? regionStart;
     public MainViewModel ViewModel { get; }
 
@@ -27,9 +28,20 @@ public sealed partial class MainWindow : Avalonia.Controls.Window
 
     private void RefreshPreview()
     {
+        sensorWindow?.ViewModel.ObserveFace(ViewModel.IsRunning && ViewModel.IsCameraSource && ViewModel.IsFace && ViewModel.LiveFaceConfirmed);
         if (!ViewModel.HasRun) AnalysisExpander.IsExpanded = false;
         PreviewImage.InvalidateVisual();
         DrawSelection(ViewModel.CanSelectRegion ? ViewModel.InitialRegion : null);
+    }
+
+    private void OpenSensors(object? sender, RoutedEventArgs args) => ShowSensors();
+
+    internal void ShowSensors()
+    {
+        if (sensorWindow is not null) { sensorWindow.Activate(); return; }
+        sensorWindow = new SensorWindow();
+        sensorWindow.Closed += (_, _) => sensorWindow = null;
+        sensorWindow.Show(this);
     }
 
     private void BeginRegion(object? sender, PointerPressedEventArgs args)
@@ -147,6 +159,7 @@ public sealed partial class MainWindow : Avalonia.Controls.Window
 
     protected override void OnClosed(EventArgs args)
     {
+        sensorWindow?.Close();
         ViewModel.FramePresented -= RefreshPreview;
         ViewModel.Dispose();
         base.OnClosed(args);

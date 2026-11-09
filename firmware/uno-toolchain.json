@@ -1,0 +1,5 @@
+{
+  "arduinoCliVersion": "1.5.1",
+  "coreVersion": "1.8.6",
+  "fqbn": "arduino:avr:uno"
+}

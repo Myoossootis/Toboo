@@ -75,3 +75,6 @@ python -m venv tmp/esp32-tools/host
 串口关闭/重新打开不等于物理拔线断电。复位、供电、PWM、机械试验须分别记录，虚拟角度不是轴位反馈。
 
 借表后按 [首次上电复核](../docs/14-first-power-on-review.md) 验证适配器、极性和空板。仍需另写/审查实际 UART 输出固件、验证驱动板上电行为，再分别接一只舵机小幅测试。未来规划 GPIO17/TX → 板 RX、GND 共地，GPIO18/RX 与通信 VCC 留空；本版不要求接这些线。保持/超时不是动力断电。
+## UNO 传感器采集（独立板卡）
+
+新增 `uno_sensors/`，目标为 Keyes UNO / `arduino:avr:uno`，不替换 ESP32 固件。两个传感器通道默认禁用，构建不自动烧录，详见 [遥测阶段说明](../docs/19-uno-sensor-telemetry.md)。以上原有 ESP32 安装与舵机流程保持独立。

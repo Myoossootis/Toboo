@@ -9,4 +9,7 @@
     <Compile Include="../Shared/ServoTool.cs" Link="Services/ServoTool.cs" />
     <None Include="../../config/tracker.json" Link="tracker.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Shared/SensorExperiment.cs" Link="SensorExperiment.cs" />
+  </ItemGroup>
 </Project>

@@ -16,6 +16,8 @@ public sealed partial class App : Application
         {
             var window = new MainWindow();
             desktop.MainWindow = window;
+            if (desktop.Args?.Contains("--sensors", StringComparer.Ordinal) == true)
+                window.Opened += (_, _) => window.ShowSensors();
             if (desktop.Args?.Contains("--servo-calibration", StringComparer.Ordinal) == true)
             {
                 window.ViewModel.SourceIndex = 3;

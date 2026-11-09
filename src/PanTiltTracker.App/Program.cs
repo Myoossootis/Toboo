@@ -21,6 +21,7 @@ internal static class Program
         try
         {
             if (args[0] == "servo") return await RunServo(args[1..]);
+            if (args[0] == "sensors") return SensorCommands.Run(args[1..]);
             var options = Options.Parse(args);
             if (options.Mode is "inspect" or "prepare-video")
             {
@@ -282,6 +283,8 @@ internal static class Program
 
     private static void PrintHelp() => Console.WriteLine("""
         PanTiltTracker (.NET 8 / Windows x64) — vision modes do not drive actuators
+        sensors demo [--out artifacts/sensors-demo]   (synthetic; no hardware output)
+        sensors replay --input events.jsonl [--out artifacts/sensors-replay]
         servo    --port COM6 [--axis S1|S2] [--action status|center|move|disarm] [--angle 90] [--execute]
         servo    --port COM6 --action home [--pan-home 90] [--tilt-home 88] --execute
         servo    --port COM6 --axis S1|S2 --action sweep --execute   (single 45-to-90 degree sweep)

@@ -16,6 +16,7 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <Compile Include="../Shared/RunLog.cs" Link="Services/RunLog.cs" />
     <Compile Include="../Shared/ServoTool.cs" Link="Services/ServoTool.cs" />
+    <Compile Include="../Shared/SensorExperiment.cs" Link="Services/SensorExperiment.cs" />
     <None Include="../../config/tracker.json" Link="tracker.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../config/face-aim.json" Link="face-aim.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

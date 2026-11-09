@@ -116,6 +116,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<string> Events { get; } = [];
     public ServoViewModel Servo { get; } = new();
     public FaceAimViewModel FaceAim { get; } = new();
+    public bool LiveFaceConfirmed { get; private set; }
     public ObservableCollection<CameraDevice> Cameras { get; } = [];
     public event Action? FramePresented;
     public bool CanConfigure => !IsRunning && !IsLoadingPreview;
@@ -429,6 +430,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     internal void Present(SessionFrame frame)
     {
+        LiveFaceConfirmed = frame.FaceAim?.Observation.HasTarget == true && frame.VisionStatus == "face_locked";
         if (frame.OutputSuspended && IsFollowing)
         {
             IsFollowing = false;
@@ -583,6 +585,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void ResetPresentation()
     {
+        LiveFaceConfirmed = false;
         CaptureSummary = "连接成功后显示实际尺寸和驱动信息。";
         preparedVideoPath = null;
         initialRegion = null;

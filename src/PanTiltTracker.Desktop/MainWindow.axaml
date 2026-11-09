@@ -23,6 +23,7 @@
         <TextBlock Text="桌面陪伴机器人" Classes="caption" />
       </StackPanel>
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <Button x:Name="SensorsButton" Content="传感器" Classes="quiet" Click="OpenSensors" />
         <Button x:Name="MarkerButton" Content="生成标记" Classes="tertiary" Click="SaveMarker" IsEnabled="{Binding CanConfigure}" />
         <Button x:Name="ExportButton" Content="导出 CSV" Classes="quiet" Click="ExportCsv" IsEnabled="{Binding CanExport}" />
         <Border Background="{StaticResource SubtleBrush}" CornerRadius="6" Padding="12,8" Margin="8,0,0,0" VerticalAlignment="Center">

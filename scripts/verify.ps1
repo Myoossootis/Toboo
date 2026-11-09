@@ -22,6 +22,18 @@ try {
     Invoke-DotNet -Arguments @($applicationPath, 'simulate', '--frames', '300', '--out', 'artifacts/verification/simulation')
     Invoke-DotNet -Arguments @($applicationPath, 'marker', '--out', 'artifacts/verification/marker-7.png')
     Invoke-DotNet -Arguments @($applicationPath, 'image', '--input', 'artifacts/verification/marker-7.png', '--out', 'artifacts/verification/image')
+    Invoke-DotNet -Arguments @($applicationPath, 'sensors', 'demo', '--out', 'artifacts/verification/sensors-demo')
+    Invoke-DotNet -Arguments @($applicationPath, 'sensors', 'replay', '--input', 'artifacts/verification/sensors-demo/events.jsonl', '--out', 'artifacts/verification/sensors-replay')
+    $sensorMetadata = Get-Content artifacts/verification/sensors-demo/run.json -Raw | ConvertFrom-Json
+    foreach ($state in @('WaitingForSensors', 'Companion', 'PostureProtection', 'DistanceProtection', 'AwaitingResume', 'Resting')) {
+        if ($state -notin $sensorMetadata.states) { throw "Missing sensor demonstration state: $state" }
+    }
+    if ($sensorMetadata.source -ne 'synthetic' -or $sensorMetadata.hardwareOutput -ne 'disabled' -or $sensorMetadata.Rejected -ne 0) {
+        throw 'Sensor demonstration metadata or reception failed.'
+    }
+    if ((Get-FileHash artifacts/verification/sensors-demo/fusion.jsonl).Hash -ne (Get-FileHash artifacts/verification/sensors-replay/fusion.jsonl).Hash) {
+        throw 'Sensor replay did not reproduce the demonstration decisions.'
+    }
 
     $rows = @(Import-Csv -LiteralPath 'artifacts/verification/simulation/telemetry.csv')
     if ($rows.Count -ne 300) { throw "Expected 300 simulated frames, got $($rows.Count)." }
@@ -36,7 +48,7 @@ try {
     if ($metadata.hardwareOutput -ne 'disabled' -or !$metadata.simulated) {
         throw 'Simulation metadata is not correctly labeled.'
     }
-    Write-Host 'PASS: build, tests, 300-frame synthetic pipeline, occlusion, marker and image CLI.'
+    Write-Host 'PASS: build, tests, synthetic vision, marker, sensor fault scenarios and deterministic replay.'
     Write-Host 'Hardware camera, UART, servo behavior and physical accuracy remain unverified.'
 }
 finally {
