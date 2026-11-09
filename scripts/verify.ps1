@@ -5,6 +5,8 @@ $repositoryPath = Split-Path -Parent $PSScriptRoot
 Push-Location -LiteralPath $repositoryPath
 try {
     & (Join-Path $PSScriptRoot 'verify-product-boundary.ps1')
+    & node --test integrations/toboo-harness/tests/engine.test.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Independent Harness bridge tests failed.' }
     function Invoke-DotNet {
         param([string[]]$Arguments)
         & dotnet @Arguments

@@ -14,10 +14,10 @@ public sealed partial class MainWindow : Window
     public MainViewModel ViewModel { get; }
     public CompanionShellViewModel Shell { get; }
     public MainWindow() : this(new MainViewModel()) { }
-    public MainWindow(MainViewModel viewModel)
+    public MainWindow(MainViewModel viewModel, ChatViewModel? chat = null)
     {
         ViewModel = viewModel;
-        Shell = new(viewModel);
+        Shell = new(viewModel, chat);
         InitializeComponent();
         DataContext = Shell;
         Shell.AdvancedRequested += ShowAdvanced;
@@ -71,10 +71,11 @@ public sealed partial class MainWindow : Window
         base.OnClosing(args);
         if (closing) return;
         if (ViewModel.Servo.Busy && !ViewModel.IsFollowing) { args.Cancel = true; return; }
-        if (ViewModel.IsRunning)
+        if (ViewModel.IsRunning || Shell.Chat.RemoteRunning || Shell.Chat.HasPending || Shell.Chat.IsBusy)
         {
             args.Cancel = true; IsEnabled = false;
             await ViewModel.StopAsync();
+            await Shell.Chat.ShutdownAsync();
             closing = true; Close();
         }
     }

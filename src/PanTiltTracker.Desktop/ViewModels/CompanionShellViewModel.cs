@@ -9,6 +9,7 @@ namespace PanTiltTracker.Desktop.ViewModels;
 public sealed partial class CompanionShellViewModel : ObservableObject, IDisposable
 {
     public MainViewModel Tracking { get; }
+    public ChatViewModel Chat { get; }
     public event Action<int>? AdvancedRequested;
     public event Action? SensorsRequested;
     [ObservableProperty]
@@ -20,8 +21,8 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     public bool IsDevicesPage => PageIndex == 1;
     public bool IsSettingsPage => PageIndex == 2;
     public string PageTitle => PageIndex switch { 1 => "设备", 2 => "设置", _ => "陪伴" };
-    public string RobotState => Tracking.IsRunning ? "感知中" : "待机中";
-    public string RobotDetail => Tracking.IsRunning ? Tracking.IsFace && Tracking.ExpressionEnabled
+    public string RobotState => Chat.RemoteRunning ? "正在回应" : Tracking.IsRunning ? "感知中" : "待机中";
+    public string RobotDetail => Chat.RemoteRunning ? "正在认真组织回复" : Tracking.IsRunning ? Tracking.IsFace && Tracking.ExpressionEnabled
         ? "正在观察可见的表情线索" : "正在预览" + Tracking.SourceLabel : "准备好了，随时开始";
     public string CameraState => Tracking.IsRunning ? Tracking.SourceLabel + " · 运行中"
         : Tracking.SelectedCamera is null ? "未开启 · 请选择摄像头" : "已发现 · 未开启";
@@ -33,11 +34,12 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     public bool HasNotice => Tracking.HasError || Tracking.HasServoNotice;
     public bool CanStartVision => Tracking.CanStart && Tracking.SelectedCamera is not null;
     public bool CanFollow => Tracking.CanStartFollow;
-    public string ConversationStatus => "对话服务尚未接入";
 
-    public CompanionShellViewModel(MainViewModel tracking)
+    public CompanionShellViewModel(MainViewModel tracking, ChatViewModel? chat = null)
     {
         Tracking = tracking;
+        Chat = chat ?? new(expression: tracking.CaptureExpressionCue);
+        Chat.PropertyChanged += ChatChanged;
         tracking.PropertyChanged += Changed;
         tracking.Servo.PropertyChanged += Changed;
         tracking.Cameras.CollectionChanged += CamerasChanged;
@@ -67,6 +69,11 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
         RefreshStatus();
     }
     private void CamerasChanged(object? sender, NotifyCollectionChangedEventArgs args) => RefreshStatus();
+    private void ChatChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(ChatViewModel.RemoteRunning))
+        { OnPropertyChanged(nameof(RobotState)); OnPropertyChanged(nameof(RobotDetail)); }
+    }
     private void RefreshStatus()
     {
         OnPropertyChanged(nameof(RobotState)); OnPropertyChanged(nameof(RobotDetail));
@@ -81,6 +88,7 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
         Tracking.PropertyChanged -= Changed;
         Tracking.Servo.PropertyChanged -= Changed;
         Tracking.Cameras.CollectionChanged -= CamerasChanged;
+        Chat.PropertyChanged -= ChatChanged; Chat.Dispose();
         AdvancedRequested = null; SensorsRequested = null;
     }
 }

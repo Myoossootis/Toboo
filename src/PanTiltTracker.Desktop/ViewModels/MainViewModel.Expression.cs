@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using PanTiltTracker.Core;
+using PanTiltTracker.Desktop.Services;
 
 namespace PanTiltTracker.Desktop.ViewModels;
 
@@ -18,6 +19,15 @@ public sealed partial class MainViewModel
     private readonly Stopwatch expressionClock = Stopwatch.StartNew();
     private DispatcherTimer? expressionTimer;
     private TimeSpan? expressionExpires;
+    private ExpressionEstimate? latestExpression;
+    internal ChatExpression? CaptureExpressionCue()
+    {
+        if (!IsRunning || !IsCameraSource || !IsFace || !ExpressionEnabled || latestExpression is not { Reason: "stable" } cue
+            || cue.Label == FacialExpression.Unknown || !double.IsFinite(cue.Score) || cue.Score is < 0.6 or > 1
+            || expressionExpires is not { } expires || expressionClock.Elapsed >= expires) return null;
+        var age = Math.Clamp(500 - (expires - expressionClock.Elapsed).TotalMilliseconds, 0, 500);
+        return new(cue.Label.ToString().ToLowerInvariant(), cue.Score, age, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - age);
+    }
 
     private void InitializeExpressionPresentation()
     {
@@ -36,11 +46,13 @@ public sealed partial class MainViewModel
         ExpressionLabel = "表情线索 · " + reason; ExpressionEmoticon = "(?)";
         ExpressionDetail = "本地识别可见表情，不代表真实心理情绪。";
         ExpressionScores = []; ExpressionTiming = "无有效推理结果"; expressionExpires = null;
+        latestExpression = null;
     }
     private void PresentExpression(ExpressionAnalysis? analysis, TimeSpan now)
     {
         if (analysis is null) { ClearExpression(ExpressionEnabled ? "等待人脸" : "已关闭"); return; }
         var result = analysis.Estimate;
+        latestExpression = result;
         ExpressionLabel = "表情线索 · " + result.DisplayName;
         ExpressionEmoticon = result.Emoticon;
         var description = result.Reason switch {

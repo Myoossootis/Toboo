@@ -1,5 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:PanTiltTracker.Desktop.ViewModels" x:Class="PanTiltTracker.Desktop.Views.PreferencesView" x:DataType="vm:CompanionShellViewModel">
+             xmlns:vm="using:PanTiltTracker.Desktop.ViewModels" xmlns:views="using:PanTiltTracker.Desktop.Views" x:Class="PanTiltTracker.Desktop.Views.PreferencesView" x:DataType="vm:CompanionShellViewModel">
   <Grid x:Name="PreferencesGrid">
     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="280" /></Grid.ColumnDefinitions>
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
@@ -14,25 +14,13 @@
                 <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><StackPanel Spacing="4"><TextBlock Text="本地表情识别" FontWeight="Medium" /><TextBlock Text="运行前可调整，画面在本机分析" Classes="caption" TextWrapping="Wrap" /></StackPanel><ToggleSwitch x:Name="SettingsExpressionToggle" Grid.Column="1" IsChecked="{Binding Tracking.ExpressionEnabled}" IsEnabled="{Binding Tracking.CanConfigure}" OnContent="" OffContent="" /></Grid>
               </StackPanel></Border>
-              <Border Classes="shellcard"><StackPanel Spacing="16">
-                <TextBlock Text="对话" Classes="section" />
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><StackPanel Spacing="4"><TextBlock Text="对话模型" FontWeight="Medium" /><TextBlock Text="用于生成对话回复" Classes="caption" /></StackPanel><ComboBox Grid.Column="1" SelectedIndex="0" IsEnabled="False" Width="160"><ComboBoxItem Content="DeepSeek" /></ComboBox></Grid>
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><TextBlock Text="API 密钥" VerticalAlignment="Center" /><TextBox Grid.Column="1" Watermark="尚未接入" IsEnabled="False" Width="160" /></Grid>
-                <TextBlock Text="对话服务接入后开放密钥配置与陪伴风格。" Classes="caption" TextWrapping="Wrap" />
-              </StackPanel></Border>
+              <Border Classes="shellcard"><views:ChatSettingsView /></Border>
               <Border Classes="shellcard"><StackPanel Spacing="12"><TextBlock Text="声音" Classes="section" /><TextBlock Text="语音输入与回复尚未接入" Classes="muted" /><TextBlock Text="麦克风和音响接入后，在这里选择声音与交互方式。" Classes="caption" TextWrapping="Wrap" /></StackPanel></Border>
-              <TextBlock Text="当前开关用于本次应用会话" Classes="caption" />
+              <TextBlock Text="视觉开关用于本次应用会话；对话偏好保存在本机" Classes="caption" TextWrapping="Wrap" />
             </StackPanel>
           </TabItem>
           <TabItem Header="对话与声音">
-            <Border Classes="shellcard" Margin="0,24,0,0"><StackPanel Spacing="24">
-              <TextBlock Text="让对话自然发生" Classes="section" />
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><TextBlock Text="对话模型" VerticalAlignment="Center" /><TextBlock Grid.Column="1" Text="DeepSeek · 待接入" Classes="muted" /></Grid>
-              <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><TextBlock Text="陪伴风格" VerticalAlignment="Center" /><ComboBox Grid.Column="1" IsEnabled="False" SelectedIndex="0" Width="160"><ComboBoxItem Content="自然" /><ComboBoxItem Content="温柔" /><ComboBoxItem Content="简洁" /></ComboBox></Grid>
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><TextBlock Text="语音回复" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsEnabled="False" IsChecked="False" OnContent="" OffContent="" /></Grid>
-              <TextBlock Text="这些选项会随对话与语音功能一起开放。目前不会调用云端服务或播放声音。" Classes="caption" TextWrapping="Wrap" LineHeight="20" />
-            </StackPanel></Border>
+            <Border Classes="shellcard" Margin="0,24,0,0"><views:ChatSettingsView /></Border>
           </TabItem>
           <TabItem Header="隐私">
             <Border Classes="shellcard" Margin="0,24,0,0"><StackPanel Spacing="24">
@@ -40,7 +28,7 @@
               <StackPanel Spacing="8"><TextBlock Text="图像在本机分析" FontWeight="SemiBold" /><TextBlock Text="表情识别在电脑上运行，不向云端上传摄像头画面。它提供可见表情线索，不判断真实心理情绪。" Classes="muted" TextWrapping="Wrap" LineHeight="24" /></StackPanel>
               <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
               <StackPanel Spacing="8"><TextBlock Text="实验记录" FontWeight="SemiBold" /><TextBlock Text="运行视觉会话时，会在本机保存检测与控制请求日志；启用表情识别后也记录分类分数和拒判原因。原始摄像头画面不会自动录像。" Classes="muted" TextWrapping="Wrap" LineHeight="24" /></StackPanel>
-              <StackPanel Spacing="8"><TextBlock Text="未来的在线对话" FontWeight="SemiBold" /><TextBlock Text="接入 DeepSeek 前会明确展示发送内容与密钥保存方式；当前尚未启用在线对话。" Classes="muted" TextWrapping="Wrap" LineHeight="24" /></StackPanel>
+              <StackPanel Spacing="8"><TextBlock Text="在线对话与记录" FontWeight="SemiBold" /><TextBlock Text="点击发送后，文字会经 Harness 发送给所选模型服务。附带表情线索默认关闭；开启后也只发送有效摘要，不上传画面。模型服务按其账号与计费设置运行。聊天记录保存在本机 .toboo-harness 的独立目录，发送状态会先保存，以便断线后核对并防止重复发送。" Classes="muted" TextWrapping="Wrap" LineHeight="24" /></StackPanel>
             </StackPanel></Border>
           </TabItem>
         </TabControl>

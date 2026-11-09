@@ -4,37 +4,62 @@
   <Grid x:Name="HomeGrid">
     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="320" /></Grid.ColumnDefinitions>
     <Grid RowDefinitions="*,Auto" Margin="32,24,32,24">
-      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="32" Margin="0,24,0,24">
-          <Grid ColumnDefinitions="144,*" ColumnSpacing="24" MinHeight="200">
+      <ScrollViewer x:Name="ConversationScroll" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="24" Margin="0,24,0,24">
+          <Grid ColumnDefinitions="144,*" ColumnSpacing="24" MinHeight="200" IsVisible="{Binding !Chat.HasMessages}">
             <Image Source="avares://toboo/Assets/toboo-companion.png" Width="144" Height="176" RenderTransformOrigin="50%,50%"><Image.RenderTransform><ScaleTransform ScaleX="1.4" ScaleY="1.4" /></Image.RenderTransform></Image>
             <StackPanel Grid.Column="1" Spacing="16" VerticalAlignment="Center">
               <TextBlock Text="今天，想聊点什么？" FontSize="32" FontWeight="SemiBold" TextWrapping="Wrap" />
               <TextBlock Text="我在这里，听你说。" FontSize="20" Classes="muted" />
             </StackPanel>
           </Grid>
-          <Border Background="{StaticResource SubtleBrush}" CornerRadius="16" Padding="24" MaxWidth="560" HorizontalAlignment="Left">
+          <Border Background="{StaticResource SubtleBrush}" CornerRadius="16" Padding="24" MaxWidth="560" HorizontalAlignment="Left" IsVisible="{Binding !Chat.HasMessages}">
             <StackPanel Spacing="12">
               <TextBlock Text="先认识一下彼此" FontSize="16" FontWeight="SemiBold" />
-              <TextBlock Text="你可以先开启视觉感知，看看 toboo 如何回应你的表情。" Classes="muted" TextWrapping="Wrap" LineHeight="24" />
-              <TextBlock Text="文字对话与语音回复将在接入服务后开放。" Classes="caption" TextWrapping="Wrap" />
-              <Button Content="连接我的设备 →" Command="{Binding NavigateCommand}" CommandParameter="1" Classes="textlink" HorizontalAlignment="Left" />
+              <TextBlock Text="连接 DeepSeek Harness，开始属于你的陪伴对话。" Classes="muted" TextWrapping="Wrap" LineHeight="24" />
+              <TextBlock Text="你可以选择附带有效表情线索，摄像头画面留在本机。" Classes="caption" TextWrapping="Wrap" />
+              <Button Content="连接 Harness →" Command="{Binding Chat.ConnectCommand}" Classes="textlink" HorizontalAlignment="Left" />
             </StackPanel>
           </Border>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsVisible="{Binding Chat.HasMessages}">
+            <TextBlock Text="{Binding Chat.SessionTitle}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Content="新对话" Command="{Binding Chat.NewChatCommand}" Classes="quiet" />
+          </Grid>
+          <Button Content="加载更早消息" Command="{Binding Chat.LoadOlderCommand}" Classes="textlink" IsVisible="{Binding Chat.HasMore}" HorizontalAlignment="Center" />
+          <ItemsControl ItemsSource="{Binding Chat.Messages}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ChatMessageItem">
+                <Border Classes="chatmessage" Classes.user="{Binding IsUser}" Padding="20,16" Margin="0,0,0,16" CornerRadius="16">
+                  <StackPanel Spacing="8">
+                    <TextBlock Text="{Binding Author}" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" FontSize="14" />
+                    <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="16" LineHeight="26" />
+                    <TextBlock Text="{Binding Status}" Classes="caption" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
         </StackPanel>
       </ScrollViewer>
       <StackPanel Grid.Row="1" Spacing="12">
+        <Border Background="#FFF4D6" Padding="12" CornerRadius="8" IsVisible="{Binding Chat.HasError}"><TextBlock Text="{Binding Chat.Error}" Foreground="#805A16" TextWrapping="Wrap" FontSize="14" /></Border>
+        <StackPanel Orientation="Horizontal" Spacing="16">
+          <Button Content="重新连接" Command="{Binding Chat.ConnectCommand}" Classes="textlink" />
+          <Button Content="重试原请求" Command="{Binding Chat.RetryCommand}" IsVisible="{Binding Chat.HasPending}" Classes="textlink" />
+          <Button x:Name="StopChatButton" Content="停止回复" Command="{Binding Chat.StopCommand}" IsVisible="{Binding Chat.CanStop}" Classes="quiet" />
+        </StackPanel>
         <Border BorderBrush="{StaticResource ControlBorderBrush}" BorderThickness="1" CornerRadius="24" Padding="20,16">
           <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
-            <TextBox x:Name="ConversationInput" Classes="conversation" Watermark="对话服务接入后，即可开始聊天…" IsEnabled="False" BorderThickness="0" Background="Transparent" FontSize="16" VerticalAlignment="Center" />
+            <TextBox x:Name="ConversationInput" Classes="conversation" Text="{Binding Chat.Draft}" Watermark="说说你此刻的想法…" IsEnabled="{Binding Chat.IsConnected}" MaxLength="4000" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="96" KeyDown="ComposerKeyDown" BorderThickness="0" Background="Transparent" FontSize="16" VerticalAlignment="Center" />
             <Button Grid.Column="1" Classes="round" IsEnabled="False" ToolTip.Tip="语音输入尚未接入"><icons:AppIcon Kind="Mic" /></Button>
-            <Button Grid.Column="2" Classes="round primary" IsEnabled="False" ToolTip.Tip="对话服务尚未接入"><icons:AppIcon Kind="Send" Stroke="White" /></Button>
+            <Button x:Name="SendChatButton" Grid.Column="2" Classes="round primary" Command="{Binding Chat.SendCommand}" ToolTip.Tip="发送 · Enter（Shift+Enter 换行）"><icons:AppIcon Kind="Send" Stroke="White" /></Button>
           </Grid>
         </Border>
         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16" Margin="8,0">
-          <TextBlock Text="文字 / 语音" Classes="caption" />
-          <TextBlock Grid.Column="1" Text="{Binding ConversationStatus}" Classes="caption" HorizontalAlignment="Right" />
+          <TextBlock Text="文字 · Enter 发送" Classes="caption" />
+          <TextBlock Grid.Column="1" Text="{Binding Chat.ConnectionStatus}" Classes="caption" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" />
         </Grid>
+        <TextBlock Text="{Binding Chat.PrivacyHint}" Classes="caption" TextWrapping="Wrap" />
       </StackPanel>
     </Grid>
     <Border Grid.Column="1" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1,0,0,0">

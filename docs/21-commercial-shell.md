@@ -1,5 +1,7 @@
 # toboo 三页产品界面
 
+本页记录前端重组阶段；后续文字聊天已在同一toboo界面接入，当前功能与验证以 [Harness对话说明](22-harness-companion-chat.md) 为准。
+
 2026-11-09：将本聊天已选的陪伴、设备、设置概念图还原为 Avalonia 原生桌面界面。保留 .NET 8、Avalonia 11、FluentTheme 和现有青绿色主题，不引入 Web 前端、Tailwind 或新的运行依赖。
 
 ## 页面与功能

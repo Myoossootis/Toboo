@@ -8,6 +8,17 @@ namespace PanTiltTracker.Desktop.Services;
 
 internal static class Diagnostics
 {
+    public static async Task ChatSelfTestAsync()
+    {
+        using var client = new TobooChatClient();
+        var status = await client.CallAsync<ChatStatus>(new { action = "status" });
+        if (status.Service != "toboo-chat" || status.Protocol != 1 || status.Version != "1.0.2" || !status.Compatible || status.Tools || status.Isolation != "owned-transcripts-direct-llm")
+            throw new InvalidDataException("toboo bridge compatibility/isolation failed.");
+        var models = await client.CallAsync<ChatCatalog>(new { action = "models" });
+        Write("chat-self-test.json", new { success = true, status.Version, status.Protocol, status.Isolation, status.Tools,
+            providerGroups = models.Groups.Length, models = models.Groups.Sum(g => g.Models.Length),
+            modelRequestsSent = false, cameraUsed = false, hardwareOutput = "disabled" });
+    }
     public static string DirectoryPath => File.Exists(Path.Combine(AppContext.BaseDirectory, "portable.mode"))
         ? Path.Combine(AppContext.BaseDirectory, "diagnostics")
         : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PanTiltTracker", "diagnostics");

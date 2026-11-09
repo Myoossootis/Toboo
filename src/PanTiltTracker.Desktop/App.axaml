@@ -90,6 +90,8 @@
       <Setter Property="CornerRadius" Value="16" />
       <Setter Property="Padding" Value="24" />
     </Style>
+    <Style Selector="Border.chatmessage"><Setter Property="Background" Value="{StaticResource SurfaceBrush}" /></Style>
+    <Style Selector="Border.chatmessage.user"><Setter Property="Background" Value="{StaticResource SubtleBrush}" /></Style>
     <Style Selector="UserControl.compact Border.shellcard"><Setter Property="Padding" Value="16" /></Style>
     <Style Selector="TabControl.preferences"><Setter Property="Background" Value="Transparent" /></Style>
     <Style Selector="TabControl.preferences TabItem"><Setter Property="FontSize" Value="16" /><Setter Property="Padding" Value="16,12" /></Style>

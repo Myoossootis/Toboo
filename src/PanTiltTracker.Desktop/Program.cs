@@ -11,6 +11,7 @@ internal static class Program
         try
         {
             if (args.Contains("--self-test", StringComparer.Ordinal)) { Diagnostics.SelfTest(); return 0; }
+            if (args.Contains("--chat-self-test", StringComparer.Ordinal)) { Diagnostics.ChatSelfTestAsync().GetAwaiter().GetResult(); return 0; }
             return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
         catch (Exception error)
