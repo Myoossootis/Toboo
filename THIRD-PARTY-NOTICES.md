@@ -1,10 +1,13 @@
 # Third-party components in the Windows portable distribution
 
+Separate UNO LCD firmware in `firmware/uno_lcd/` uses Bill Perry's **hd44780 1.3.2** library (GPL-3.0-or-later), https://github.com/duinoWitchery/hd44780. The display firmware sources carry the same license; the complete license is retained in `licenses/hd44780-GPL-3.0.txt`. This library is not linked into the .NET application or included in the Windows executable. The pinned firmware build installs the unmodified library into the ignored local toolchain directory.
+
 The source project's publication does not grant an additional license to third-party components. Original license and notice texts are retained in `licenses/`, including texts extracted from the exact locked NuGet packages. Dependency versions and hashes are recorded in `licenses/packages.lock.json`.
 
 | Component | License / source |
 | --- | --- |
 | .NET runtime 8.0.33 | MIT and third-party notices; `LICENSE.txt`, `THIRD-PARTY-NOTICES.txt` in the runtime distribution; https://github.com/dotnet/runtime |
+| System.IO.Ports 8.0.0 | MIT; https://github.com/dotnet/runtime/tree/v8.0.0/src/libraries/System.IO.Ports |
 | Avalonia 11.3.22 | MIT; https://github.com/AvaloniaUI/Avalonia |
 | CommunityToolkit.Mvvm 8.4.0 | MIT; https://github.com/CommunityToolkit/dotnet |
 | OpenCvSharp 4.10.0.20240616 | Apache-2.0; https://github.com/shimat/opencvsharp |

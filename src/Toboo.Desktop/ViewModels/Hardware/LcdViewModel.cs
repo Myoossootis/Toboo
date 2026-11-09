@@ -81,7 +81,7 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
             var ttl = cue is not null && double.IsFinite(cue.AgeMs) && cue.AgeMs >= 0
                 ? (int)Math.Clamp(450 - cue.AgeMs, 0, 450) : 0;
             var valid = ttl > 0 && cue is { Score: >= 0.6 and <= 1 }
-                && Enum.TryParse<FacialExpression>(cue.Label, true, out var value) && value != FacialExpression.Unknown
+                && Enum.TryParse<FacialExpression>(cue.Label, true, out var value) && Enum.IsDefined(value) && value != FacialExpression.Unknown
                 && value.ToString().ToLowerInvariant() == cue.Label;
             var label = valid ? cue!.Label : "unknown";
             await current.SendAsync(label, valid ? ttl : 1, token);
@@ -94,7 +94,8 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
         catch (OperationCanceledException) { }
         catch (Exception error) when (IsConnectionError(error))
         {
-            Disconnect(); Status = "LCD 已断开：" + error.Message;
+            if (ReferenceEquals(connection, current))
+            { Disconnect(); Status = "LCD 已断开：" + error.Message; }
         }
         finally { sending = false; }
     }

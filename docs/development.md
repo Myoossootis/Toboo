@@ -39,7 +39,9 @@ dotnet run --project src/Toboo.Cli -- sensors replay --input artifacts/sensors-d
 
 ```powershell
 ./scripts/publish-portable.ps1
-./scripts/test-portable.ps1 -ZipPath artifacts/release/toboo-0.2.0-win-x64-portable.zip
+./scripts/test-portable.ps1 -ZipPath artifacts/release/toboo-0.2.1-win-x64-portable.zip
 ```
 
 发布脚本固定 .NET 运行时版本、核对 VC 运行库签名并附带许可证、模型和独立聊天插件；输出完整 ZIP、SHA256 文件和带提交号的 `build-info.json`。解压测试使用应用自带运行时，执行原生模型自检与合成桌面帧测试，不代替硬件验收。
+
+LCD 协议与固件的独立检查：准备固定 Arduino 工具链后运行 `scripts/build-uno-lcd.ps1`，它包含 C++ 超时/拆包测试和 Python 主机模拟测试，不自动烧录。便携包可加 `-LcdPort COM7` 进行显式串口检查；默认验证不接硬件。

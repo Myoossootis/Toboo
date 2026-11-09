@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="340" viewBox="0 0 960 340" role="img" aria-labelledby="title desc">
+  <title id="title">UNO R3 to 5V I2C LCD1602 wiring</title>
+  <desc id="desc">UNO 5V to LCD VCC, GND to GND, A4 to SDA, A5 to SCL. Disconnect USB before wiring. Follow printed pin labels, not cable colors.</desc>
+  <rect width="960" height="340" rx="18" fill="#f5f8f7"/>
+  <g font-family="Segoe UI,Arial,sans-serif" fill="#183b39">
+    <text x="40" y="40" font-size="23" font-weight="700">UNO R3 + I²C LCD1602</text>
+    <rect x="42" y="66" width="240" height="206" rx="14" fill="#e2efec" stroke="#719a91"/>
+    <rect x="680" y="66" width="238" height="206" rx="14" fill="#e2efec" stroke="#719a91"/>
+    <text x="64" y="99" font-size="21" font-weight="600">UNO R3</text>
+    <text x="706" y="99" font-size="21" font-weight="600">5V LCD1602</text>
+    <g font-family="Consolas,monospace" font-size="19">
+      <text x="220" y="136">5V</text><text x="702" y="136">VCC</text>
+      <text x="210" y="175">GND</text><text x="702" y="175">GND</text>
+      <text x="220" y="214">A4</text><text x="702" y="214">SDA</text>
+      <text x="220" y="253">A5</text><text x="702" y="253">SCL</text>
+    </g>
+    <text x="64" y="154" font-size="15">USB power</text>
+    <text x="40" y="306" font-size="17">Disconnect USB before wiring. Match pin labels; line colors here are illustrative.</text>
+  </g>
+  <g fill="none" stroke-width="4" stroke-linecap="round">
+    <path d="M282 130H680" stroke="#c45751"/><path d="M282 169H680" stroke="#455461"/>
+    <path d="M282 208H680" stroke="#16847b"/><path d="M282 247H680" stroke="#4d79bd"/>
+  </g>
+</svg>

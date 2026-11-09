@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Toboo.Desktop.ViewModels" xmlns:icons="using:Toboo.Desktop.Controls"
              x:Class="Toboo.Desktop.Views.DevicesView" x:DataType="vm:CompanionShellViewModel">
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+  <ScrollViewer x:Name="DeviceScroll" HorizontalScrollBarVisibility="Disabled">
     <StackPanel Spacing="24" Margin="32,24">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
         <StackPanel Spacing="4"><TextBlock Text="我的设备" FontSize="32" FontWeight="SemiBold" /><TextBlock Text="连接与管理 toboo 的感知和表达" Classes="muted" TextWrapping="Wrap" /></StackPanel>

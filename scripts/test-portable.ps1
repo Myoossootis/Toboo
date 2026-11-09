@@ -1,4 +1,4 @@
-﻿param([Parameter(Mandatory = $true)][string]$ZipPath, [int]$CameraIndex = -1, [string]$BaseZipPath)
+﻿param([Parameter(Mandatory = $true)][string]$ZipPath, [int]$CameraIndex = -1, [string]$BaseZipPath, [string]$LcdPort)
 $ErrorActionPreference = 'Stop'
 $repositoryPath = Split-Path -Parent $PSScriptRoot
 $resolvedZip = (Resolve-Path -LiteralPath $ZipPath).Path
@@ -30,7 +30,7 @@ if ($BaseZipPath) {
 $executable = Join-Path $appPath 'toboo.exe'
 $buildInfo = Get-Content -LiteralPath (Join-Path $appPath 'build-info.json') -Raw | ConvertFrom-Json
 if ($buildInfo.workingTreeDirty -or $buildInfo.commit -notmatch '^[0-9a-f]{40}$') { throw 'Release must identify a clean source commit.' }
-foreach ($required in @('README-portable-zh-CN.md', 'docs/harness.md', 'scripts/install-toboo-harness.ps1', 'integrations/toboo-harness/index.mjs', 'integrations/toboo-harness/engine.mjs', 'integrations/toboo-harness/server.mjs', 'integrations/toboo-harness/lock.mjs')) {
+foreach ($required in @('README-portable-zh-CN.md', 'docs/harness.md', 'docs/lcd.md', 'System.IO.Ports.dll', 'firmware/uno_lcd/uno_lcd.ino', 'scripts/install-toboo-harness.ps1', 'integrations/toboo-harness/index.mjs', 'integrations/toboo-harness/engine.mjs', 'integrations/toboo-harness/server.mjs', 'integrations/toboo-harness/lock.mjs')) {
     if (!(Test-Path -LiteralPath (Join-Path $appPath $required))) { throw "Missing packaged feature dependency: $required" }
 }
 $unexpected = @(Get-ChildItem -LiteralPath $appPath -Recurse -Force -File | Where-Object {
@@ -74,6 +74,14 @@ try {
     Write-Host "PASS: extracted ZIP, app-local $($selfTest.framework), native OpenCV, and $($uiTest.frames) desktop frames from $mode."
     Write-Host 'Actuator output is disabled. Other camera/computer combinations remain unverified.'
     Write-Host "Reports: $appPath/diagnostics"
+    if ($LcdPort) {
+        if ($LcdPort -notmatch '^COM[1-9][0-9]*$') { throw 'Specify the confirmed UNO COM port explicitly.' }
+        $process = Start-Process -FilePath $executable -ArgumentList "--lcd-self-test --lcd-port $LcdPort" -WorkingDirectory $appPath -WindowStyle Hidden -Wait -PassThru
+        if ($process.ExitCode -ne 0) { throw 'Packaged native LCD serial check failed. See diagnostics/startup-error.json.' }
+        $lcd = Get-Content -LiteralPath (Join-Path $appPath 'diagnostics/lcd-self-test.json') -Raw | ConvertFrom-Json
+        if (!$lcd.success -or !$lcd.nativeSerial -or $lcd.pythonRequired) { throw 'Packaged LCD check did not pass.' }
+        Write-Host 'PASS: native LCD handshake and display acknowledgements; no source checkout or Python runtime required.'
+    }
 }
 finally {
     $env:DOTNET_ROOT = $originalRoot

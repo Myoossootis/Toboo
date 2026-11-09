@@ -8,6 +8,16 @@ namespace Toboo.Desktop.Services;
 
 internal static class Diagnostics
 {
+    public static async Task LcdSelfTestAsync(string port)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var connection = await LcdConnection.OpenAsync(port, timeout.Token);
+        foreach (var label in new[] { "unknown", "neutral", "unknown" })
+            await connection.SendAsync(label, label == "unknown" ? 1 : 300, timeout.Token);
+        Write("lcd-self-test.json", new { success = true, source = "actual-uno-usb-protocol", port,
+            nativeSerial = true, pythonRequired = false, cameraUsed = false, actuatorOutput = "none",
+            opticalDisplayVerified = false, acknowledged = new[] { "unknown", "neutral", "unknown" } });
+    }
     public static async Task ChatSelfTestAsync()
     {
         using var client = new TobooChatClient();

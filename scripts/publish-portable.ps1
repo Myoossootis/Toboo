@@ -36,6 +36,15 @@ try {
     Copy-Item -LiteralPath docs -Destination (Join-Path $outputPath 'docs') -Recurse
     New-Item -ItemType Directory -Force (Join-Path $outputPath 'scripts') | Out-Null
     Copy-Item scripts/install-toboo-harness.ps1 (Join-Path $outputPath 'scripts/install-toboo-harness.ps1')
+    # Ship only committed firmware sources, never local board logs or tool caches.
+    $firmwareFiles = @(& git ls-files firmware)
+    if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate firmware sources.' }
+    $firmwareFiles += @('scripts/prepare-firmware.ps1', 'scripts/build-firmware.ps1', 'scripts/build-uno-sensors.ps1', 'scripts/build-uno-lcd.ps1')
+    foreach ($relative in $firmwareFiles) {
+        $destination = Join-Path $outputPath $relative
+        New-Item -ItemType Directory -Force (Split-Path -Parent $destination) | Out-Null
+        Copy-Item -LiteralPath $relative -Destination $destination
+    }
     $bridgePath = Join-Path $outputPath 'integrations/toboo-harness'
     New-Item -ItemType Directory -Force $bridgePath | Out-Null
     foreach ($file in @('index.mjs', 'engine.mjs', 'lock.mjs', 'server.mjs', 'package.json', 'README.md')) {

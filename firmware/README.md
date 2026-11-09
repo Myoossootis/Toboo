@@ -5,10 +5,13 @@
 | esp32_bench | ESP32-S3 | 无执行器输出的协议与状态机验证 |
 | esp32_single_servo | ESP32-S3 | 独立 UART 舵机输出、同步回位与跟随 |
 | uno_sensors | Arduino UNO | 独立距离、加速度遥测，默认采集通道禁用 |
+| uno_lcd | Arduino UNO | I²C LCD1602 实时表情显示与独立失效清除 |
 | tools | Windows / Python | 串口检查、目标发送与传感器记录 |
 | tests | 主机 | C++ 逻辑测试与显式串口测试 |
 
 桌面视觉和对话无需这些设备。构建脚本不自动烧录；串口测试、目标发送和烧录需明确选取设备，不能把合成测试当作实物验证。
+
+Uno LCD 的接线、固定依赖、构建和上传见 [表情屏说明](../docs/lcd.md)。`uno_lcd` 与 `uno_sensors` 当前为二选一固件，串口独占。
 
 ## 准备环境
 
