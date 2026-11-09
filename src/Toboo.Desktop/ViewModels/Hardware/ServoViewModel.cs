@@ -303,7 +303,7 @@ public sealed partial class ServoViewModel : ObservableObject
         var serialPort = (Port ?? "").Trim().ToUpperInvariant();
         if (!Regex.IsMatch(serialPort, @"\ACOM[1-9][0-9]{0,3}\z"))
         {
-            Status = "请输入 Windows 串口号，例如 COM6。";
+            Status = "请先选择 ESP32 串口；连接设备后可点击刷新。";
             return;
         }
         Busy = true;
