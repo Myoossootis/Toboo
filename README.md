@@ -10,6 +10,8 @@ EESM 5840 期末项目：以本地视觉、双轴云台和 Labkit 多传感器�
 
 ## 启动
 
+主界面现为“陪伴、设备、设置”三页，按已选商业化概念图还原。摄像头和表情入口在设备页；原有采集、舵机、对准、录像与日志工具仍可从“高级调试”打开。未接入的对话和语音功能明确显示待接入。详见 [三页界面说明](docs/21-commercial-shell.md)。
+
 需要 Windows x64 与固定的 .NET 8 SDK，不依赖 Visual Studio 或 C++/CLI。
 
 ```powershell
@@ -18,7 +20,7 @@ EESM 5840 期末项目：以本地视觉、双轴云台和 Labkit 多传感器�
 ./scripts/start-toboo.ps1 -ServoCalibration
 # 打开传感器遥测页（仅预览，不控制舵机）
 ./scripts/start-toboo.ps1 -Sensors
-# 直接进入表情识别页（默认不启动相机或舵机）
+# 直接进入设备页查看表情识别（默认不启动相机或舵机）
 ./scripts/start-toboo.ps1 -Expression
 ```
 

@@ -1,0 +1,59 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PanTiltTracker.Desktop.ViewModels" x:Class="PanTiltTracker.Desktop.Views.PreferencesView" x:DataType="vm:CompanionShellViewModel">
+  <Grid x:Name="PreferencesGrid">
+    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="280" /></Grid.ColumnDefinitions>
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="24" Margin="32,24">
+        <StackPanel Spacing="4"><TextBlock Text="偏好设置" FontSize="32" FontWeight="SemiBold" /><TextBlock Text="让 toboo 更适合你" Classes="muted" /></StackPanel>
+        <TabControl x:Name="PreferencesTabs" Classes="preferences" SelectedIndex="{Binding SettingsSection}">
+          <TabItem Header="通用">
+            <StackPanel Spacing="16" Margin="0,24,0,0">
+              <Border Classes="shellcard"><StackPanel Spacing="24">
+                <TextBlock Text="视觉与交互" Classes="section" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><StackPanel Spacing="4"><TextBlock Text="首页视觉感知" FontWeight="Medium" /><TextBlock Text="在陪伴页展示预览和表情" Classes="caption" TextWrapping="Wrap" /></StackPanel><ToggleSwitch x:Name="ShowVisualToggle" Grid.Column="1" IsChecked="{Binding ShowVisualPanel}" OnContent="" OffContent="" /></Grid>
+                <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><StackPanel Spacing="4"><TextBlock Text="本地表情识别" FontWeight="Medium" /><TextBlock Text="运行前可调整，画面在本机分析" Classes="caption" TextWrapping="Wrap" /></StackPanel><ToggleSwitch x:Name="SettingsExpressionToggle" Grid.Column="1" IsChecked="{Binding Tracking.ExpressionEnabled}" IsEnabled="{Binding Tracking.CanConfigure}" OnContent="" OffContent="" /></Grid>
+              </StackPanel></Border>
+              <Border Classes="shellcard"><StackPanel Spacing="16">
+                <TextBlock Text="对话" Classes="section" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><StackPanel Spacing="4"><TextBlock Text="对话模型" FontWeight="Medium" /><TextBlock Text="用于生成对话回复" Classes="caption" /></StackPanel><ComboBox Grid.Column="1" SelectedIndex="0" IsEnabled="False" Width="160"><ComboBoxItem Content="DeepSeek" /></ComboBox></Grid>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><TextBlock Text="API 密钥" VerticalAlignment="Center" /><TextBox Grid.Column="1" Watermark="尚未接入" IsEnabled="False" Width="160" /></Grid>
+                <TextBlock Text="对话服务接入后开放密钥配置与陪伴风格。" Classes="caption" TextWrapping="Wrap" />
+              </StackPanel></Border>
+              <Border Classes="shellcard"><StackPanel Spacing="12"><TextBlock Text="声音" Classes="section" /><TextBlock Text="语音输入与回复尚未接入" Classes="muted" /><TextBlock Text="麦克风和音响接入后，在这里选择声音与交互方式。" Classes="caption" TextWrapping="Wrap" /></StackPanel></Border>
+              <TextBlock Text="当前开关用于本次应用会话" Classes="caption" />
+            </StackPanel>
+          </TabItem>
+          <TabItem Header="对话与声音">
+            <Border Classes="shellcard" Margin="0,24,0,0"><StackPanel Spacing="24">
+              <TextBlock Text="让对话自然发生" Classes="section" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><TextBlock Text="对话模型" VerticalAlignment="Center" /><TextBlock Grid.Column="1" Text="DeepSeek · 待接入" Classes="muted" /></Grid>
+              <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><TextBlock Text="陪伴风格" VerticalAlignment="Center" /><ComboBox Grid.Column="1" IsEnabled="False" SelectedIndex="0" Width="160"><ComboBoxItem Content="自然" /><ComboBoxItem Content="温柔" /><ComboBoxItem Content="简洁" /></ComboBox></Grid>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><TextBlock Text="语音回复" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsEnabled="False" IsChecked="False" OnContent="" OffContent="" /></Grid>
+              <TextBlock Text="这些选项会随对话与语音功能一起开放。目前不会调用云端服务或播放声音。" Classes="caption" TextWrapping="Wrap" LineHeight="20" />
+            </StackPanel></Border>
+          </TabItem>
+          <TabItem Header="隐私">
+            <Border Classes="shellcard" Margin="0,24,0,0"><StackPanel Spacing="24">
+              <TextBlock Text="你的数据如何处理" Classes="section" />
+              <StackPanel Spacing="8"><TextBlock Text="图像在本机分析" FontWeight="SemiBold" /><TextBlock Text="表情识别在电脑上运行，不向云端上传摄像头画面。它提供可见表情线索，不判断真实心理情绪。" Classes="muted" TextWrapping="Wrap" LineHeight="24" /></StackPanel>
+              <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
+              <StackPanel Spacing="8"><TextBlock Text="实验记录" FontWeight="SemiBold" /><TextBlock Text="运行视觉会话时，会在本机保存检测与控制请求日志；启用表情识别后也记录分类分数和拒判原因。原始摄像头画面不会自动录像。" Classes="muted" TextWrapping="Wrap" LineHeight="24" /></StackPanel>
+              <StackPanel Spacing="8"><TextBlock Text="未来的在线对话" FontWeight="SemiBold" /><TextBlock Text="接入 DeepSeek 前会明确展示发送内容与密钥保存方式；当前尚未启用在线对话。" Classes="muted" TextWrapping="Wrap" LineHeight="24" /></StackPanel>
+            </StackPanel></Border>
+          </TabItem>
+        </TabControl>
+      </StackPanel>
+    </ScrollViewer>
+    <Border x:Name="ContextRail" Grid.Column="1" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1,0,0,0">
+      <StackPanel Spacing="24" Margin="24,64,24,24">
+        <Image Source="avares://toboo/Assets/toboo-companion.png" Height="200" RenderTransformOrigin="50%,50%"><Image.RenderTransform><ScaleTransform ScaleX="1.4" ScaleY="1.4" /></Image.RenderTransform></Image>
+        <TextBlock Text="按你的节奏相处" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Text="随时调整，也可以随时关闭。" Classes="muted" TextWrapping="Wrap" LineHeight="24" />
+        <TextBlock Text="表情仅作为互动线索。" Classes="caption" TextWrapping="Wrap" />
+        <Button Content="查看隐私说明 →" Classes="quiet" Command="{Binding ShowPrivacyCommand}" HorizontalAlignment="Left" />
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

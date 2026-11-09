@@ -89,7 +89,7 @@ public sealed class FaceFollowOutputGuardTests
     public async Task OutputFaultLeavesTheWindowRunningWithAnAmberNoticeAndFreshFrames(int width,int height)
     {
         using var model=new MainViewModel { IsRunning=true,IsFollowing=true };
-        var window=new MainWindow(model) { Width=width,Height=height };
+        var window=new AdvancedWindow(model) { Width=width,Height=height };
         try
         {
             window.Show();

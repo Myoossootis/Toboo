@@ -18,7 +18,7 @@ public sealed class WorkbenchPreviewTests
         var output = Path.Combine(workspace, "artifacts", "ui-refactor-preview");
         Directory.CreateDirectory(output);
         using var model = new MainViewModel(output);
-        var window = new MainWindow(model) { Width = width, Height = height };
+        var window = new AdvancedWindow(model) { Width = width, Height = height };
         Task? running = null;
         try
         {

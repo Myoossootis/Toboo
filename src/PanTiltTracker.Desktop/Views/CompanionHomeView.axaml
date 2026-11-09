@@ -1,0 +1,72 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PanTiltTracker.Desktop.ViewModels" xmlns:icons="using:PanTiltTracker.Desktop.Controls"
+             x:Class="PanTiltTracker.Desktop.Views.CompanionHomeView" x:DataType="vm:CompanionShellViewModel">
+  <Grid x:Name="HomeGrid">
+    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="320" /></Grid.ColumnDefinitions>
+    <Grid RowDefinitions="*,Auto" Margin="32,24,32,24">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="32" Margin="0,24,0,24">
+          <Grid ColumnDefinitions="144,*" ColumnSpacing="24" MinHeight="200">
+            <Image Source="avares://toboo/Assets/toboo-companion.png" Width="144" Height="176" RenderTransformOrigin="50%,50%"><Image.RenderTransform><ScaleTransform ScaleX="1.4" ScaleY="1.4" /></Image.RenderTransform></Image>
+            <StackPanel Grid.Column="1" Spacing="16" VerticalAlignment="Center">
+              <TextBlock Text="今天，想聊点什么？" FontSize="32" FontWeight="SemiBold" TextWrapping="Wrap" />
+              <TextBlock Text="我在这里，听你说。" FontSize="20" Classes="muted" />
+            </StackPanel>
+          </Grid>
+          <Border Background="{StaticResource SubtleBrush}" CornerRadius="16" Padding="24" MaxWidth="560" HorizontalAlignment="Left">
+            <StackPanel Spacing="12">
+              <TextBlock Text="先认识一下彼此" FontSize="16" FontWeight="SemiBold" />
+              <TextBlock Text="你可以先开启视觉感知，看看 toboo 如何回应你的表情。" Classes="muted" TextWrapping="Wrap" LineHeight="24" />
+              <TextBlock Text="文字对话与语音回复将在接入服务后开放。" Classes="caption" TextWrapping="Wrap" />
+              <Button Content="连接我的设备 →" Command="{Binding NavigateCommand}" CommandParameter="1" Classes="textlink" HorizontalAlignment="Left" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+      <StackPanel Grid.Row="1" Spacing="12">
+        <Border BorderBrush="{StaticResource ControlBorderBrush}" BorderThickness="1" CornerRadius="24" Padding="20,16">
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+            <TextBox x:Name="ConversationInput" Classes="conversation" Watermark="对话服务接入后，即可开始聊天…" IsEnabled="False" BorderThickness="0" Background="Transparent" FontSize="16" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="round" IsEnabled="False" ToolTip.Tip="语音输入尚未接入"><icons:AppIcon Kind="Mic" /></Button>
+            <Button Grid.Column="2" Classes="round primary" IsEnabled="False" ToolTip.Tip="对话服务尚未接入"><icons:AppIcon Kind="Send" Stroke="White" /></Button>
+          </Grid>
+        </Border>
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16" Margin="8,0">
+          <TextBlock Text="文字 / 语音" Classes="caption" />
+          <TextBlock Grid.Column="1" Text="{Binding ConversationStatus}" Classes="caption" HorizontalAlignment="Right" />
+        </Grid>
+      </StackPanel>
+    </Grid>
+    <Border Grid.Column="1" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1,0,0,0">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="24" Margin="24,32">
+          <TextBlock Text="此刻的 toboo" FontSize="20" FontWeight="SemiBold" />
+          <StackPanel Spacing="8">
+            <Image Source="avares://toboo/Assets/toboo-companion.png" Height="200" RenderTransformOrigin="50%,50%"><Image.RenderTransform><ScaleTransform ScaleX="1.4" ScaleY="1.4" /></Image.RenderTransform></Image>
+            <TextBlock Text="{Binding RobotState}" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding RobotDetail}" Classes="muted" HorizontalAlignment="Center" TextWrapping="Wrap" />
+          </StackPanel>
+          <StackPanel Spacing="12" IsVisible="{Binding ShowVisualPanel}">
+            <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
+            <TextBlock Text="视觉感知" FontSize="16" FontWeight="SemiBold" />
+            <Border Height="160" CornerRadius="12" ClipToBounds="True" Background="{StaticResource SubtleBrush}">
+              <Grid>
+                <Image Source="{Binding Tracking.Preview}" Stretch="Uniform" IsVisible="{Binding Tracking.HasPreview}" />
+                <StackPanel Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !Tracking.HasPreview}">
+                  <icons:AppIcon Kind="Camera" Width="32" Height="32" HorizontalAlignment="Center" />
+                  <TextBlock Text="摄像头尚未开启" Classes="caption" />
+                </StackPanel>
+              </Grid>
+            </Border>
+            <TextBlock Text="{Binding SourceCaption}" Classes="caption" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Tracking.ExpressionLabel}" TextWrapping="Wrap" FontWeight="Medium" />
+            <TextBlock Text="表情仅作为互动线索" Classes="caption" />
+            <Button Content="管理视觉设备 →" Command="{Binding NavigateCommand}" CommandParameter="1" Classes="textlink" HorizontalAlignment="Left" />
+          </StackPanel>
+          <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
+          <TextBlock Text="麦克风与音响尚未接入" Classes="caption" TextWrapping="Wrap" />
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+  </Grid>
+</UserControl>

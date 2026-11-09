@@ -13,7 +13,7 @@ public sealed class FaceTargetTests
     public async Task FaceChoiceWorksForCameraAndDoesNotReplaceSimulationOrVideoTrackers()
     {
         using var model = new MainViewModel { SourceIndex = 3 };
-        var window = new MainWindow(model);
+        var window = new AdvancedWindow(model);
         try
         {
             window.Show();
@@ -50,7 +50,7 @@ public sealed class FaceTargetTests
         var path = Path.Combine(output, "blank.png");
         using (var blank = new Mat(480, 640, MatType.CV_8UC3, Scalar.All(40))) blank.SaveImage(path);
         using var model = new MainViewModel(output) { SourceIndex = 1, InputPath = path, TargetIndex = 1 };
-        var window = new MainWindow(model);
+        var window = new AdvancedWindow(model);
         try
         {
             window.Show();

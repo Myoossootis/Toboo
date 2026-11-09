@@ -23,7 +23,7 @@ public sealed class CameraTests
     public async Task NamedCameraSelectionUpdatesManualIndexAndAllowsPreviewWithoutAMarker()
     {
         using var model = new MainViewModel() { SourceIndex = 3 };
-        var window = new MainWindow(model);
+        var window = new AdvancedWindow(model);
         try
         {
             window.Show();

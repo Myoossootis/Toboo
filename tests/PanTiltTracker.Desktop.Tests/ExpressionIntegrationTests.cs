@@ -62,7 +62,7 @@ public sealed class ExpressionIntegrationTests
     public async Task ExpressionTabRendersScoresAndDoesNotLeaveStaleLabels(int width, int height)
     {
         using var model = new MainViewModel { SourceIndex = 3, TargetIndex = 1, IsRunning = true };
-        var window = new MainWindow(model) { Width = width, Height = height };
+        var window = new AdvancedWindow(model) { Width = width, Height = height };
         try
         {
             window.Show();

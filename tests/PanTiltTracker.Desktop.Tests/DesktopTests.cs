@@ -37,7 +37,7 @@ public sealed class DesktopTests
             }
         }
         using var model = new MainViewModel(OutputRoot) { SourceIndex = 2, AlgorithmIndex = 1, InputPath = path };
-        var window = new MainWindow(model) { Width = width, Height = height };
+        var window = new AdvancedWindow(model) { Width = width, Height = height };
         try
         {
             window.Show();
@@ -100,7 +100,7 @@ public sealed class DesktopTests
     public async Task LayoutKeepsPrimaryActionsAndPreviewVisible(int width, int height, string name)
     {
         using var viewModel = new MainViewModel(OutputRoot);
-        var window = new MainWindow(viewModel) { Width = width, Height = height };
+        var window = new AdvancedWindow(viewModel) { Width = width, Height = height };
         try
         {
             window.Show();
@@ -122,7 +122,7 @@ public sealed class DesktopTests
     public async Task SimulationCanStartOccludeRecoverStopAndExport()
     {
         using var viewModel = new MainViewModel(OutputRoot);
-        var window = new MainWindow(viewModel);
+        var window = new AdvancedWindow(viewModel);
         Task? running = null;
         try
         {
@@ -171,7 +171,7 @@ public sealed class DesktopTests
     public async Task MissingInputIsReportedWithoutStartingASession()
     {
         using var viewModel = new MainViewModel(OutputRoot) { SourceIndex = 1, InputPath = "" };
-        var window = new MainWindow(viewModel);
+        var window = new AdvancedWindow(viewModel);
         try
         {
             window.Show();
@@ -191,7 +191,7 @@ public sealed class DesktopTests
         var imagePath = Path.Combine(OutputRoot, "marker.png");
         using (var marker = ArucoTargetDetector.CreateMarker()) marker.SaveImage(imagePath);
         using var viewModel = new MainViewModel(OutputRoot) { SourceIndex = 1, InputPath = imagePath };
-        var window = new MainWindow(viewModel);
+        var window = new AdvancedWindow(viewModel);
         try
         {
             window.Show();
@@ -214,7 +214,7 @@ public sealed class DesktopTests
     public async Task ClosingAnActiveWindowStopsTheSession()
     {
         using var viewModel = new MainViewModel(OutputRoot);
-        var window = new MainWindow(viewModel);
+        var window = new AdvancedWindow(viewModel);
         window.Show();
         var running = viewModel.StartAsync();
         try

@@ -19,12 +19,12 @@ public sealed partial class App : Application
             if (desktop.Args?.Contains("--sensors", StringComparer.Ordinal) == true)
                 window.Opened += (_, _) => window.ShowSensors();
             if (desktop.Args?.Contains("--expression-preview", StringComparer.Ordinal) == true)
-                window.Opened += (_, _) => window.FindControl<TabControl>("SettingsTabs")!.SelectedIndex = 4;
+                window.Shell.PageIndex = 1;
             if (desktop.Args?.Contains("--servo-calibration", StringComparer.Ordinal) == true)
             {
                 window.ViewModel.SourceIndex = 3;
                 window.ViewModel.TargetIndex = 1;
-                window.FindControl<TabControl>("SettingsTabs")!.SelectedIndex = 2;
+                window.Opened += (_, _) => window.ShowAdvanced(2);
             }
             if (desktop.Args?.Contains("--smoke-test-ui", StringComparer.Ordinal) != true)
             {

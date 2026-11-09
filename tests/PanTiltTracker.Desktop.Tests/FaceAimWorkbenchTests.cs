@@ -138,7 +138,7 @@ public sealed class FaceAimWorkbenchTests
         using var model = new MainViewModel { SourceIndex = 3, TargetIndex = 1 };
         model.FaceAim.GeometryMode = 1;
         model.FaceAim.DirectionsConfirmed = false;
-        var window = new MainWindow(model) { Width = width, Height = height };
+        var window = new AdvancedWindow(model) { Width = width, Height = height };
         try
         {
             window.Show();
