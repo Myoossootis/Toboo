@@ -42,6 +42,6 @@ dotnet run --project src/Toboo.Cli -- sensors replay --input artifacts/sensors-d
 ./scripts/test-portable.ps1 -ZipPath artifacts/release/toboo-0.2.1-win-x64-portable.zip
 ```
 
-发布脚本固定 .NET 运行时版本、核对 VC 运行库签名并附带许可证、模型和独立聊天插件；输出完整 ZIP、SHA256 文件和带提交号的 `build-info.json`。解压测试使用应用自带运行时，执行原生模型自检与合成桌面帧测试，不代替硬件验收。
+发布脚本固定 .NET 运行时版本、核对 VC 运行库签名并附带许可证、模型和独立聊天插件；输出完整 ZIP、SHA256 文件和带提交号的 `build-info.json`。`config/serial-runtime.json` 固定应用内串口运行环境及下载哈希；准备脚本从官方嵌入式 Python 包和固定 pyserial 包构建，不复制开发者环境。解压测试屏蔽系统 Python 和外部 Python 环境变量，检查三个串口工具的导入，不打开端口，也不代替硬件验收。
 
 LCD 协议与固件的独立检查：准备固定 Arduino 工具链后运行 `scripts/build-uno-lcd.ps1`，它包含 C++ 超时/拆包测试和 Python 主机模拟测试，不自动烧录。便携包可加 `-LcdPort COM7` 进行显式串口检查；默认验证不接硬件。

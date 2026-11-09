@@ -12,6 +12,15 @@ internal static class Program
         {
             if (args.Contains("--self-test", StringComparer.Ordinal)) { Diagnostics.SelfTest(); return 0; }
             if (args.Contains("--chat-self-test", StringComparer.Ordinal)) { Diagnostics.ChatSelfTestAsync().GetAwaiter().GetResult(); return 0; }
+            if (args.Contains("--serial-runtime-self-test", StringComparer.Ordinal))
+            { Diagnostics.SerialRuntimeSelfTestAsync().GetAwaiter().GetResult(); return 0; }
+            if (args.Contains("--servo-self-test", StringComparer.Ordinal))
+            {
+                var port = Array.IndexOf(args, "--servo-port");
+                if (port < 0 || port + 1 >= args.Length || !System.Text.RegularExpressions.Regex.IsMatch(args[port + 1], @"\ACOM[1-9][0-9]{0,3}\z"))
+                    throw new ArgumentException("--servo-self-test requires --servo-port with the confirmed ESP32 port.");
+                Diagnostics.ServoSelfTestAsync(args[port + 1]).GetAwaiter().GetResult(); return 0;
+            }
             if (args.Contains("--lcd-self-test", StringComparer.Ordinal))
             {
                 var port = Array.IndexOf(args, "--lcd-port");

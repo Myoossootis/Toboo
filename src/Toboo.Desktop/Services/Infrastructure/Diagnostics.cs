@@ -3,11 +3,44 @@ using System.Diagnostics;
 using System.Text.Json;
 using OpenCvSharp;
 using Toboo.Vision;
+using Toboo.Runtime;
 
 namespace Toboo.Desktop.Services;
 
 internal static class Diagnostics
 {
+    public static async Task SerialRuntimeSelfTestAsync()
+    {
+        foreach (var script in new[] { "single_servo.py", "face_follow.py", "sensor_telemetry.py" })
+        {
+            var result = await ServoTool.RunScriptAsync(script, ["--help"]);
+            if (result.ExitCode != 0 || !result.Output.Contains("usage:", StringComparison.Ordinal))
+                throw new InvalidOperationException("串口运行环境自检失败：" + script + " " + result.Error);
+        }
+        var start = ServoTool.CreateStartInfo("single_servo.py", ["--help"]);
+        var bundled = start.FileName.StartsWith(Path.Combine(AppContext.BaseDirectory, "runtime"), StringComparison.OrdinalIgnoreCase);
+        Write("serial-runtime-self-test.json", new { success = true, bundledRuntime = bundled,
+            helpers = new[] { "single_servo", "face_follow", "sensor_telemetry" }, serialOpened = false, hardwareOutput = "disabled" });
+    }
+
+    public static async Task ServoSelfTestAsync(string port)
+    {
+        Directory.CreateDirectory(DirectoryPath);
+        var log = Path.Combine(DirectoryPath, "servo-readonly.jsonl");
+        var result = await ServoTool.RunAsync(["--port", port, "--action", "inspect", "--log", log]);
+        if (result.ExitCode != 0) throw new IOException("舵机只读检查失败：" + result.Error);
+        using var report = JsonDocument.Parse(result.Output);
+        // HELLO/STATUS only. A mistaken ARM, move, heartbeat or disarm fails the diagnostic.
+        foreach (var line in File.ReadLines(log))
+        {
+            using var record = JsonDocument.Parse(line);
+            if (record.RootElement.TryGetProperty("tx", out var tx) &&
+                tx.GetString() is not ("b'HELLO\\n'" or "b'STATUS\\n'" or "b'STATUS_S2\\n'" or "b'STATUS_S3\\n'"))
+                throw new InvalidOperationException("只读检查发现了非状态查询命令。");
+        }
+        Write("servo-self-test.json", new { success = true, source = "actual-esp32-readonly-status", port,
+            cameraUsed = false, movementRequested = false, report = report.RootElement.Clone() });
+    }
     public static async Task LcdSelfTestAsync(string port)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));

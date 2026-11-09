@@ -20,6 +20,7 @@ try {
     }
     & "$PSScriptRoot/verify-public-tree.ps1"
     & "$PSScriptRoot/prepare-vc-runtime.ps1"
+    $serialRuntime = & "$PSScriptRoot/prepare-serial-runtime.ps1"
     & dotnet publish src/Toboo.Desktop -c Release -r win-x64 --self-contained true -p:RestoreLockedMode=true `
         "-p:Version=$Version" "-p:RuntimeFrameworkVersion=$runtimeVersion" `
         -p:PublishSingleFile=false -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false -o $outputPath
@@ -52,6 +53,11 @@ try {
     }
     Copy-Item THIRD-PARTY-NOTICES.md $outputPath
     Copy-Item licenses/* $licensePath
+    $serialDestination = Join-Path $outputPath 'runtime/python'
+    New-Item -ItemType Directory -Force (Split-Path -Parent $serialDestination) | Out-Null
+    Copy-Item -LiteralPath $serialRuntime -Destination $serialDestination -Recurse
+    Copy-Item -LiteralPath (Join-Path $serialDestination 'LICENSE.txt') -Destination (Join-Path $licensePath 'Python-PSF.txt')
+    Copy-Item -LiteralPath (Join-Path $serialDestination 'pyserial-LICENSE.txt') -Destination (Join-Path $licensePath 'pyserial-BSD.txt')
     Set-Content -LiteralPath (Join-Path $outputPath 'portable.mode') -Value 'Logs stay beside the app.' -Encoding UTF8
 
     # Preserve license/notice files from the exact locked NuGet packages too.
@@ -81,7 +87,8 @@ try {
         version = $Version; commit = $commit; workingTreeDirty = $dirty; runtime = ".NET $runtimeVersion";
         platform = 'win-x64'; selfContained = $true; vcRuntime = '14.44.35211.0';
         vcInstallerSha256 = (Get-FileHash tmp/portable-deps/vc_redist.x64.exe -Algorithm SHA256).Hash;
-        hardwareOutput = 'disabled'; physicalCameraVerified = $false
+        hardwareOutput = 'disabled'; physicalCameraVerified = $false;
+        serialRuntime = (Get-Content config/serial-runtime.json -Raw | ConvertFrom-Json)
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputPath 'build-info.json') -Encoding UTF8
     foreach ($required in @('toboo.exe', 'coreclr.dll', 'OpenCvSharpExtern.dll', 'libSkiaSharp.dll', 'vcruntime140.dll', 'msvcp140.dll', 'models/face/face_detection_yunet_2023mar.onnx', 'models/expression/facial_expression_recognition_mobilefacenet_2022july.onnx', 'scripts/install-toboo-harness.ps1', 'integrations/toboo-harness/index.mjs')) {
         if (!(Test-Path -LiteralPath (Join-Path $outputPath $required))) { throw "Missing portable dependency: $required" }

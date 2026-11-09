@@ -43,11 +43,17 @@ if (!$runtimeConfig.runtimeOptions.includedFrameworks -or $runtimeConfig.runtime
 }
 $originalRoot = $env:DOTNET_ROOT
 $originalLookup = $env:DOTNET_MULTILEVEL_LOOKUP
+$originalPath = $env:PATH
+$originalPythonHome = $env:PYTHONHOME
+$originalPythonPath = $env:PYTHONPATH
 try {
     $env:DOTNET_ROOT = Join-Path $testPath 'no-installed-dotnet-here'
     $env:DOTNET_MULTILEVEL_LOOKUP = '0'
+    $env:PATH = Join-Path $env:SystemRoot 'System32'
+    $env:PYTHONHOME = Join-Path $testPath 'wrong-python-home'
+    $env:PYTHONPATH = Join-Path $testPath 'wrong-python-modules'
     $uiArguments = if ($CameraIndex -ge 0) { "--smoke-test-ui --camera-index $CameraIndex" } else { '--smoke-test-ui' }
-    foreach ($argument in @('--self-test', $uiArguments)) {
+    foreach ($argument in @('--self-test', '--serial-runtime-self-test', $uiArguments)) {
         $process = Start-Process -FilePath $executable -ArgumentList $argument -WorkingDirectory $appPath -WindowStyle Hidden -PassThru
         $null = $process.Handle
         if (!$process.WaitForExit(30000)) {
@@ -60,6 +66,8 @@ try {
     }
     $selfTest = Get-Content -LiteralPath (Join-Path $appPath 'diagnostics/self-test.json') -Raw | ConvertFrom-Json
     $uiTest = Get-Content -LiteralPath (Join-Path $appPath 'diagnostics/ui-smoke-test.json') -Raw | ConvertFrom-Json
+    $serialTest = Get-Content -LiteralPath (Join-Path $appPath 'diagnostics/serial-runtime-self-test.json') -Raw | ConvertFrom-Json
+    if (!$serialTest.success -or !$serialTest.bundledRuntime -or $serialTest.serialOpened) { throw 'Bundled serial runtime self-test failed.' }
     if (!$selfTest.success -or !$selfTest.faceModelLoaded -or $selfTest.faceDetector -ne 'yunet_2023mar' -or !$selfTest.faceBlankFramePassed -or
         !$selfTest.expressionModelLoaded -or !$uiTest.success -or $uiTest.frames -lt 12) { throw 'Portable smoke checks did not pass.' }
     if (!$selfTest.runtimeDirectory.StartsWith($appPath, [StringComparison]::OrdinalIgnoreCase)) {
@@ -73,6 +81,7 @@ try {
     $mode = if ($CameraIndex -ge 0) { "physical camera $CameraIndex" } else { 'synthetic scene' }
     Write-Host "PASS: extracted ZIP, app-local $($selfTest.framework), native OpenCV, and $($uiTest.frames) desktop frames from $mode."
     Write-Host 'Actuator output is disabled. Other camera/computer combinations remain unverified.'
+    Write-Host 'PASS: bundled servo, face-follow and sensor helper imports with system Python unavailable and hostile Python environment variables.'
     Write-Host "Reports: $appPath/diagnostics"
     if ($LcdPort) {
         if ($LcdPort -notmatch '^COM[1-9][0-9]*$') { throw 'Specify the confirmed UNO COM port explicitly.' }
@@ -86,4 +95,7 @@ try {
 finally {
     $env:DOTNET_ROOT = $originalRoot
     $env:DOTNET_MULTILEVEL_LOOKUP = $originalLookup
+    $env:PATH = $originalPath
+    $env:PYTHONHOME = $originalPythonHome
+    $env:PYTHONPATH = $originalPythonPath
 }
