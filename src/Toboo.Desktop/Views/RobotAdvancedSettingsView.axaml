@@ -6,6 +6,7 @@
              xmlns:vm="using:Toboo.Desktop.ViewModels" x:Class="Toboo.Desktop.Views.RobotAdvancedSettingsView"
              x:DataType="vm:CompanionShellViewModel">
   <StackPanel Spacing="24" IsEnabled="{Binding CanPrepareRobot}">
+    <TextBlock Text="{Binding Tracking.CameraModelLabel}" Classes="caption" TextWrapping="Wrap" />
     <StackPanel DataContext="{Binding Tracking.Servo}" x:DataType="vm:ServoViewModel" Spacing="12">
       <TextBlock Text="工作边界" Classes="section" />
       <TextBlock Text="首次使用或更换舵机后校准；已验证的边界可继续复用。" Classes="caption" TextWrapping="Wrap" />
