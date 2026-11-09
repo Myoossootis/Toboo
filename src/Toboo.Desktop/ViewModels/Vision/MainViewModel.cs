@@ -116,7 +116,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<string> Events { get; } = [];
     public ServoViewModel Servo { get; } = new();
     public FaceAimViewModel FaceAim { get; } = new();
-    public LcdViewModel Lcd { get; }
     public bool LiveFaceConfirmed { get; private set; }
     public ObservableCollection<CameraDevice> Cameras { get; } = [];
     public event Action? FramePresented;
@@ -161,7 +160,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public MainViewModel(string? workspace = null)
     {
-        Lcd = new(CaptureExpressionCue);
         this.workspace = workspace ?? FindWorkspace();
         var config = Path.Combine(AppContext.BaseDirectory, "tracker.json");
         initialSettings = File.Exists(config)
@@ -628,7 +626,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (disposed) return;
         disposed = true;
-        Lcd.Dispose();
         expressionTimer?.Stop();
         if (expressionTimer is not null) expressionTimer.Tick -= ExpireExpression;
         Servo.PropertyChanged -= ServoChanged;

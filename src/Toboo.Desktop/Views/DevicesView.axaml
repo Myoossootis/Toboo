@@ -75,16 +75,9 @@
             <StackPanel Spacing="16">
               <TextBlock Text="表情屏幕" Classes="section" />
               <Border Background="#173D40" Padding="8" CornerRadius="8" HorizontalAlignment="Left">
-                <Border Background="#134FBB" Padding="24,8" CornerRadius="4">
-                  <StackPanel><TextBlock Text="{Binding Tracking.Lcd.DisplayFace}" FontFamily="Consolas" FontSize="20" Foreground="#E0EEFF" TextAlignment="Center" />
-                    <TextBlock Text="{Binding Tracking.Lcd.DisplayLabel}" FontFamily="Consolas" Foreground="#E0EEFF" TextAlignment="Center" /></StackPanel>
-                </Border>
+                <Border Background="#134FBB" Padding="24,8" CornerRadius="4"><TextBlock Text="(^_^)&#10;toboo" FontFamily="Consolas" FontSize="20" Foreground="#E0EEFF" TextAlignment="Center" /></Border>
               </Border>
-              <TextBlock Text="{Binding Tracking.Lcd.Status}" FontWeight="Medium" TextWrapping="Wrap" />
-              <TextBox x:Name="LcdPortInput" Text="{Binding Tracking.Lcd.Port}" Watermark="Uno 端口，例如 COM7" IsEnabled="{Binding Tracking.Lcd.CanConnect}" />
-              <Button x:Name="ConnectLcdButton" Content="连接表情屏" Command="{Binding Tracking.Lcd.ConnectCommand}" Classes="quiet" IsVisible="{Binding !Tracking.Lcd.IsConnected}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
-              <Button Content="断开表情屏" Command="{Binding Tracking.Lcd.DisconnectCommand}" Classes="quiet" IsVisible="{Binding Tracking.Lcd.CanDisconnect}" />
-              <TextBlock Text="连接已烧录 LCD 固件的 Uno；开启本地视觉感知后同步表情。屏幕预览为最近已确认的发送内容。" Classes="caption" TextWrapping="Wrap" />
+              <TextBlock Text="LCD 1602 · 待接入" FontWeight="Medium" /><TextBlock Text="颜文字效果示意，尚未发送到屏幕。" Classes="caption" TextWrapping="Wrap" />
             </StackPanel>
           </Border>
           <Button Content="传感器遥测 →" Command="{Binding OpenSensorsCommand}" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
