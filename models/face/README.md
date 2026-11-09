@@ -10,7 +10,7 @@ Active file: `face_detection_yunet_2023mar.onnx` (232589 bytes).
 
 The input is BGR, resized down to at most 640 pixels wide with its aspect ratio preserved, then padded on the bottom/right to multiples of 32. No histogram equalization or image mirroring is applied. The network is run once for frontal and profile views, using score threshold 0.8 and NMS IoU threshold 0.3. Boxes are clipped and mapped back to original unmirrored coordinates; the largest retained box supplies the center observation. This does not identify or persist the identity of a person.
 
-Extreme poses, occlusion, poor lighting or unusual image quality can still cause misses or false positives. Landmarks from the upstream network are not exposed by this application. All inference is local and requires no network access at runtime.
+Extreme poses, occlusion, poor lighting or unusual image quality can still cause misses or false positives. Five landmarks from the same network pass are exposed for optional expression alignment, mapped to the original unmirrored image. All inference is local and requires no network access at runtime.
 
 ## Retained v0.1.2 model (not used by current main)
 

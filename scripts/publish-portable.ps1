@@ -62,7 +62,7 @@ try {
         vcInstallerSha256 = (Get-FileHash tmp/portable-deps/vc_redist.x64.exe -Algorithm SHA256).Hash;
         hardwareOutput = 'disabled'; physicalCameraVerified = $false
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputPath 'build-info.json') -Encoding UTF8
-    foreach ($required in @('toboo.exe', 'coreclr.dll', 'OpenCvSharpExtern.dll', 'libSkiaSharp.dll', 'vcruntime140.dll', 'msvcp140.dll', 'models/face/face_detection_yunet_2023mar.onnx')) {
+    foreach ($required in @('toboo.exe', 'coreclr.dll', 'OpenCvSharpExtern.dll', 'libSkiaSharp.dll', 'vcruntime140.dll', 'msvcp140.dll', 'models/face/face_detection_yunet_2023mar.onnx', 'models/expression/facial_expression_recognition_mobilefacenet_2022july.onnx')) {
         if (!(Test-Path -LiteralPath (Join-Path $outputPath $required))) { throw "Missing portable dependency: $required" }
     }
     if (Get-ChildItem -LiteralPath (Join-Path $outputPath 'models') -Filter '*.onnx' -Recurse | Where-Object { $_.Directory.Name -eq 'drone' }) { throw 'Experimental drone weights must not be bundled.' }

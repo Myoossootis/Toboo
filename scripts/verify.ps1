@@ -48,7 +48,7 @@ try {
     if ($metadata.hardwareOutput -ne 'disabled' -or !$metadata.simulated) {
         throw 'Simulation metadata is not correctly labeled.'
     }
-    Write-Host 'PASS: build, tests, synthetic vision, marker, sensor fault scenarios and deterministic replay.'
+    Write-Host 'PASS: build, tests, synthetic vision, expression model/time logic, marker, sensor fault scenarios and deterministic replay.'
     Write-Host 'Hardware camera, UART, servo behavior and physical accuracy remain unverified.'
 }
 finally {

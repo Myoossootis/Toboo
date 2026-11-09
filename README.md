@@ -4,6 +4,8 @@ EESM 5840 期末项目：以本地视觉、双轴云台和 Labkit 多传感器�
 
 当前已实现本地正面/侧面人脸检测、空间锁定、双轴跟随、平滑回中心、矩形与交叉对角线检查、工作区限位，以及串口异常时保留预览的降级处理。现役 S1 工作请求 30–175°，S2 50–150°，中心为 (103°,100°)。所有角度均为请求，不是实测轴位。响应速度改进安排在新 S1 舵机到货后。
 
+新增本地七类表情线索识别：YuNet五点对齐、MobileFaceNet模型、质量拒判、时间平滑与连续确认；结果可为未知，不代表真实心理情绪。界面“表情”页显示分数与颜文字，表情不控制舵机。开源比较、参数和验证见 [表情识别说明](docs/20-facial-expression.md)。
+
 已加入 Keyes UNO 加速度/超声波采集固件、桌面遥测入口、融合判断预览和确定性回放；软件及固件编译通过，尚未接线或烧录。融合判断尚未控制舵机。传感器唤醒、近手互动和环境模式仍待开发；详见 [遥测阶段说明](docs/19-uno-sensor-telemetry.md) 与 [多传感器方案](docs/18-toboo-multisensor-plan.md)。
 
 ## 启动
@@ -16,6 +18,8 @@ EESM 5840 期末项目：以本地视觉、双轴云台和 Labkit 多传感器�
 ./scripts/start-toboo.ps1 -ServoCalibration
 # 打开传感器遥测页（仅预览，不控制舵机）
 ./scripts/start-toboo.ps1 -Sensors
+# 直接进入表情识别页（默认不启动相机或舵机）
+./scripts/start-toboo.ps1 -Expression
 ```
 
 开发编译后的程序为 `artifacts/toboo/bin/PanTiltTracker.Desktop/release/toboo.exe`。默认只打开界面；动作需要读状态、确认供电并明确点击回位、扫动或跟随。

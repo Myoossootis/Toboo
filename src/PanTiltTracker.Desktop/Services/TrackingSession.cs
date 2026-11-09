@@ -12,12 +12,13 @@ public sealed record SessionOptions(InputSource Source, string InputPath, int Ca
     int MarkerId, ControllerSettings Settings, string OutputDirectory,
     VideoAlgorithm Algorithm = VideoAlgorithm.Aruco, Rect? InitialRegion = null, CameraSettings? Camera = null,
     bool DetectFaces = false,
-    FaceAimSettings? FaceAim = null, AimReference? FaceAimReference = null);
+    FaceAimSettings? FaceAim = null, AimReference? FaceAimReference = null, bool DetectExpressions = false);
 
 public sealed record SessionFrame(byte[] Pixels, int Width, int Height,
     TargetObservation Observation, TrackingCommand Command, TimeSpan Time, double AlgorithmMs,
     string VisionStatus = "aruco_detection", string? CaptureSummary = null, int TargetCount = 0,
-    double? TargetScore = null, FaceAimResult? FaceAim = null, string? OutputNotice = null, bool OutputSuspended = false);
+    double? TargetScore = null, FaceAimResult? FaceAim = null, string? OutputNotice = null, bool OutputSuspended = false,
+    ExpressionAnalysis? Expression = null);
 
 public static class TrackingSession
 {
@@ -59,9 +60,18 @@ public static class TrackingSession
                     angles = "camera sight error, not measured shaft angle" },
                 faceViews = options.DetectFaces ? "YuNet 2023mar; frontal and profile; score 0.8; IoU NMS 0.3" : null },
             hardwareOutput: followOutput is null ? "disabled" : "face_follow_requests");
+        using var expression = options.DetectFaces && options.DetectExpressions
+            ? new ExpressionSession(options.OutputDirectory, options.Source == InputSource.Image) : null;
+        if (expression is not null)
+            File.WriteAllText(Path.Combine(options.OutputDirectory, "expression-settings.json"), JsonSerializer.Serialize(new {
+                model = "OpenCV Zoo Progressive Teacher / MobileFaceNet", sha256 = FacialExpressionRecognizer.ModelSha256,
+                settings = new ExpressionSettings(), intervalSeconds = FaceExpressionSession.IntervalSeconds,
+                minimumFacePixels = 64, maximumInputAgeSeconds = 0.2, minimumBrightness = 25, maximumBrightness = 235,
+                minimumLaplacianVariance = 35, source = mode, temporalConfirmation = options.Source != InputSource.Image,
+                hardwareOutput = "disabled", thresholds = "preliminary, not calibrated", interpretation = "visible expression cues only" }));
         if (options.Source == InputSource.Camera)
         {
-            await RunCameraAsync(options, detector, faceDetector, controller, log, present, cancellation, faceAim, faceAimSettings, followOutput);
+            await RunCameraAsync(options, detector, faceDetector, controller, log, present, cancellation, faceAim, faceAimSettings, followOutput, expression);
             return;
         }
 
@@ -70,7 +80,7 @@ public static class TrackingSession
             using var image = Cv2.ImRead(options.InputPath, ImreadModes.Color);
             if (image.Empty()) throw new IOException("无法读取图片，请检查文件格式。");
             await ProcessAsync(image, 0, TimeSpan.Zero, TimeSpan.Zero, detector,
-                controller, log, present, false, cancellation, faceDetector: faceDetector);
+                controller, log, present, false, cancellation, faceDetector: faceDetector, expression: expression);
             return;
         }
 
@@ -87,7 +97,7 @@ public static class TrackingSession
             {
                 var time = TimeSpan.FromSeconds(frame / fps);
                 await ProcessAsync(image, frame++, time, time, detector, controller, log,
-                    present, false, cancellation, videoTracker, faceDetector: faceDetector, faceAim: faceAim, faceAimSettings: faceAimSettings);
+                    present, false, cancellation, videoTracker, faceDetector: faceDetector, faceAim: faceAim, faceAimSettings: faceAimSettings, expression: expression);
                 await PaceAsync(wallClock, TimeSpan.FromSeconds(frame / fps), cancellation);
             }
             cancellation.ThrowIfCancellationRequested();
@@ -114,7 +124,8 @@ public static class TrackingSession
         PanTiltController controller, RunLog log, Func<SessionFrame, Task> present, CancellationToken cancellation,
         FaceAimController? faceAim = null,
         FaceAimSettings? faceAimSettings = null,
-        Func<FaceAimResult, TimeSpan, CancellationToken, Task<FollowOutputFeedback>>? followOutput = null)
+        Func<FaceAimResult, TimeSpan, CancellationToken, Task<FollowOutputFeedback>>? followOutput = null,
+        ExpressionSession? expression = null)
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         using var buffer = new LatestFrameBuffer();
@@ -172,7 +183,7 @@ public static class TrackingSession
                 lastArrival = clock.Elapsed;
                 await ProcessAsync(frame.Image, frame.Number, frame.CapturedAt, clock.Elapsed,
                     detector, controller, log, present, true, cancellation, captureSummary: Volatile.Read(ref captureSummary),
-                    faceDetector: faceDetector, faceAim: faceAim, faceAimSettings: faceAimSettings, followOutput: followOutput);
+                    faceDetector: faceDetector, faceAim: faceAim, faceAimSettings: faceAimSettings, followOutput: followOutput, expression: expression);
             }
         }
         finally
@@ -194,9 +205,12 @@ public static class TrackingSession
         VideoTargetTracker? videoTracker = null, string? captureSummary = null, FaceTargetDetector? faceDetector = null,
         FaceAimController? faceAim = null,
         FaceAimSettings? faceAimSettings = null,
-        Func<FaceAimResult, TimeSpan, CancellationToken, Task<FollowOutputFeedback>>? followOutput = null)
+        Func<FaceAimResult, TimeSpan, CancellationToken, Task<FollowOutputFeedback>>? followOutput = null,
+        ExpressionSession? expression = null)
     {
         cancellation.ThrowIfCancellationRequested();
+        var frameWatch = Stopwatch.StartNew();
+        var frameStartTime = time;
         var watch = Stopwatch.StartNew();
         var tracked = videoTracker?.Process(image, number, capturedAt);
         var faces = faceDetector?.Detect(image, number, capturedAt);
@@ -221,6 +235,10 @@ public static class TrackingSession
         var command = aim?.Command ?? controller.Step(observation, time);
         var faceBox = aim?.SelectedBox is { } selected ? new Rect((int)selected.X, (int)selected.Y,
             (int)selected.Width, (int)selected.Height) : (Rect?)null;
+        // Optional expression inference happens after the existing control request/acknowledgement.
+        // It does not feed angles, target selection, arming or motion permission.
+        var expressionNow = realTime ? frameStartTime + frameWatch.Elapsed : time;
+        var expressionResult = faces is not null ? expression?.Analyze(image, faces, aim, expressionNow, realTime) : null;
         log.Write(observation, command, time, watch.Elapsed.TotalMilliseconds, (aim is null ? faces?.PrimaryBox : faceBox) ?? tracked?.Box,
             outputFeedback?.Suspended == true ? status + ";servo_output_suspended" : status, faces?.Boxes.Length ?? tracked?.CandidateCount,
             faceAim: aim);
@@ -235,6 +253,9 @@ public static class TrackingSession
         if (tracked is not null) VideoTargetTracker.DrawResult(color, tracked);
         if (faces is not null) FaceTargetDetector.DrawResult(color, faces, aim);
         if (faces is not null && faceAimSettings is not null) FaceAimOverlay.Draw(color, faceAimSettings, aim);
+        if (expressionResult is { } cue)
+            Cv2.PutText(color, $"Expression: {cue.Estimate.Label} | {cue.Estimate.Reason}",
+                new(10, Math.Max(18, image.Height - 12)), HersheyFonts.HersheySimplex, 0.45, new Scalar(255, 220, 80), 1, LineTypes.AntiAlias);
         var center = new Point(image.Width / 2, image.Height / 2);
         Cv2.DrawMarker(color, center, new Scalar(120, 130, 140), MarkerTypes.Cross, 32, 1);
         if (observation.HasTarget)
@@ -251,9 +272,9 @@ public static class TrackingSession
         Cv2.CvtColor(color, bgra, ColorConversionCodes.BGR2BGRA);
         var pixels = new byte[bgra.Width * bgra.Height * 4];
         System.Runtime.InteropServices.Marshal.Copy(bgra.Data, pixels, 0, pixels.Length);
-        await present(new(pixels, bgra.Width, bgra.Height, observation, command, time,
+        await present(new(pixels, bgra.Width, bgra.Height, observation, command, realTime ? frameStartTime + frameWatch.Elapsed : time,
             watch.Elapsed.TotalMilliseconds, status, captureSummary, faces?.Boxes.Length ?? 0,
-            null, aim, outputFeedback?.Notice, outputFeedback?.Suspended == true));
+            null, aim, outputFeedback?.Notice, outputFeedback?.Suspended == true, expressionResult));
         return command;
     }
 

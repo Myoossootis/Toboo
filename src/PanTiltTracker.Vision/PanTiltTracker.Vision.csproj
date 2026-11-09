@@ -6,5 +6,7 @@
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.10.0.20240616" />
     <Content Include="../../models/face/**/*" Link="models/face/%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../models/expression/**/*" Link="models/expression/%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -5,7 +5,8 @@ using PanTiltTracker.Core;
 
 namespace PanTiltTracker.Vision;
 
-public sealed record FaceDetectionResult(TargetObservation Observation, Rect[] Boxes)
+public sealed record FaceLandmarks(Rect Box, Point2f[] Points, float DetectionScore);
+public sealed record FaceDetectionResult(TargetObservation Observation, Rect[] Boxes, FaceLandmarks[]? Landmarks = null)
 {
     public Rect? PrimaryBox => Boxes.Length == 0 ? null : Boxes[0];
 }
@@ -20,7 +21,7 @@ public sealed class FaceTargetDetector : IDisposable
         "models", "face", "face_detection_yunet_2023mar.onnx");
     private static readonly int[] strides = [8, 16, 32];
     private static readonly string[] outputNames =
-        ["cls_8", "cls_16", "cls_32", "obj_8", "obj_16", "obj_32", "bbox_8", "bbox_16", "bbox_32"];
+        ["cls_8", "cls_16", "cls_32", "obj_8", "obj_16", "obj_32", "bbox_8", "bbox_16", "bbox_32", "kps_8", "kps_16", "kps_32"];
     private readonly Net network;
 
     public FaceTargetDetector(string? modelPath = null)
@@ -60,6 +61,7 @@ public sealed class FaceTargetDetector : IDisposable
         var outputs = outputNames.Select(_ => new Mat()).ToArray();
         var candidates = new List<Rect>();
         var scores = new List<float>();
+        var landmarks = new List<FaceLandmarks>();
         try
         {
             network.Forward(outputs, outputNames);
@@ -73,7 +75,8 @@ public sealed class FaceTargetDetector : IDisposable
                 var classes = ReadFloats(outputs[level]);
                 var objects = ReadFloats(outputs[level + 3]);
                 var boxes = ReadFloats(outputs[level + 6]);
-                if (classes.Length != count || objects.Length != count || boxes.Length != count * 4)
+                var keypoints = ReadFloats(outputs[level + 9]);
+                if (classes.Length != count || objects.Length != count || boxes.Length != count * 4 || keypoints.Length != count * 10)
                     throw new InvalidDataException("YuNet 输出尺寸与模型版本不匹配。");
                 for (var index = 0; index < count; index++)
                 {
@@ -89,8 +92,14 @@ public sealed class FaceTargetDetector : IDisposable
                     var right = (int)Math.Ceiling(Math.Clamp(cx + width / 2, 0, working.Width));
                     var bottom = (int)Math.Ceiling(Math.Clamp(cy + height / 2, 0, working.Height));
                     if (right <= left || bottom <= top) continue;
-                    candidates.Add(MapToSource(new(left, top, right - left, bottom - top), working.Size(), image.Size()));
+                    var sourceBox = MapToSource(new(left, top, right - left, bottom - top), working.Size(), image.Size());
+                    var points = new Point2f[5];
+                    for (var k = 0; k < 5; k++)
+                        points[k] = new((keypoints[index * 10 + k * 2] + index % columns) * stride * image.Width / working.Width,
+                            (keypoints[index * 10 + k * 2 + 1] + index / columns) * stride * image.Height / working.Height);
+                    candidates.Add(sourceBox);
                     scores.Add(score);
+                    landmarks.Add(new(sourceBox, points, score));
                 }
             }
         }
@@ -99,7 +108,8 @@ public sealed class FaceTargetDetector : IDisposable
         var primary = merged.Length == 0 ? (Rect?)null : merged[0];
         return new(new(number, capturedAt, image.Width, image.Height,
             primary is { } b ? b.X + b.Width / 2.0 : null,
-            primary is { } p ? p.Y + p.Height / 2.0 : null), merged);
+            primary is { } p ? p.Y + p.Height / 2.0 : null), merged,
+            merged.Select(box => landmarks.Where(l => l.Box == box).MaxBy(l => l.DetectionScore)!).ToArray());
     }
 
     private static float[] ReadFloats(Mat output)

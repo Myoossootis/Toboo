@@ -27,6 +27,7 @@ internal static class Diagnostics
         var observation = detector.Detect(image, 0, TimeSpan.Zero);
         if (!observation.HasTarget) throw new InvalidOperationException("Native OpenCV ArUco smoke test failed.");
         using var faceDetector = new FaceTargetDetector();
+        using var expressionRecognizer = new FacialExpressionRecognizer();
         using var blank = new Mat(240, 320, MatType.CV_8UC1, Scalar.Black);
         if (faceDetector.Detect(blank, 0, TimeSpan.Zero).Boxes.Length != 0)
             throw new InvalidOperationException("Native face detector blank-frame smoke test failed.");
@@ -41,6 +42,7 @@ internal static class Diagnostics
                 .Select(m => new { name = m.ModuleName, path = m.FileName }).ToArray(),
             openCv = Cv2.GetVersionString(), syntheticMarkerDetected = true, faceModelLoaded = true, faceDetector = "yunet_2023mar",
             faceBlankFramePassed = true, physicalCameraTested = false,
+            expressionModelLoaded = true, expressionModelSha256 = FacialExpressionRecognizer.ModelSha256,
             hardwareOutput = "disabled", cameraDevices = CameraDevices.List()
         });
     }

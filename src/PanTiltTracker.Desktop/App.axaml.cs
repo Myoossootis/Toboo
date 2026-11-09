@@ -18,6 +18,8 @@ public sealed partial class App : Application
             desktop.MainWindow = window;
             if (desktop.Args?.Contains("--sensors", StringComparer.Ordinal) == true)
                 window.Opened += (_, _) => window.ShowSensors();
+            if (desktop.Args?.Contains("--expression-preview", StringComparer.Ordinal) == true)
+                window.Opened += (_, _) => window.FindControl<TabControl>("SettingsTabs")!.SelectedIndex = 4;
             if (desktop.Args?.Contains("--servo-calibration", StringComparer.Ordinal) == true)
             {
                 window.ViewModel.SourceIndex = 3;

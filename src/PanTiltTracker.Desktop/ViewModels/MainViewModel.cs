@@ -170,6 +170,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ApplySettings(initialSettings);
         Servo.PropertyChanged += ServoChanged;
         FaceAim.PropertyChanged += FaceAimChanged;
+        InitializeExpressionPresentation();
         PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(CanConfigure) or nameof(IsFace) or nameof(IsCameraSource) or nameof(IsRunning))
@@ -328,7 +329,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 1 => new(1280, 720, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW),
                 2 => new(1920, 1080, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW),
                 _ => new(640, 480, 30, CameraBackendIndex == 1 ? OpenCvSharp.VideoCaptureAPIs.MSMF : OpenCvSharp.VideoCaptureAPIs.DSHOW)
-            }, DetectFaces: IsFace, FaceAim: activeFaceSettings);
+            }, DetectFaces: IsFace, FaceAim: activeFaceSettings, DetectExpressions: IsFace && ExpressionEnabled);
         IsRunning = true;
         ResetPresentation();
         HasRun = true;
@@ -389,6 +390,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (follow) await Servo.ReleaseFollowAsync(normalStop && transport is not null && guardedOutput?.Suspended != true);
             if (guardedOutput?.Suspended != true) ServoNotice = "";
             IsFollowing = false;
+            if (SourceIndex != 1) ClearExpression("已停止");
             displayClock.Stop();
             cancellation.Dispose();
             cancellation = null;
@@ -430,6 +432,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     internal void Present(SessionFrame frame)
     {
+        PresentExpression(frame.Expression, frame.Time);
         LiveFaceConfirmed = frame.FaceAim?.Observation.HasTarget == true && frame.VisionStatus == "face_locked";
         if (frame.OutputSuspended && IsFollowing)
         {
@@ -585,6 +588,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void ResetPresentation()
     {
+        ClearExpression(ExpressionEnabled ? "等待人脸" : "已关闭");
         LiveFaceConfirmed = false;
         CaptureSummary = "连接成功后显示实际尺寸和驱动信息。";
         preparedVideoPath = null;
@@ -622,6 +626,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (disposed) return;
         disposed = true;
+        expressionTimer?.Stop();
+        if (expressionTimer is not null) expressionTimer.Tick -= ExpireExpression;
         Servo.PropertyChanged -= ServoChanged;
         FaceAim.PropertyChanged -= FaceAimChanged;
         cancellation?.Cancel();

@@ -306,6 +306,32 @@
                 </StackPanel>
               </ScrollViewer>
             </TabItem>
+            <TabItem Header="表情" IsVisible="{Binding IsFace}">
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="12" Margin="0,16,4,0">
+                  <CheckBox x:Name="ExpressionToggle" Content="本地表情识别" IsChecked="{Binding ExpressionEnabled}" IsEnabled="{Binding CanConfigure}" />
+                  <TextBlock Text="只判断可见表情线索，不代表真实心理情绪。低分、侧脸、模糊和丢脸时允许不判断。" Classes="caption" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding ExpressionEmoticon}" FontFamily="Consolas" FontSize="28" />
+                  <TextBlock x:Name="ExpressionDetailsLabel" Text="{Binding ExpressionLabel}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding ExpressionDetail}" Classes="caption" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding ExpressionTiming}" Classes="caption" TextWrapping="Wrap" />
+                  <ItemsControl ItemsSource="{Binding ExpressionScores}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ExpressionScoreRow">
+                        <StackPanel Spacing="4" Margin="0,0,0,10">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{Binding Name}" FontSize="12" />
+                            <TextBlock Grid.Column="1" Text="{Binding Score, StringFormat={}{0:0.00}}" FontSize="12" />
+                          </Grid>
+                          <ProgressBar Minimum="0" Maximum="1" Value="{Binding Score}" Height="4" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="YuNet五点对齐 → MobileFaceNet七类模型 → 时间平滑与连续确认。分数不是准确率。表情结果不发送舵机命令。" Classes="caption" TextWrapping="Wrap" />
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
           </TabControl>
 
           <StackPanel Grid.Row="2" Spacing="8">
@@ -372,6 +398,7 @@
               <StackPanel Spacing="4" VerticalAlignment="Center">
                 <TextBlock Text="{Binding DetectionLabel}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
                 <StackPanel IsVisible="{Binding IsFace}" Spacing="3">
+                  <TextBlock x:Name="ExpressionSummary" Text="{Binding ExpressionLabel}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
                   <TextBlock x:Name="FaceSightText" Text="{Binding FaceSightError}" FontSize="12" TextWrapping="Wrap" />
                   <TextBlock Text="{Binding FaceAlignment}" Classes="caption" TextWrapping="Wrap" />
                   <TextBlock Text="{Binding FaceCorrection}" Classes="caption" TextWrapping="Wrap" />

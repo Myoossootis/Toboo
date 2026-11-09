@@ -1,0 +1,18 @@
+{
+  "name": "OpenCV Zoo Progressive Teacher / MobileFaceNet",
+  "upstreamCommit": "25f423d0e04c31a17254620e58febd7386da523b",
+  "url": "https://media.githubusercontent.com/media/opencv/opencv_zoo/25f423d0e04c31a17254620e58febd7386da523b/models/facial_expression_recognition/facial_expression_recognition_mobilefacenet_2022july.onnx",
+  "sha256": "4f61307602fc089ce20488a31d4e4614e3c9753a7d6c41578c854858b183e1a9",
+  "bytes": 4791892,
+  "license": "Apache-2.0",
+  "input": "RGB NCHW 1x3x112x112; (value/255 - 0.5)/0.5",
+  "labels": [
+    "angry",
+    "disgust",
+    "fearful",
+    "happy",
+    "neutral",
+    "sad",
+    "surprised"
+  ]
+}
