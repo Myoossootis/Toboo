@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Compiler = 'g++',
     [ValidateSet('bench', 'single')][string]$Target = 'bench'
 )

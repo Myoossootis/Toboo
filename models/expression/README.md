@@ -12,4 +12,4 @@ Pinned OpenCV Zoo Progressive Teacher / MobileFaceNet model, 4,791,892 bytes. Ex
 
 Upstream benchmark accuracy is not this prototype's measured accuracy. This predicts visible-expression categories; it does not identify people or determine their true emotional or medical state.
 
-See `docs/20-facial-expression.md` for temporal confirmation, rejection rules, experiments and runtime limits.
+See [expression analysis](../../docs/expressions.md) for temporal confirmation, rejection rules and runtime limits.

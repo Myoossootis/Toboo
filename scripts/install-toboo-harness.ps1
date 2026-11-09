@@ -1,4 +1,4 @@
-param([string]$HarnessHome = (Join-Path ([Environment]::GetFolderPath('UserProfile')) '.dsh'))
+﻿param([string]$HarnessHome = (Join-Path ([Environment]::GetFolderPath('UserProfile')) '.dsh'))
 $ErrorActionPreference = 'Stop'
 $repositoryPath = Split-Path -Parent $PSScriptRoot
 $pluginPath = (Join-Path $repositoryPath 'integrations/toboo-harness/index.mjs').Replace('\','/')

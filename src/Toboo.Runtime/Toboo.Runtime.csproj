@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Toboo.Core/Toboo.Core.csproj" />
+    <ProjectReference Include="../Toboo.Vision/Toboo.Vision.csproj" />
+    <InternalsVisibleTo Include="Toboo.Cli" />
+    <InternalsVisibleTo Include="toboo" />
+    <InternalsVisibleTo Include="Toboo.Desktop.Tests" />
+  </ItemGroup>
+</Project>

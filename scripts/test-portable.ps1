@@ -1,4 +1,4 @@
-param([Parameter(Mandatory = $true)][string]$ZipPath, [int]$CameraIndex = -1, [string]$BaseZipPath)
+﻿param([Parameter(Mandatory = $true)][string]$ZipPath, [int]$CameraIndex = -1, [string]$BaseZipPath)
 $ErrorActionPreference = 'Stop'
 $repositoryPath = Split-Path -Parent $PSScriptRoot
 $resolvedZip = (Resolve-Path -LiteralPath $ZipPath).Path
@@ -28,6 +28,13 @@ if ($BaseZipPath) {
     Write-Host "PASS: applied $($manifest.baseVersion) -> $($manifest.targetVersion); all target file hashes match."
 }
 $executable = Join-Path $appPath 'toboo.exe'
+foreach ($required in @('README-portable-zh-CN.md', 'docs/harness.md', 'scripts/install-toboo-harness.ps1', 'integrations/toboo-harness/index.mjs', 'integrations/toboo-harness/engine.mjs', 'integrations/toboo-harness/server.mjs', 'integrations/toboo-harness/lock.mjs')) {
+    if (!(Test-Path -LiteralPath (Join-Path $appPath $required))) { throw "Missing packaged feature dependency: $required" }
+}
+$unexpected = @(Get-ChildItem -LiteralPath $appPath -Recurse -Force -File | Where-Object {
+    $_.FullName.Substring($appPath.Length + 1) -match '^(local|hardware|output|data|calibration|tmp|artifacts)[\\/]|(^|[\\/])(connection|client)\.json$|(^|[\\/])AGENTS\.md$'
+})
+if ($unexpected.Count) { throw 'Local-only files found in the portable package.' }
 $runtimeConfig = Get-Content -LiteralPath (Join-Path $appPath 'toboo.runtimeconfig.json') -Raw | ConvertFrom-Json
 if (!$runtimeConfig.runtimeOptions.includedFrameworks -or $runtimeConfig.runtimeOptions.framework) {
     throw 'Expected a self-contained runtime configuration.'
@@ -52,7 +59,7 @@ try {
     $selfTest = Get-Content -LiteralPath (Join-Path $appPath 'diagnostics/self-test.json') -Raw | ConvertFrom-Json
     $uiTest = Get-Content -LiteralPath (Join-Path $appPath 'diagnostics/ui-smoke-test.json') -Raw | ConvertFrom-Json
     if (!$selfTest.success -or !$selfTest.faceModelLoaded -or $selfTest.faceDetector -ne 'yunet_2023mar' -or !$selfTest.faceBlankFramePassed -or
-        !$uiTest.success -or $uiTest.frames -lt 12) { throw 'Portable smoke checks did not pass.' }
+        !$selfTest.expressionModelLoaded -or !$uiTest.success -or $uiTest.frames -lt 12) { throw 'Portable smoke checks did not pass.' }
     if (!$selfTest.runtimeDirectory.StartsWith($appPath, [StringComparison]::OrdinalIgnoreCase)) {
         throw 'The executable did not use its app-local .NET runtime.'
     }

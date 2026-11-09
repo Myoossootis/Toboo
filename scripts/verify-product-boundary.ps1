@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $repositoryPath = Split-Path -Parent $PSScriptRoot
 $sourceFiles = Get-ChildItem -LiteralPath (Join-Path $repositoryPath 'src') -Recurse -File |
     Where-Object { $_.Extension -in '.cs', '.axaml' -and $_.FullName -notmatch '[\\/](obj|bin)[\\/]' }

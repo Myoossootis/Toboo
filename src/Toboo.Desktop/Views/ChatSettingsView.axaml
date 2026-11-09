@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Toboo.Desktop.ViewModels" x:Class="Toboo.Desktop.Views.ChatSettingsView" x:DataType="vm:CompanionShellViewModel">
+  <StackPanel Spacing="20">
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+      <StackPanel Spacing="4"><TextBlock Text="DeepSeek Harness" Classes="section" /><TextBlock Text="{Binding Chat.ConnectionStatus}" Classes="caption" TextWrapping="Wrap" /></StackPanel>
+      <Button Grid.Column="1" Content="连接 / 刷新" Command="{Binding Chat.ConnectCommand}" Classes="quiet" />
+    </Grid>
+    <TextBlock Text="模型认证沿用 Harness。这里的选择只用于 toboo，不改变其他应用的默认模型。" Classes="caption" TextWrapping="Wrap" LineHeight="20" />
+    <TextBlock Text="{Binding Chat.Error}" Foreground="#805A16" TextWrapping="Wrap" FontSize="14" IsVisible="{Binding Chat.HasError}" />
+    <StackPanel Spacing="8"><TextBlock Text="对话模型" FontWeight="Medium" /><ComboBox x:Name="ChatModelSelector" ItemsSource="{Binding Chat.Models}" SelectedItem="{Binding Chat.SelectedModel}" IsEnabled="{Binding Chat.CanChoose}" PlaceholderText="连接后读取可用模型" /></StackPanel>
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><StackPanel Spacing="4"><TextBlock Text="陪伴风格" FontWeight="Medium" /><TextBlock Text="影响下一条回复的语气" Classes="caption" /></StackPanel>
+      <ComboBox Grid.Column="1" SelectedIndex="{Binding Chat.StyleIndex}" IsEnabled="{Binding Chat.CanChoose}" Width="144"><ComboBoxItem Content="自然" /><ComboBoxItem Content="温柔" /><ComboBoxItem Content="简洁" /></ComboBox>
+    </Grid>
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16"><StackPanel Spacing="4"><TextBlock Text="附带表情线索" FontWeight="Medium" /><TextBlock Text="仅发送已确认且未过期的表情摘要" Classes="caption" TextWrapping="Wrap" /></StackPanel><ToggleSwitch Grid.Column="1" IsChecked="{Binding Chat.IncludeExpression}" IsEnabled="{Binding Chat.CanChoose}" OnContent="" OffContent="" /></Grid>
+    <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
+    <StackPanel Spacing="8">
+      <TextBlock Text="toboo 的对话" FontWeight="Medium" />
+      <ComboBox x:Name="ChatSessionSelector" ItemsSource="{Binding Chat.Sessions}" SelectedItem="{Binding Chat.SelectedSession}" IsEnabled="{Binding Chat.CanChoose}" PlaceholderText="选择本机独立历史会话" />
+      <StackPanel Orientation="Horizontal" Spacing="12"><Button Content="打开对话" Command="{Binding Chat.OpenSessionCommand}" Classes="quiet" /><Button Content="新建对话" Command="{Binding Chat.NewChatCommand}" Classes="quiet" /></StackPanel>
+    </StackPanel>
+    <TextBlock Text="本机独立保存聊天记录和发送标识；不读取 Trilium 或 Harness 的其他会话。语音输入与回复尚未接入。" Classes="caption" TextWrapping="Wrap" LineHeight="20" />
+  </StackPanel>
+</UserControl>

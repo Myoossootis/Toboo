@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>toboo</AssemblyName>
+    <Product>toboo</Product>
+    <Title>toboo · 桌面陪伴机器人</Title>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/*.png" />
+    <InternalsVisibleTo Include="Toboo.Desktop.Tests" />
+    <ProjectReference Include="../Toboo.Runtime/Toboo.Runtime.csproj" />
+    <ProjectReference Include="../Toboo.Core/Toboo.Core.csproj" />
+    <ProjectReference Include="../Toboo.Vision/Toboo.Vision.csproj" />
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <None Include="../../config/tracker.json" Link="tracker.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../config/face-aim.json" Link="face-aim.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,4 +1,4 @@
-param([switch]$Live, [string]$Provider = 'deepseek-official', [string]$Model = 'deepseek-flash')
+﻿param([switch]$Live, [string]$Provider = 'deepseek-official', [string]$Model = 'deepseek-flash')
 $ErrorActionPreference = 'Stop'
 $repositoryPath = Split-Path -Parent $PSScriptRoot
 $taskFile = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.toboo-harness/connection.json'

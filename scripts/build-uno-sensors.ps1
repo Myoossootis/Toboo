@@ -1,4 +1,4 @@
-param([switch]$EnableUltrasonic, [switch]$EnableMmaAfterVoltageCheck)
+﻿param([switch]$EnableUltrasonic, [switch]$EnableMmaAfterVoltageCheck)
 $ErrorActionPreference = 'Stop'
 $repositoryPath = Split-Path -Parent $PSScriptRoot
 Push-Location -LiteralPath $repositoryPath
@@ -7,10 +7,10 @@ try {
     $config = Join-Path $repositoryPath 'tmp/esp32-tools/arduino-cli.yaml'
     $settings = Get-Content firmware/uno-toolchain.json -Raw | ConvertFrom-Json
     $version = & $cli version --format json | ConvertFrom-Json
-    if ($LASTEXITCODE -ne 0 -or $version.VersionString -ne $settings.arduinoCliVersion) { throw 'Pinned Arduino CLI required; see docs/19-uno-sensor-telemetry.md.' }
+    if ($LASTEXITCODE -ne 0 -or $version.VersionString -ne $settings.arduinoCliVersion) { throw 'Pinned Arduino CLI required; see firmware/README.md.' }
     $cores = & $cli core list --config-file $config --format json | ConvertFrom-Json
     if ($LASTEXITCODE -ne 0 -or !($cores.platforms | Where-Object { $_.id -eq 'arduino:avr' -and $_.installed_version -eq $settings.coreVersion })) {
-        throw 'Install arduino:avr@1.8.6 in the isolated toolchain first; see docs/19-uno-sensor-telemetry.md.'
+        throw 'Install arduino:avr@1.8.6 in the isolated toolchain first; see firmware/README.md.'
     }
     $variant = if ($EnableMmaAfterVoltageCheck) { 'mma' } else { 'no-mma' }
     $variant += if ($EnableUltrasonic) { '-distance' } else { '-no-distance' }

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Toboo.Runtime/Toboo.Runtime.csproj" />
+    <ProjectReference Include="../Toboo.Core/Toboo.Core.csproj" />
+    <ProjectReference Include="../Toboo.Vision/Toboo.Vision.csproj" />
+    <None Include="../../config/tracker.json" Link="tracker.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

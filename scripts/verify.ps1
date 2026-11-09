@@ -1,9 +1,10 @@
-param()
+﻿param()
 
 $ErrorActionPreference = 'Stop'
 $repositoryPath = Split-Path -Parent $PSScriptRoot
 Push-Location -LiteralPath $repositoryPath
 try {
+    & (Join-Path $PSScriptRoot 'verify-public-tree.ps1')
     & (Join-Path $PSScriptRoot 'verify-product-boundary.ps1')
     & node --test integrations/toboo-harness/tests/engine.test.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Independent Harness bridge tests failed.' }
@@ -13,11 +14,11 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "dotnet failed: $($Arguments -join ' ')" }
     }
 
-    Invoke-DotNet -Arguments @('restore', 'PanTiltTracker.sln', '--locked-mode')
-    Invoke-DotNet -Arguments @('build', 'PanTiltTracker.sln', '-c', 'Release', '--no-restore')
-    Invoke-DotNet -Arguments @('test', 'PanTiltTracker.sln', '-c', 'Release', '--no-build', '--no-restore')
+    Invoke-DotNet -Arguments @('restore', 'Toboo.sln', '--locked-mode')
+    Invoke-DotNet -Arguments @('build', 'Toboo.sln', '-c', 'Release', '--no-restore')
+    Invoke-DotNet -Arguments @('test', 'Toboo.sln', '-c', 'Release', '--no-build', '--no-restore')
 
-    $applicationPath = & dotnet msbuild src/PanTiltTracker.App/PanTiltTracker.App.csproj `
+    $applicationPath = & dotnet msbuild src/Toboo.Cli/Toboo.Cli.csproj `
         -getProperty:TargetPath -property:Configuration=Release
     if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the built CLI application path.' }
     $applicationPath = $applicationPath.Trim()

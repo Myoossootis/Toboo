@@ -1,53 +1,69 @@
-# toboo · 桌面陪伴机器人
+# toboo
 
-EESM 5840 期末项目：以本地视觉、双轴云台和 Labkit 多传感器融合构建桌面陪伴机器人。
+Windows 桌面陪伴机器人原型：在一个界面中完成 AI 对话、摄像头预览、面部表情线索分析和设备管理。
 
-当前已实现本地正面/侧面人脸检测、空间锁定、双轴跟随、平滑回中心、矩形与交叉对角线检查、工作区限位，以及串口异常时保留预览的降级处理。现役 S1 工作请求 30–175°，S2 50–150°，中心为 (103°,100°)。所有角度均为请求，不是实测轴位。响应速度改进安排在新 S1 舵机到货后。
-
-新增本地七类表情线索识别：YuNet五点对齐、MobileFaceNet模型、质量拒判、时间平滑与连续确认；结果可为未知，不代表真实心理情绪。界面“表情”页显示分数与颜文字，表情不控制舵机。开源比较、参数和验证见 [表情识别说明](docs/20-facial-expression.md)。
-
-已加入 Keyes UNO 加速度/超声波采集固件、桌面遥测入口、融合判断预览和确定性回放；软件及固件编译通过，尚未接线或烧录。融合判断尚未控制舵机。传感器唤醒、近手互动和环境模式仍待开发；详见 [遥测阶段说明](docs/19-uno-sensor-telemetry.md) 与 [多传感器方案](docs/18-toboo-multisensor-plan.md)。
+**[下载最新 Windows x64 版本](https://github.com/Myoossootis/Toboo/releases/latest)** · [开始使用](docs/getting-started.md) · [开发说明](docs/development.md) · [架构](docs/architecture.md)
 
 ## 启动
 
-主界面现为“陪伴、设备、设置”三页。文字聊天已通过独立Harness桥接接入**toboo上位机内**：支持增量回复、停止、历史会话、模型与风格选择，可选附带有效表情摘要。Harness只提供后台模型服务，不经过Trilium；详见 [对话接入说明](docs/22-harness-companion-chat.md)。语音与LCD发送仍待接入。摄像头和表情入口在设备页，原有实验工具从“高级调试”打开。
+下载 Release 中的 `toboo-版本号-win-x64-portable.zip`，**完整解压后双击 `toboo.exe`**。便携包自带 .NET 运行时，无需安装 SDK。
 
-需要 Windows x64 与固定的 .NET 8 SDK，不依赖 Visual Studio 或 C++/CLI。
+从源码运行：安装 [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)，双击仓库根目录的 **`start-toboo.cmd`**，或执行：
 
 ```powershell
 ./scripts/start-toboo.ps1
-# 直接进入舵机页
-./scripts/start-toboo.ps1 -ServoCalibration
-# 打开传感器遥测页（仅预览，不控制舵机）
-./scripts/start-toboo.ps1 -Sensors
-# 直接进入设备页查看表情识别（默认不启动相机或舵机）
-./scripts/start-toboo.ps1 -Expression
 ```
 
-开发编译后的程序为 `artifacts/toboo/bin/PanTiltTracker.Desktop/release/toboo.exe`。默认只打开界面；动作需要读状态、确认供电并明确点击回位、扫动或跟随。
+源码主入口是 [`src/Toboo.Desktop/Program.cs`](src/Toboo.Desktop/Program.cs)，解决方案是 [`Toboo.sln`](Toboo.sln)。
 
-本地调试也可运行：
+## 功能与状态
+
+| 功能 | 当前能力 |
+| --- | --- |
+| 陪伴对话 | 在 toboo 内输入、接收流式回复、停止生成、切换模型、管理会话；通过独立的 DeepSeek Harness 桥接插件连接模型服务 |
+| 视觉 | 图片、录像和 USB 摄像头；本地 YuNet 人脸检测、目标锁定和画面标注 |
+| 表情线索 | 愤怒、厌恶、恐惧、开心、中性、悲伤、惊讶七类；不确定时显示 Unknown，支持时间确认和失效清除 |
+| 设备与设置 | 摄像头配置、连接状态、模型与陪伴风格；高级工作台保留视觉分析、舵机调试和传感器预览 |
+| 硬件原型 | 独立 ESP32 舵机固件、UNO 传感器遥测和可复现的合成数据回放；接线和参数需按设备核对 |
+| 待接入 | 麦克风语音输入、语音输出、LCD 表情发送；当前版本不将这些规划项作为已完成功能 |
+
+面部表情分类描述可见线索，不能判断人的真实心理情绪。图像分析在本地运行；使用 AI 对话时，对话文本会交给 Harness 配置的模型服务。相机画面不会通过聊天桥自动上传，表情结果也不会自动控制执行器。
+
+## AI 对话
+
+先安装并配置 DeepSeek Harness 的模型服务，再安装本仓库附带的独立桥接插件。聊天界面始终在 **toboo** 中，Harness 提供后台模型连接。
+
+源码和便携包都提供 `scripts/install-toboo-harness.ps1`。首次安装后需要从系统托盘完全退出并重新打开 Harness。完整步骤、连接文件和故障排查见 [Harness 接入](docs/harness.md)。
+
+## 源码布局
+
+```text
+src/
+  Toboo.Desktop/     Avalonia 桌面入口、页面、视图模型和界面服务
+  Toboo.Cli/         无界面的视觉实验与传感器工具
+  Toboo.Core/        纯算法、状态机和数据模型
+  Toboo.Vision/      OpenCV 图像处理、检测、表情推理和原生缓冲
+  Toboo.Runtime/     日志、传感器回放和主机串口工具调用
+tests/              算法、图像和桌面交互测试
+integrations/       独立 Harness 桥接插件及其测试
+firmware/           ESP32 / UNO 固件、协议和主机工具
+models/             固定版本的离线模型及来源信息
+scripts/            启动、验证、固件构建与发布脚本
+docs/               面向使用者和贡献者的说明
+```
+
+## 开发与验证
+
+支持 Windows x64，使用 .NET 8 CLI 和固定版本依赖。完整验证还需要 Node.js 20 或更新版本。
 
 ```powershell
-dotnet run --project src/PanTiltTracker.Desktop -- --face-preview
+dotnet restore Toboo.sln --locked-mode
+dotnet build Toboo.sln -c Release --no-restore
 ./scripts/verify.ps1
 ```
 
-相机仍采用本地 YuNet 模型，支持正面和侧面人脸；不识别身份，不隐式翻转算法坐标。相机 FOV 目前为估算，跟随请求不能当作机械角度精度报告。
+验证默认使用合成输入，不驱动物理执行器。真实相机、串口、电源和机械运动需要独立测试，不能从单元测试结果推断。更多说明见 [开发与验证](docs/development.md)、[硬件接口](docs/hardware.md) 和 [贡献指南](CONTRIBUTING.md)。
 
-## 产品边界与 Git
+## 依赖与许可
 
-无人机识别、重捕获、模型准备和评价代码封存在 `codex/archive-drone-recognition-20261109`，完整快照为 `9c98b66`。toboo 主线不再包含该功能，不从归档分支整体合并。通用标记检测、视频读取、CSRT、帧差、日志和控制器继续复用。
-
-`verify.ps1` 包含产品边界检查，阻止无人机专用入口/集成重新混入 toboo。原 GitHub 仓库地址及共享历史保留，后续产品更名不改写既有提交；本次不发布 Release。见 [Git 约定](docs/05-git-workflow.md)。
-
-## 开发与资料
-
-- [多传感器实施方案](docs/18-toboo-multisensor-plan.md)：模块清单、融合场景、采集架构、量化实验和课程时间表。
-- [人脸对准与跟随](docs/17-face-aiming.md)：限位、跟随、视觉/串口故障处理及验证。
-- [舵机调试](docs/16-single-servo-bringup.md)、[固件协议](firmware/protocol-single-s1.md)。
-- [架构](docs/01-architecture.md)、[开发](docs/02-development.md)、[本机标定](calibration/README.md)。
-
-内部解决方案、命名空间、原本地配置目录和串口协议继续保持兼容名称 `PanTiltTracker` / `UAVTRACK_PANTILT`，以复用已有固件与已验证校准；用户可见产品和可执行文件名称为 toboo。
-
-原始图像、视频、本机配置与标定结果均放在忽略目录，不提交。第三方许可见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。原 EyeTracking 项目保持独立。
+第三方组件和模型的来源、许可及再分发声明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) 与 [`licenses/`](licenses/)。便携包也包含这些声明。仓库尚未为项目原创代码授予开源许可证；公开可见不代表可以任意再分发或商用。

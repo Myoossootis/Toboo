@@ -1,0 +1,38 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Toboo.Desktop.ViewModels" x:Class="Toboo.Desktop.SensorWindow"
+        x:DataType="vm:SensorViewModel" Title="toboo · 传感器遥测" Width="720" Height="720" MinWidth="480" MinHeight="540"
+        WindowStartupLocation="CenterOwner">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="24" Spacing="16">
+      <TextBlock Text="传感器遥测" FontSize="24" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding Source}" TextWrapping="Wrap" Classes="caption" />
+      <TextBlock Text="本页只预览融合判断，尚未接入舵机保护。现有人脸跟随仍独立运行。阈值、模块方向与距离换算待实测标定。" TextWrapping="Wrap" />
+      <WrapPanel>
+        <Button x:Name="SensorDemoButton" Content="合成演示" Command="{Binding DemoCommand}" Margin="0,0,8,8" />
+        <Button Content="停止采集" Command="{Binding StopCommand}" Classes="quiet" Margin="0,0,8,8" />
+        <Button Content="确认恢复候选" Command="{Binding ResumeCommand}" Classes="quiet" Margin="0,0,0,8" />
+      </WrapPanel>
+      <Border Classes="card" Padding="16">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Keyes UNO · 独立 USB" FontWeight="SemiBold" />
+          <TextBlock Text="核对设备管理器中的 UNO 端口；打开串口可能复位该板。请勿选择 ESP32 舵机端口。" Classes="caption" TextWrapping="Wrap" />
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBox Text="{Binding Port}" Watermark="已确认的 UNO 端口，例如 COM8" IsEnabled="{Binding !Busy}" />
+            <Button Grid.Column="1" Content="连接采集" Command="{Binding ConnectCommand}" Classes="quiet" />
+          </Grid>
+        </StackPanel>
+      </Border>
+      <Border Classes="card" Padding="16">
+        <StackPanel Spacing="12">
+          <TextBlock x:Name="FusionStateLabel" Text="{Binding State}" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding Reason}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Acceleration}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Distance}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Statistics}" Classes="caption" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+      <TextBlock Text="实物模式使用主窗口 USB 摄像头连续确认的人脸；录像、图片和合成画面不作为实物在场证据。" TextWrapping="Wrap" Classes="caption" />
+      <TextBlock Text="{Binding LogPath}" Classes="caption" TextWrapping="Wrap" />
+    </StackPanel>
+  </ScrollViewer>
+</Window>

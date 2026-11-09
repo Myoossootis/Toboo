@@ -1,4 +1,4 @@
-param([string]$Version)
+﻿param([string]$Version)
 $ErrorActionPreference = 'Stop'
 $repositoryPath = Split-Path -Parent $PSScriptRoot
 if (!$Version) {
@@ -16,7 +16,7 @@ if ((Test-Path -LiteralPath $outputPath) -or (Test-Path -LiteralPath $zipPath)) 
 Push-Location -LiteralPath $repositoryPath
 try {
     & "$PSScriptRoot/prepare-vc-runtime.ps1"
-    & dotnet publish src/PanTiltTracker.Desktop -c Release -r win-x64 --self-contained true -p:RestoreLockedMode=true `
+    & dotnet publish src/Toboo.Desktop -c Release -r win-x64 --self-contained true -p:RestoreLockedMode=true `
         "-p:Version=$Version" "-p:RuntimeFrameworkVersion=$runtimeVersion" `
         -p:PublishSingleFile=false -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false -o $outputPath
     if ($LASTEXITCODE -ne 0) { throw 'Portable publish failed.' }
@@ -28,7 +28,15 @@ try {
     }
     Copy-Item tmp/portable-deps/ui/u4 (Join-Path $licensePath 'Microsoft-VC-runtime-en.rtf')
     Copy-Item tmp/portable-deps/ui/u28 (Join-Path $licensePath 'Microsoft-VC-runtime-zh-CN.rtf')
-    Copy-Item docs/09-portable-camera.md (Join-Path $outputPath 'README-portable-zh-CN.md')
+    Copy-Item docs/portable.md (Join-Path $outputPath 'README-portable-zh-CN.md')
+    Copy-Item -LiteralPath docs -Destination (Join-Path $outputPath 'docs') -Recurse
+    New-Item -ItemType Directory -Force (Join-Path $outputPath 'scripts') | Out-Null
+    Copy-Item scripts/install-toboo-harness.ps1 (Join-Path $outputPath 'scripts/install-toboo-harness.ps1')
+    $bridgePath = Join-Path $outputPath 'integrations/toboo-harness'
+    New-Item -ItemType Directory -Force $bridgePath | Out-Null
+    foreach ($file in @('index.mjs', 'engine.mjs', 'lock.mjs', 'server.mjs', 'package.json', 'README.md')) {
+        Copy-Item -LiteralPath (Join-Path 'integrations/toboo-harness' $file) -Destination $bridgePath
+    }
     Copy-Item THIRD-PARTY-NOTICES.md $outputPath
     Copy-Item licenses/* $licensePath
     Set-Content -LiteralPath (Join-Path $outputPath 'portable.mode') -Value 'Logs stay beside the app.' -Encoding UTF8
@@ -36,7 +44,7 @@ try {
     # Preserve license/notice files from the exact locked NuGet packages too.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $packageCache = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget/packages' }
-    $lock = Get-Content src/PanTiltTracker.Desktop/packages.lock.json -Raw | ConvertFrom-Json
+    $lock = Get-Content src/Toboo.Desktop/packages.lock.json -Raw | ConvertFrom-Json
     foreach ($property in $lock.dependencies.'net8.0'.PSObject.Properties) {
         if ($property.Value.type -eq 'Project') { continue }
         $id = $property.Name.ToLowerInvariant()
@@ -53,7 +61,7 @@ try {
         }
         finally { $archive.Dispose() }
     }
-    Copy-Item src/PanTiltTracker.Desktop/packages.lock.json (Join-Path $licensePath 'packages.lock.json')
+    Copy-Item src/Toboo.Desktop/packages.lock.json (Join-Path $licensePath 'packages.lock.json')
     $commit = (& git rev-parse HEAD).Trim()
     $dirty = [bool](& git status --porcelain --untracked-files=normal)
     @{
@@ -62,7 +70,7 @@ try {
         vcInstallerSha256 = (Get-FileHash tmp/portable-deps/vc_redist.x64.exe -Algorithm SHA256).Hash;
         hardwareOutput = 'disabled'; physicalCameraVerified = $false
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputPath 'build-info.json') -Encoding UTF8
-    foreach ($required in @('toboo.exe', 'coreclr.dll', 'OpenCvSharpExtern.dll', 'libSkiaSharp.dll', 'vcruntime140.dll', 'msvcp140.dll', 'models/face/face_detection_yunet_2023mar.onnx', 'models/expression/facial_expression_recognition_mobilefacenet_2022july.onnx')) {
+    foreach ($required in @('toboo.exe', 'coreclr.dll', 'OpenCvSharpExtern.dll', 'libSkiaSharp.dll', 'vcruntime140.dll', 'msvcp140.dll', 'models/face/face_detection_yunet_2023mar.onnx', 'models/expression/facial_expression_recognition_mobilefacenet_2022july.onnx', 'scripts/install-toboo-harness.ps1', 'integrations/toboo-harness/index.mjs')) {
         if (!(Test-Path -LiteralPath (Join-Path $outputPath $required))) { throw "Missing portable dependency: $required" }
     }
     if (Get-ChildItem -LiteralPath (Join-Path $outputPath 'models') -Filter '*.onnx' -Recurse | Where-Object { $_.Directory.Name -eq 'drone' }) { throw 'Experimental drone weights must not be bundled.' }

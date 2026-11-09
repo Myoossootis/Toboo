@@ -13,17 +13,22 @@ __pycache__/
 /tmp/
 /firmware/**/build/
 
-# Third-party experimental drone weights are downloaded separately, never bundled.
-/models/drone/*.onnx
+# Local archives, personal notes, reference/course materials
+/local/
+/AGENTS.md
+/hardware/
+/output/
+/hw/
+/course/
+/coursework/
+/references/
+/课程资料/
+/models/drone/
 
 # Generated experiment data, recordings, calibration and printable markers
 /artifacts/
-/data/raw/*
-!/data/raw/README.md
-/data/processed/*
-!/data/processed/README.md
-/calibration/local/*
-!/calibration/local/README.md
+/data/
+/calibration/
 
 # Local settings and credentials
 .env
@@ -33,5 +38,7 @@ __pycache__/
 *.pfx
 *.key
 *.pem
+.toboo-harness/
+.dsh/
 Thumbs.db
 .DS_Store
