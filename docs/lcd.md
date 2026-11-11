@@ -50,6 +50,14 @@
 
 ## 构建和上传
 
+GitHub Release 提供 `toboo-版本号-uno-lcd.hex` 预编译固件。使用 Arduino CLI 和 Arduino AVR core 可直接写入 Uno。先断开 toboo 的表情屏连接，将示例中的 COM7、文件名和路径换成实际值。
+
+```powershell
+arduino-cli upload --fqbn arduino:avr:uno --port COM7 --input-file ./toboo-0.2.2-uno-lcd.hex --verify
+```
+
+需要从源码构建时，使用以下隔离工具环境。
+
 沿用 [隔离串口工具环境](../firmware/README.md)，固定 Arduino CLI 1.5.1、AVR core 1.8.6、pyserial 3.5。新增显示驱动 **hd44780 1.3.2**，仅安装到 `tmp/esp32-tools/user/libraries`，自动探测 I²C 地址和转接板映射。
 
 ```powershell
