@@ -2,51 +2,101 @@
 #ifndef TOBOO_LCD_FACE_H
 #define TOBOO_LCD_FACE_H
 #include "LcdProtocol.h"
+#ifdef __AVR__
+#include <avr/pgmspace.h>
+#define LCD_FLASH PROGMEM
+#else
+#define LCD_FLASH
+#endif
 
 namespace LcdFace {
 constexpr uint8_t glyphCount = 6;
 using Frame = uint8_t[glyphCount][8];
 
-// Each 10×16 eye uses four 5×8 characters. The two eyes share those slots.
+struct Pose { int8_t x, y, eye, mouth; };
+struct Keyframe { uint16_t time; Pose pose; };
+
+#define CLIP(name) static const Keyframe name[] LCD_FLASH = {
+#define POSE(time, x, y, eye, mouth) {time, {x, y, eye, mouth}},
+#define END_CLIP() };
+#include "LcdMotion.h"
+#undef CLIP
+#undef POSE
+#undef END_CLIP
+#undef LCD_FLASH
+
+inline Keyframe read(const Keyframe& keyframe) {
+#ifdef __AVR__
+  Keyframe value;
+  memcpy_P(&value, &keyframe, sizeof(value));
+  return value;
+#else
+  return keyframe;
+#endif
+}
+
+inline int8_t blend(int8_t from, int8_t to, uint16_t step, uint16_t duration) {
+  const int32_t delta = (int32_t)(to - from) * step;
+  return from + (delta + (delta < 0 ? -(int32_t)duration / 2 : duration / 2)) / duration;
+}
+
+template <unsigned N>
+Pose sample(const Keyframe (&frames)[N], uint32_t elapsed) {
+  const uint16_t time = elapsed % read(frames[N - 1]).time;
+  Keyframe from = read(frames[0]);
+  for (unsigned i = 1; i < N; ++i) {
+    const Keyframe to = read(frames[i]);
+    if (time <= to.time) {
+      const uint16_t step = time - from.time, duration = to.time - from.time;
+      return {blend(from.pose.x, to.pose.x, step, duration), blend(from.pose.y, to.pose.y, step, duration),
+              blend(from.pose.eye, to.pose.eye, step, duration), blend(from.pose.mouth, to.pose.mouth, step, duration)};
+    }
+    from = to;
+  }
+  return from.pose;
+}
+
+inline Pose poseAt(LcdRole role, uint32_t elapsed) {
+  switch (role) {
+    case LcdRole::Attentive: return sample(Attentive, elapsed);
+    case LcdRole::Thinking: return sample(Thinking, elapsed);
+    case LcdRole::Responding: return sample(Responding, elapsed);
+    case LcdRole::Happy: return sample(Happy, elapsed);
+    default: return sample(Idle, elapsed);
+  }
+}
+
+// The two eyes share four CGRAM slots. The mouth uses two more.
 inline void frameAt(LcdRole role, uint32_t elapsed, Frame& glyphs) {
-  const uint32_t cycle = elapsed % 4400;
-  const bool blinks = role == LcdRole::Idle || role == LcdRole::Attentive || role == LcdRole::Responding;
-  const bool closed = blinks && cycle >= 3500 && cycle < 3620;
-  const bool closing = blinks && cycle >= 3420 && cycle < 3700;
-  const bool wide = role == LcdRole::Attentive;
-  const uint16_t smile[] = {0x078, 0x0FC, 0x186, 0x303, 0x201};
-  const int8_t smileTop = elapsed % 1200 < 600 ? 5 : 6;
-  for (uint8_t y = 0; y < 16; ++y) {
+  const Pose pose = poseAt(role, elapsed);
+  const int8_t top = 8 + pose.y - pose.eye / 2;
+  const uint16_t curvedEye[] = {0x078, 0x0FC, 0x186, 0x303, 0x201};
+  for (int8_t y = 0; y < 16; ++y) {
     uint16_t pixels = 0;
-    if (closed) {
-      if (y == 9) pixels = 0x1FE;
-    } else if (closing) {
-      if (y >= 7 && y <= 10) pixels = y == 7 || y == 10 ? 0x1FE : 0x3FF;
-    } else if (role == LcdRole::Happy) {
-      if (y >= smileTop && y < smileTop + 5) pixels = smile[y - smileTop];
-    } else if (y >= (wide ? 1 : 2) && y < (wide ? 15 : 14)) {
-      const uint8_t edge = wide ? 1 : 2;
-      if (y == edge || y == 15 - edge) pixels = 0x0FC;
-      else if (y == edge + 1 || y == 14 - edge) pixels = 0x1FE;
-      else pixels = 0x3FF;
-      if (role == LcdRole::Thinking && y >= 5 && y <= 8) {
-        const uint16_t pupil = elapsed % 2000 < 1000 ? 0x0E0 : 0x01C;
-        pixels &= ~pupil;
-      }
+    const int8_t row = y - top;
+    if (role == LcdRole::Happy) {
+      const int8_t curve = y - 6 - pose.y;
+      if (curve >= 0 && curve < 5) pixels = curvedEye[curve];
+    } else if (row >= 0 && row < pose.eye) {
+      pixels = pose.eye <= 2 || (row != 0 && row != pose.eye - 1) ? 0x0FC : 0x078;
+      if (pose.x < 0) pixels <<= -pose.x;
+      else pixels >>= pose.x;
     }
     const uint8_t slot = (y / 8) * 2;
     glyphs[slot][y % 8] = pixels >> 5;
     glyphs[slot + 1][y % 8] = pixels & 0x1F;
   }
-  const uint8_t mouthPhase = (elapsed / 140) % 4;
-  const uint16_t talking[] = {0, 0x078, 0x0CC, 0x084, 0x0CC, 0x078, 0, 0};
-  const uint16_t smiling[] = {0, 0, 0x102, 0x102, 0x084, 0x078, 0, 0};
-  for (uint8_t y = 0; y < 8; ++y) {
+  const uint16_t smiling[] = {0, 0x102, 0x102, 0x084, 0x078, 0, 0, 0};
+  for (int8_t y = 0; y < 8; ++y) {
     uint16_t pixels = 0;
-    if (role == LcdRole::Happy) pixels = smiling[y];
-    else if (role == LcdRole::Responding && mouthPhase == 1) pixels = talking[y];
-    else if (role == LcdRole::Responding && mouthPhase == 3 && y >= 3 && y <= 5) pixels = 0x078;
-    else if (y == 4) pixels = role == LcdRole::Thinking ? 0x04A : 0x078;
+    if (role == LcdRole::Happy) {
+      const int8_t row = y - pose.y;
+      if (row >= 0 && row < 8) pixels = smiling[row];
+    } else {
+      const int8_t row = y - 4;
+      if (row >= -pose.mouth && row <= pose.mouth)
+        pixels = row == -pose.mouth || row == pose.mouth ? 0x078 : 0x084;
+    }
     glyphs[4][y] = pixels >> 5;
     glyphs[5][y] = pixels & 0x1F;
   }

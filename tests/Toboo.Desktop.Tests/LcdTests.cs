@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Toboo.Core;
+using Toboo.Desktop.Controls;
 using Toboo.Desktop.Services;
 using Toboo.Desktop.ViewModels;
 using Toboo.Desktop.Views;
@@ -49,7 +50,7 @@ public sealed class LcdTests
         Assert.Equal((LcdRole.Idle, 1200), transport.Roles[0]);
         await model.SendCurrentAsync();
         Assert.Equal((LcdRole.Thinking, 1200), transport.Roles[^1]);
-        Assert.Equal("思考", model.DisplayLabel);
+        Assert.Equal("思考", model.PreviewLabel);
         chatRole = null;
         await model.SendCurrentAsync();
         Assert.Equal((LcdRole.Happy, 300), transport.Roles[^1]);
@@ -69,14 +70,16 @@ public sealed class LcdTests
         Assert.Equal(("unknown", 1), transport.Sent[0]);
         await model.SendCurrentAsync();
         Assert.Equal(("happy", 300), transport.Sent[^1]);
-        Assert.Equal("(^_^)", model.DisplayFace);
+        Assert.Equal(LcdRole.Happy, model.PreviewRole);
+        Assert.Contains("固件需更新", model.Status);
         cue = cue with { AgeMs = 499 };
         await model.SendCurrentAsync();
         Assert.Equal(("unknown", 1), transport.Sent[^1]);
-        Assert.Equal("(?)", model.DisplayFace);
+        Assert.Equal(LcdRole.Idle, model.PreviewRole);
         cue = null;
         await model.SendCurrentAsync();
         Assert.Equal(("unknown", 1), transport.Sent[^1]);
+        Assert.Contains("固件需更新", model.Status);
         transport.Fail = true;
         await model.SendCurrentAsync();
         Assert.False(model.IsConnected); Assert.True(transport.Disposed);
@@ -95,7 +98,20 @@ public sealed class LcdTests
         Assert.Equal(2, transport.Sent.Count);
         model.Dispose(); await sending;
         Assert.False(model.IsConnected); Assert.True(transport.Disposed);
-        Assert.Equal("(?)", model.DisplayFace);
+        Assert.Equal(LcdRole.Attentive, model.PreviewRole);
+    }
+
+    [AvaloniaFact]
+    public async Task LocalPreviewReactsWithoutOpeningASerialPort()
+    {
+        LcdRole? chatRole = null;
+        using var model = new LcdViewModel(() => null) { CaptureChatRole = () => chatRole };
+        Assert.Equal(LcdRole.Idle, model.PreviewRole);
+        chatRole = LcdRole.Responding;
+        await model.SendCurrentAsync();
+        Assert.Equal(LcdRole.Responding, model.PreviewRole);
+        Assert.False(model.IsConnected);
+        Assert.Equal("回应", model.PreviewLabel);
     }
 
     [AvaloniaFact]
@@ -177,6 +193,12 @@ public sealed class LcdTests
             var ports = devices.FindControl<ComboBox>("LcdPortSelector")!;
             Assert.Null(ports.SelectedItem); Assert.Null(model.Lcd.Port); Assert.False(model.Lcd.IsConnected);
             Assert.True(devices.FindControl<Button>("RefreshLcdPortsButton")!.IsEffectivelyEnabled);
+            var preview = devices.FindControl<LcdFacePreview>("LcdPreview")!;
+            Assert.True(preview.IsEffectivelyVisible);
+            Assert.Equal(LcdRole.Idle, preview.Role);
+            model.Lcd.CaptureChatRole = () => LcdRole.Happy;
+            await model.Lcd.SendCurrentAsync();
+            Assert.Equal(LcdRole.Happy, preview.Role);
             Assert.False(model.IsRunning); Assert.False(model.Servo.Ready);
             devices.FindControl<ScrollViewer>("DeviceScroll")!.ScrollToEnd();
             await Task.Delay(50);

@@ -21,8 +21,9 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string[] availablePorts = [];
     [ObservableProperty] private string portsHint = "";
     [ObservableProperty] private string status = "未连接 · I²C LCD1602";
-    [ObservableProperty] private string displayFace = "(?)";
-    [ObservableProperty] private string displayLabel = "No valid cue";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PreviewLabel))]
+    private LcdRole previewRole;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanConnect), nameof(CanDisconnect))]
     [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(DisconnectCommand), nameof(RefreshPortsCommand))]
@@ -33,6 +34,14 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
     private bool isConnected;
     public bool CanConnect => !disposed && !Connecting && !IsConnected;
     public bool CanDisconnect => Connecting || IsConnected;
+    public string PreviewLabel => PreviewRole switch
+    {
+        LcdRole.Attentive => "注意",
+        LcdRole.Thinking => "思考",
+        LcdRole.Responding => "回应",
+        LcdRole.Happy => "开心",
+        _ => "待机"
+    };
 
     internal LcdViewModel(Func<ChatExpression?> capture,
         Func<string, CancellationToken, Task<ILcdConnection>>? connect = null, Func<string[]>? getPorts = null)
@@ -40,6 +49,7 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
         this.capture = capture; this.connect = connect ?? LcdConnection.OpenAsync;
         this.getPorts = getPorts ?? SerialPortCatalog.List;
         timer.Tick += Tick;
+        timer.Start();
         RefreshPorts();
     }
 
@@ -81,17 +91,16 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
                 if (!await opened.SendRoleAsync(LcdRole.Idle, RoleLifetime, token))
                     throw new TimeoutException("角色状态在串口发送前已过期。");
                 token.ThrowIfCancellationRequested();
-                ShowRole(LcdRole.Idle);
+                Status = "已连接 · 实体屏动画已开启";
             }
             else
             {
                 await opened.SendAsync("unknown", 1, token);
-                Status = "已连接 · 旧版固件";
+                Status = "已连接 · Uno 固件需更新后才能播放动画";
             }
             token.ThrowIfCancellationRequested();
             connection = opened; opened = null;
             IsConnected = true;
-            timer.Start();
         }
         catch (OperationCanceledException) { if (!disposed) Status = "已断开"; }
         catch (Exception error) when (IsConnectionError(error)) { Status = "LCD 连接失败：" + error.Message; }
@@ -107,37 +116,26 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
 
     internal async Task SendCurrentAsync()
     {
+        if (disposed) return;
+        var cue = capture();
+        // Leave 50ms for transport. Do not extend a sample's original 500ms validity.
+        var ttl = cue is not null && double.IsFinite(cue.AgeMs) && cue.AgeMs >= 0
+            ? (int)Math.Clamp(450 - cue.AgeMs, 0, 450) : 0;
+        var valid = ttl > 0 && cue is { Score: >= 0.6 and <= 1 }
+            && Enum.TryParse<FacialExpression>(cue.Label, true, out var value) && Enum.IsDefined(value) && value != FacialExpression.Unknown
+            && value.ToString().ToLowerInvariant() == cue.Label;
+        var chatRole = CaptureChatRole?.Invoke();
+        PreviewRole = chatRole ?? (valid ? (cue!.Label == "happy" ? LcdRole.Happy : LcdRole.Attentive) : LcdRole.Idle);
+
         if (sending || !IsConnected || connection is not { } current || lifetime is null) return;
         var token = lifetime.Token;
         sending = true;
         try
         {
-            var cue = capture();
-            // Leave 50ms for transport. Do not extend a sample's original 500ms validity.
-            var ttl = cue is not null && double.IsFinite(cue.AgeMs) && cue.AgeMs >= 0
-                ? (int)Math.Clamp(450 - cue.AgeMs, 0, 450) : 0;
-            var valid = ttl > 0 && cue is { Score: >= 0.6 and <= 1 }
-                && Enum.TryParse<FacialExpression>(cue.Label, true, out var value) && Enum.IsDefined(value) && value != FacialExpression.Unknown
-                && value.ToString().ToLowerInvariant() == cue.Label;
             if (current.SupportsRoles)
-            {
-                var chatRole = CaptureChatRole?.Invoke();
-                var role = chatRole ?? (valid ? LcdRole.Attentive : LcdRole.Idle);
-                if (chatRole is null && valid && cue!.Label == "happy") role = LcdRole.Happy;
-                if (await current.SendRoleAsync(role, chatRole is null && valid ? ttl : RoleLifetime, token))
-                {
-                    token.ThrowIfCancellationRequested();
-                    ShowRole(role);
-                }
-                return;
-            }
-            var label = valid ? cue!.Label : "unknown";
-            await current.SendAsync(label, valid ? ttl : 1, token);
-            token.ThrowIfCancellationRequested();
-            var expression = Enum.Parse<FacialExpression>(label, true);
-            DisplayFace = new ExpressionEstimate(expression, 0, 0, "", null, []).Emoticon;
-            DisplayLabel = valid ? label : "No valid cue";
-            Status = valid ? "已发送 · Uno 已确认" : "已连接 · 等待有效实时表情";
+                await current.SendRoleAsync(PreviewRole, chatRole is null && valid ? ttl : RoleLifetime, token);
+            else
+                await current.SendAsync(valid ? cue!.Label : "unknown", valid ? ttl : 1, token);
         }
         catch (OperationCanceledException) { }
         catch (Exception error) when (IsConnectionError(error))
@@ -148,26 +146,13 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
         finally { sending = false; }
     }
 
-    private void ShowRole(LcdRole role)
-    {
-        (DisplayFace, DisplayLabel) = role switch
-        {
-            LcdRole.Attentive => ("(O_O)", "注意"),
-            LcdRole.Thinking => ("(o_o)", "思考"),
-            LcdRole.Responding => ("(o.O)", "回应"),
-            LcdRole.Happy => ("(^_^)", "开心"),
-            _ => ("(•_•)", "待机")
-        };
-        Status = "已连接 · 角色动画";
-    }
-
     [RelayCommand(CanExecute = nameof(CanDisconnect))]
     private void Disconnect()
     {
         var animated = connection?.SupportsRoles == true;
-        timer.Stop(); lifetime?.Cancel(); connection?.Dispose(); connection = null;
+        lifetime?.Cancel(); connection?.Dispose(); connection = null;
         if (!Connecting) { lifetime?.Dispose(); lifetime = null; }
-        IsConnected = false; DisplayFace = "(?)"; DisplayLabel = "No valid cue";
+        IsConnected = false;
         Status = animated ? "已断开 · 屏幕会恢复待机" : "已断开";
     }
     private static bool IsConnectionError(Exception error) => error is IOException or InvalidOperationException
@@ -176,6 +161,6 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         if (disposed) return;
-        disposed = true; Disconnect(); timer.Tick -= Tick;
+        disposed = true; timer.Stop(); timer.Tick -= Tick; Disconnect();
     }
 }

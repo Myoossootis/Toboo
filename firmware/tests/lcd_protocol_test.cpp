@@ -53,16 +53,20 @@ int main() {
 
   LcdFace::Frame open, blink, talking, resting, glanceLeft, glanceRight, happy, attentive;
   LcdFace::frameAt(LcdRole::Idle, 0, open);
-  LcdFace::frameAt(LcdRole::Idle, 3550, blink);
+  LcdFace::frameAt(LcdRole::Idle, 680, blink);
   assert(memcmp(open, blink, 32) != 0);
+  assert(LcdFace::poseAt(LcdRole::Idle, 680).eye == 1);
+  assert(LcdFace::poseAt(LcdRole::Idle, 2100).x == -2 && LcdFace::poseAt(LcdRole::Idle, 6400).x == 2);
+  assert(LcdFace::poseAt(LcdRole::Idle, 9200).eye == 10);
   LcdFace::frameAt(LcdRole::Responding, 0, resting);
-  LcdFace::frameAt(LcdRole::Responding, 140, talking);
-  assert(memcmp(resting, talking, 32) == 0 && memcmp(resting[4], talking[4], 16) != 0);
-  LcdFace::frameAt(LcdRole::Thinking, 0, glanceLeft);
-  LcdFace::frameAt(LcdRole::Thinking, 1000, glanceRight);
+  LcdFace::frameAt(LcdRole::Responding, 120, talking);
+  assert(memcmp(resting[4], talking[4], 16) != 0);
+  assert(LcdFace::poseAt(LcdRole::Responding, 600).mouth == 0);
+  LcdFace::frameAt(LcdRole::Thinking, 400, glanceLeft);
+  LcdFace::frameAt(LcdRole::Thinking, 1700, glanceRight);
   assert(memcmp(glanceLeft, glanceRight, 32) != 0);
   LcdFace::frameAt(LcdRole::Happy, 0, happy);
-  LcdFace::frameAt(LcdRole::Attentive, 0, attentive);
+  LcdFace::frameAt(LcdRole::Attentive, 140, attentive);
   assert(memcmp(happy, open, 32) != 0 && memcmp(attentive, open, 32) != 0);
   puts("PASS: LCD protocol, legacy compatibility, autonomous role playback, animation frames, expiry and millis wrap.");
 }

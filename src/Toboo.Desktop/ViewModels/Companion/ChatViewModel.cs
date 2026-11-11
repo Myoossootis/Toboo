@@ -68,8 +68,12 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
             return currentRequestId is { } id && turns.TryGetValue(id, out var turn)
                 && turn.State == "running" && !string.IsNullOrWhiteSpace(turn.Reply)
                 ? LcdRole.Responding : LcdRole.Thinking;
-        if (IsConnected && replyCompletedAt is { } completed && Stopwatch.GetElapsedTime(completed).TotalMilliseconds < 900)
-            return LcdRole.Responding;
+        if (IsConnected && replyCompletedAt is { } completed)
+        {
+            var elapsed = Stopwatch.GetElapsedTime(completed).TotalMilliseconds;
+            if (elapsed < 760) return LcdRole.Responding;
+            if (elapsed < 1500) return LcdRole.Happy;
+        }
         return string.IsNullOrWhiteSpace(Draft) ? null : LcdRole.Attentive;
     }
 

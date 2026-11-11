@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <AvaloniaResource Include="Assets/*.png" />
+    <EmbeddedResource Include="../../firmware/uno_lcd/LcdMotion.h" LogicalName="Toboo.LcdMotion" />
     <InternalsVisibleTo Include="Toboo.Desktop.Tests" />
     <ProjectReference Include="../Toboo.Runtime/Toboo.Runtime.csproj" />
     <ProjectReference Include="../Toboo.Core/Toboo.Core.csproj" />

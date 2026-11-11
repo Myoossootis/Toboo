@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Toboo.Desktop.Services;
 
-internal enum LcdRole { Idle, Attentive, Thinking, Responding, Happy }
+public enum LcdRole { Idle, Attentive, Thinking, Responding, Happy }
 
 internal interface ILcdConnection : IDisposable
 {

@@ -67,8 +67,10 @@
         <StackPanel Spacing="24" Margin="24,32">
           <TextBlock Text="此刻的 toboo" FontSize="20" FontWeight="SemiBold" />
           <StackPanel Spacing="8">
-            <Image Source="avares://toboo/Assets/toboo-companion.png" Height="200" RenderTransformOrigin="50%,50%"><Image.RenderTransform><ScaleTransform ScaleX="1.4" ScaleY="1.4" /></Image.RenderTransform></Image>
-            <TextBlock Text="{Binding RobotState}" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" />
+            <Border Background="#134FBB" CornerRadius="14" Width="176" Height="78" HorizontalAlignment="Center">
+              <icons:LcdFacePreview Role="{Binding Tracking.Lcd.PreviewRole}" Width="168" Height="52" VerticalAlignment="Center" />
+            </Border>
+            <TextBlock Text="{Binding Tracking.Lcd.PreviewLabel}" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" />
             <TextBlock Text="{Binding RobotDetail}" Classes="muted" HorizontalAlignment="Center" TextWrapping="Wrap" />
           </StackPanel>
           <StackPanel Spacing="12" IsVisible="{Binding ShowVisualPanel}">

@@ -41,7 +41,6 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     public bool IsDevicesPage => PageIndex == 1;
     public bool IsSettingsPage => PageIndex == 2;
     public string PageTitle => PageIndex switch { 1 => "设备", 2 => "设置", _ => "陪伴" };
-    public string RobotState => Chat.RemoteRunning ? "正在回应" : Tracking.IsRunning ? "感知中" : "待机中";
     public string RobotDetail => Chat.RemoteRunning ? "正在认真组织回复" : Tracking.IsRunning ? Tracking.IsFace && Tracking.ExpressionEnabled
         ? "正在观察可见的表情线索" : "正在预览" + Tracking.SourceLabel : "准备好了，随时开始";
     public string CameraState => Tracking.IsRunning ? Tracking.SourceLabel + " · 运行中"
@@ -122,11 +121,11 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     private void ChatChanged(object? sender, PropertyChangedEventArgs args)
     {
         if (args.PropertyName == nameof(ChatViewModel.RemoteRunning))
-        { OnPropertyChanged(nameof(RobotState)); OnPropertyChanged(nameof(RobotDetail)); }
+            OnPropertyChanged(nameof(RobotDetail));
     }
     private void RefreshStatus()
     {
-        OnPropertyChanged(nameof(RobotState)); OnPropertyChanged(nameof(RobotDetail));
+        OnPropertyChanged(nameof(RobotDetail));
         OnPropertyChanged(nameof(CameraState)); OnPropertyChanged(nameof(RobotConnection));
         OnPropertyChanged(nameof(SourceCaption)); OnPropertyChanged(nameof(CanFollow));
         OnPropertyChanged(nameof(CanStartVision)); OnPropertyChanged(nameof(FollowState));

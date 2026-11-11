@@ -81,9 +81,11 @@
             <StackPanel Spacing="16">
               <TextBlock Text="表情屏幕" Classes="section" />
               <Border Background="#173D40" Padding="8" CornerRadius="8" HorizontalAlignment="Left">
-                <Border Background="#134FBB" Padding="24,8" CornerRadius="4">
-                  <StackPanel><TextBlock Text="{Binding Tracking.Lcd.DisplayFace}" FontFamily="Consolas" FontSize="20" Foreground="#E0EEFF" TextAlignment="Center" />
-                    <TextBlock Text="{Binding Tracking.Lcd.DisplayLabel}" FontFamily="Consolas" Foreground="#E0EEFF" TextAlignment="Center" /></StackPanel>
+                <Border Background="#134FBB" Padding="8,4,8,8" CornerRadius="4">
+                  <StackPanel Width="138">
+                    <icons:LcdFacePreview x:Name="LcdPreview" Role="{Binding Tracking.Lcd.PreviewRole}" Height="44" />
+                    <TextBlock Text="{Binding Tracking.Lcd.PreviewLabel}" Foreground="#E0EEFF" TextAlignment="Center" />
+                  </StackPanel>
                 </Border>
               </Border>
               <TextBlock Text="{Binding Tracking.Lcd.Status}" FontWeight="Medium" TextWrapping="Wrap" />
@@ -95,7 +97,7 @@
               <TextBlock Text="{Binding Tracking.Lcd.PortsHint}" Classes="caption" TextWrapping="Wrap" />
               <Button x:Name="ConnectLcdButton" Content="连接表情屏" Command="{Binding Tracking.Lcd.ConnectCommand}" Classes="quiet" IsVisible="{Binding !Tracking.Lcd.IsConnected}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
               <Button Content="断开表情屏" Command="{Binding Tracking.Lcd.DisconnectCommand}" Classes="quiet" IsVisible="{Binding Tracking.Lcd.CanDisconnect}" />
-              <TextBlock Text="选择表情屏 Uno 的串口。这里显示当前状态，动画在实体屏播放。" Classes="caption" TextWrapping="Wrap" />
+              <TextBlock Text="动画可在电脑上预览，连接支持动画的 Uno 后同步到实体屏。" Classes="caption" TextWrapping="Wrap" />
             </StackPanel>
           </Border>
           <Button Content="传感器遥测 →" Command="{Binding OpenSensorsCommand}" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
