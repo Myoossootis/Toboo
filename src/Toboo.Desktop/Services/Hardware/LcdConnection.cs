@@ -4,11 +4,13 @@ using System.Text;
 
 namespace Toboo.Desktop.Services;
 
-public enum LcdRole { Idle, Attentive, Thinking, Responding, Happy }
+// Roles after Happy require the seven-expression firmware.
+public enum LcdRole { Idle, Attentive, Thinking, Responding, Happy, Neutral, Angry, Disgust, Fearful, Sad, Surprised }
 
 internal interface ILcdConnection : IDisposable
 {
     bool SupportsRoles { get; }
+    bool SupportsExpressions { get; }
     Task SendAsync(string label, int lifetimeMilliseconds, CancellationToken cancellation);
     Task<bool> SendRoleAsync(LcdRole role, int lifetimeMilliseconds, CancellationToken cancellation);
 }
@@ -27,6 +29,7 @@ internal sealed class LcdConnection : ILcdConnection
     private readonly ILcdSerialChannel channel;
     private int busy, disposed;
     public bool SupportsRoles { get; private set; }
+    public bool SupportsExpressions { get; private set; }
     private LcdConnection(ILcdSerialChannel channel) => this.channel = channel;
 
     internal static Task<ILcdConnection> OpenAsync(string port, CancellationToken cancellation) =>
@@ -53,6 +56,16 @@ internal sealed class LcdConnection : ILcdConnection
                     "ERR" => false,
                     _ => throw new IOException("UNO LCD 返回了未知的固件能力。")
                 };
+                if (connection.SupportsRoles)
+                {
+                    channel.WriteLine("LCD_FACES?");
+                    connection.SupportsExpressions = connection.ReadLine(TimeSpan.FromMilliseconds(600), cancellation) switch
+                    {
+                        "LCD_FACES,7" => true,
+                        "ERR" => false,
+                        _ => throw new IOException("UNO LCD 返回了未知的表情能力。")
+                    };
+                }
             }, cancellation);
             cancellation.ThrowIfCancellationRequested();
             return connection;
@@ -73,6 +86,7 @@ internal sealed class LcdConnection : ILcdConnection
         if (!SupportsRoles) throw new InvalidOperationException("Uno 固件需要更新才能播放角色动画。");
         if (!Enum.IsDefined(role) || lifetimeMilliseconds is < 1 or > 1500)
             throw new ArgumentException("Invalid LCD role.");
+        if (!SupportsExpressions && role > LcdRole.Happy) role = LcdRole.Attentive;
         return SendAsync("R", role.ToString().ToLowerInvariant(), lifetimeMilliseconds, cancellation);
     }
 

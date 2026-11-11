@@ -4,12 +4,14 @@
 #include <stdint.h>
 #include <string.h>
 
-enum class LcdRole : uint8_t { Idle, Attentive, Thinking, Responding, Happy, Count };
+enum class LcdRole : uint8_t {
+  Idle, Attentive, Thinking, Responding, Happy, Neutral, Angry, Disgust, Fearful, Sad, Surprised, Count
+};
 
 // Fixed storage, strict vocabulary and a per-observation expiry. No actuator output.
 class LcdProtocol {
 public:
-  enum Result { None, Hello, Capabilities, Status, Updated, RoleUpdated, Rejected };
+  enum Result { None, Hello, Capabilities, Faces, Status, Updated, RoleUpdated, Rejected };
   uint8_t expression = 7;
   bool animated = true;
   LcdRole role = LcdRole::Idle;
@@ -55,6 +57,12 @@ public:
       case LcdRole::Thinking: return "thinking";
       case LcdRole::Responding: return "responding";
       case LcdRole::Happy: return "happy";
+      case LcdRole::Neutral: return "neutral";
+      case LcdRole::Angry: return "angry";
+      case LcdRole::Disgust: return "disgust";
+      case LcdRole::Fearful: return "fearful";
+      case LcdRole::Sad: return "sad";
+      case LcdRole::Surprised: return "surprised";
       default: return "";
     }
   }
@@ -78,6 +86,7 @@ private:
     if (strcmp(buffer, "LCD_STATUS?") == 0) return Status;
     if (!session) return Rejected;
     if (strcmp(buffer, "LCD_CAPS?") == 0) return Capabilities;
+    if (strcmp(buffer, "LCD_FACES?") == 0) return Faces;
     const bool isRole = strncmp(buffer, "R,", 2) == 0;
     if (!isRole && strncmp(buffer, "E,", 2) != 0) return Rejected;
     char* comma = strchr(buffer + 2, ',');

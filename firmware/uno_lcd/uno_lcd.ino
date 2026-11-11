@@ -30,7 +30,7 @@ bool drawFace(uint32_t now) {
   memcpy(displayedGlyphs, glyphs, sizeof(glyphs));
   if (!faceVisible) {
     const uint8_t cells[2][16] = {
-      {' ', ' ', ' ', 0, 1, ' ', ' ', ' ', ' ', ' ', ' ', 0, 1, ' ', ' ', ' '},
+      {' ', ' ', ' ', 0, 1, ' ', ' ', ' ', ' ', ' ', ' ', 6, 7, ' ', ' ', ' '},
       {' ', ' ', ' ', 2, 3, ' ', ' ', 4, 5, ' ', ' ', 2, 3, ' ', ' ', ' '}
     };
     for (uint8_t y = 0; y < 2; ++y) {
@@ -72,6 +72,8 @@ void loop() {
       else { Serial.print(F("TOBOO_LCD_ERROR,")); Serial.println(lcdStatus); }
     } else if (result == LcdProtocol::Capabilities) {
       Serial.println(F("LCD_CAPS,ROLE1"));
+    } else if (result == LcdProtocol::Faces) {
+      Serial.println(F("LCD_FACES,7"));
     } else if (result == LcdProtocol::Updated || result == LcdProtocol::RoleUpdated) {
       draw(now, true);
       if (lcdStatus != 0) { Serial.print(F("TOBOO_LCD_ERROR,")); Serial.println(lcdStatus); }

@@ -13,6 +13,7 @@ public sealed class LcdTransportTests
         public ConcurrentQueue<string> Written { get; } = new();
         public string Hello { get; set; } = "TOBOO_LCD,1,UNO,16,2\r\n";
         public string Capabilities { get; set; } = "ERR\r\n";
+        public string Faces { get; set; } = "ERR\r\n";
         public Func<string, string?> Reply { get; set; } = text => "OK," + text.Split(',')[1] + "\r\n";
         public bool Disposed { get; private set; }
         public bool Opened { get; private set; }
@@ -22,7 +23,7 @@ public sealed class LcdTransportTests
         public void WriteLine(string text)
         {
             Written.Enqueue(text);
-            var response = text switch { "TOBOO_LCD?" => Hello, "LCD_CAPS?" => Capabilities, _ => Reply(text) };
+            var response = text switch { "TOBOO_LCD?" => Hello, "LCD_CAPS?" => Capabilities, "LCD_FACES?" => Faces, _ => Reply(text) };
             if (response is not null) foreach (var value in Encoding.ASCII.GetBytes(response)) incoming.Enqueue(value);
         }
         public int ReadByte()
@@ -61,6 +62,19 @@ public sealed class LcdTransportTests
         Assert.StartsWith("R,thinking,", channel.Written.Last());
         Assert.InRange(int.Parse(channel.Written.Last().Split(',')[2]), 1, 1200);
         await Assert.ThrowsAsync<IOException>(() => connection.SendRoleAsync(LcdRole.Happy, 450, default));
+    }
+
+    [Theory]
+    [InlineData("LCD_FACES,7\n", true, "sad")]
+    [InlineData("ERR\n", false, "attentive")]
+    public async Task FaceCapabilityUsesFullRolesOrKeepsOlderAnimationsWorking(string faces, bool extended, string sentRole)
+    {
+        var channel = new Channel { Capabilities = "LCD_CAPS,ROLE1\n", Faces = faces, Reply = _ => $"OK,R,{sentRole}\n" };
+        using var connection = await LcdConnection.OpenAsync(channel, default, TimeSpan.Zero);
+        Assert.Equal(extended, connection.SupportsExpressions);
+        Assert.True(await connection.SendRoleAsync(LcdRole.Sad, 400, default));
+        Assert.Contains("LCD_FACES?", channel.Written);
+        Assert.StartsWith($"R,{sentRole},", channel.Written.Last());
     }
 
     [Fact]

@@ -24,16 +24,28 @@
 | 角色状态 | 动画 | 触发条件 |
 | --- | --- | --- |
 | 待机 | 单眨、双眨，偶尔向两侧看 | 上电、没有有效线索，或连接超时 |
-| 注意 | 短暂睁大眼睛，随后放松 | 正在输入，或相机检测到其他有效表情线索 |
+| 注意 | 短暂睁大眼睛，随后放松 | 正在输入 |
 | 思考 | 抬眼看向一侧、停顿、回到中间 | DeepSeek 已接收请求，正在生成文本 |
 | 回应 | 嘴型大小交替，动作之间留有停顿 | 文本开始流式返回，结束后短暂延续 |
 | 开心 | 弯眼微笑，轻轻上跳两次 | 回复结束，或相机检测到有效的开心线索 |
+
+开启本地表情识别后，七类实时线索分别播放以下动作。
+
+| 表情线索 | 角色动作 |
+| --- | --- |
+| 愤怒 | 斜眼皱眉，抿嘴 |
+| 厌恶 | 侧眼缩起，嘴角一歪 |
+| 恐惧 | 眼睛变细变高，轻颤，小幅张嘴 |
+| 开心 | 弯眼微笑，轻跳两次 |
+| 中性 | 目光居中，轻轻眨眼 |
+| 悲伤 | 垂眼慢眨，嘴角向下 |
+| 惊讶 | 瞪大双眼，嘴巴张成圆形 |
 
 对话状态优先。桌面每 200ms 取一次最新状态，同一时刻只发送一条请求。Uno 收不到新状态时会在约 1.2 秒内回到待机，视觉线索按原有效期更早过期。陪伴页和设备页均可预览动画；设备页同时显示 Uno 连接状态。动作关键帧定义在 [LcdMotion.h](../firmware/uno_lcd/LcdMotion.h)，由桌面和 Uno 共用。
 
 ## 旧版表情模式
 
-旧版桌面和已烧录旧版固件的 Uno 仍可使用以下颜文字。角色动画需要新版桌面和新版固件。
+带旧版颜文字固件的 Uno 可继续显示下表。v0.2.2 的动画固件保留原有动作，新增类别在实体屏上会使用「注意」。实体屏要显示完整七类动画，需要同时更新桌面与 Uno 固件。
 
 | 类别 | 第一行 | 第二行 |
 | --- | --- | --- |
@@ -50,7 +62,7 @@
 
 ## 构建和上传
 
-GitHub Release 提供 `toboo-版本号-uno-lcd.hex` 预编译固件。使用 Arduino CLI 和 Arduino AVR core 可直接写入 Uno。先断开 toboo 的表情屏连接，将示例中的 COM7、文件名和路径换成实际值。
+GitHub Release 提供对应版本的 `toboo-版本号-uno-lcd.hex` 预编译固件。使用 Arduino CLI 和 Arduino AVR core 可直接写入 Uno。先断开 toboo 的表情屏连接，将示例中的 COM7、文件名和路径换成实际值。
 
 ```powershell
 arduino-cli upload --fqbn arduino:avr:uno --port COM7 --input-file ./toboo-0.2.2-uno-lcd.hex --verify
@@ -86,11 +98,13 @@ host: TOBOO_LCD?
 UNO:  TOBOO_LCD,1,UNO,16,2
 host: LCD_CAPS?
 UNO:  LCD_CAPS,ROLE1
+host: LCD_FACES?
+UNO:  LCD_FACES,7
 host: R,thinking,1200
 UNO:  OK,R,thinking
 ```
 
-`R,<role>,<ttl_ms>` 接受 `idle`、`attentive`、`thinking`、`responding`、`happy`，有效期为 1–1500ms。续发同一状态时继续播放当前动画。
+`R,<role>,<ttl_ms>` 接受 `idle`、`attentive`、`thinking`、`responding` 和七个表情标签 `angry`、`disgust`、`fearful`、`happy`、`neutral`、`sad`、`surprised`，有效期为 1–1500ms。续发同一状态时继续播放当前动画。`LCD_FACES?` 返回 `ERR` 时，新类别在实体屏使用兼容的 `attentive` 动作。
 
 ```text
 host: E,happy,300

@@ -10,7 +10,7 @@
 #endif
 
 namespace LcdFace {
-constexpr uint8_t glyphCount = 6;
+constexpr uint8_t glyphCount = 8;
 using Frame = uint8_t[glyphCount][8];
 
 struct Pose { int8_t x, y, eye, mouth; };
@@ -62,36 +62,71 @@ inline Pose poseAt(LcdRole role, uint32_t elapsed) {
     case LcdRole::Thinking: return sample(Thinking, elapsed);
     case LcdRole::Responding: return sample(Responding, elapsed);
     case LcdRole::Happy: return sample(Happy, elapsed);
+    case LcdRole::Neutral: return sample(Neutral, elapsed);
+    case LcdRole::Angry: return sample(Angry, elapsed);
+    case LcdRole::Disgust: return sample(Disgust, elapsed);
+    case LcdRole::Fearful: return sample(Fearful, elapsed);
+    case LcdRole::Sad: return sample(Sad, elapsed);
+    case LcdRole::Surprised: return sample(Surprised, elapsed);
     default: return sample(Idle, elapsed);
   }
 }
 
-// The two eyes share four CGRAM slots. The mouth uses two more.
+inline uint16_t mirrorEye(uint16_t pixels) {
+  uint16_t mirrored = 0;
+  for (uint8_t i = 0; i < 10; ++i) {
+    mirrored = (mirrored << 1) | (pixels & 1);
+    pixels >>= 1;
+  }
+  return mirrored;
+}
+
+// The right eye has its own upper tiles for the inward slant. Both eyes share the lower tiles.
 inline void frameAt(LcdRole role, uint32_t elapsed, Frame& glyphs) {
   const Pose pose = poseAt(role, elapsed);
   const int8_t top = 8 + pose.y - pose.eye / 2;
   const uint16_t curvedEye[] = {0x078, 0x0FC, 0x186, 0x303, 0x201};
+  const uint16_t angryEye[] = {0x300, 0x3E0, 0x1FC, 0x078};
   for (int8_t y = 0; y < 16; ++y) {
     uint16_t pixels = 0;
     const int8_t row = y - top;
     if (role == LcdRole::Happy) {
       const int8_t curve = y - 6 - pose.y;
       if (curve >= 0 && curve < 5) pixels = curvedEye[curve];
+    } else if (role == LcdRole::Angry) {
+      const int8_t slant = y - 3 - pose.y;
+      if (slant >= 0 && slant < 4) {
+        const int8_t shift = pose.x < 0 ? -pose.x : pose.x;
+        pixels = angryEye[slant] >> shift;
+      }
     } else if (row >= 0 && row < pose.eye) {
       pixels = pose.eye <= 2 || (row != 0 && row != pose.eye - 1) ? 0x0FC : 0x078;
+      if (role == LcdRole::Fearful) pixels &= 0x078;
       if (pose.x < 0) pixels <<= -pose.x;
       else pixels >>= pose.x;
     }
     const uint8_t slot = (y / 8) * 2;
     glyphs[slot][y % 8] = pixels >> 5;
     glyphs[slot + 1][y % 8] = pixels & 0x1F;
+    if (y < 8) {
+      const uint16_t right = role == LcdRole::Angry ? mirrorEye(pixels) : pixels;
+      glyphs[6][y] = right >> 5;
+      glyphs[7][y] = right & 0x1F;
+    }
   }
   const uint16_t smiling[] = {0, 0x102, 0x102, 0x084, 0x078, 0, 0, 0};
+  const uint16_t frowning[] = {0, 0, 0, 0x078, 0x084, 0x102, 0, 0};
+  const uint16_t grimacing[] = {0, 0, 0, 0x070, 0x18E, 0x003, 0, 0};
   for (int8_t y = 0; y < 8; ++y) {
     uint16_t pixels = 0;
     if (role == LcdRole::Happy) {
       const int8_t row = y - pose.y;
       if (row >= 0 && row < 8) pixels = smiling[row];
+    } else if (role == LcdRole::Sad || role == LcdRole::Angry) {
+      pixels = frowning[y];
+      if (role == LcdRole::Angry) pixels &= 0x0FC;
+    } else if (role == LcdRole::Disgust) {
+      pixels = grimacing[y];
     } else {
       const int8_t row = y - 4;
       if (row >= -pose.mouth && row <= pose.mouth)

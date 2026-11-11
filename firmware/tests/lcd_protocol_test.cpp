@@ -34,13 +34,14 @@ int main() {
   LcdProtocol role;
   assert(role.animated && role.role == LcdRole::Idle);
   assert(send(role, "R,thinking,1200\n", 0) == LcdProtocol::Rejected);
+  assert(send(role, "LCD_FACES?\n", 0) == LcdProtocol::Rejected);
   assert(send(role, "TOBOO_LCD?\n", 5) == LcdProtocol::Hello);
   assert(send(role, "LCD_CAPS?\n", 5) == LcdProtocol::Capabilities);
   assert(send(role, "R,thinking,1200\n", 10) == LcdProtocol::RoleUpdated);
   assert(role.role == LcdRole::Thinking && role.roleStartedAt == 10);
   assert(send(role, "R,thinking,1200\n", 200) == LcdProtocol::RoleUpdated);
   assert(role.roleStartedAt == 10);
-  assert(send(role, "R,neutral,1200\n", 220) == LcdProtocol::Rejected);
+  assert(send(role, "R,unknown,1200\n", 220) == LcdProtocol::Rejected);
   assert(send(role, "R,happy,1501\n", 220) == LcdProtocol::Rejected);
   assert(!role.expire(1399) && role.expire(1400));
   assert(role.role == LcdRole::Idle && role.roleStartedAt == 1400);
@@ -50,6 +51,22 @@ int main() {
   assert(!role.animated && role.expression == 3);
   assert(send(role, "R,idle,1200\n", 110) == LcdProtocol::RoleUpdated);
   assert(role.animated && role.roleStartedAt == 110 && role.expression == 7);
+  assert(send(role, "LCD_FACES?\n", 115) == LcdProtocol::Faces);
+
+  const LcdRole expressions[] = {LcdRole::Angry, LcdRole::Disgust, LcdRole::Fearful, LcdRole::Happy,
+    LcdRole::Neutral, LcdRole::Sad, LcdRole::Surprised};
+  const char* expressionCommands[] = {"R,angry,300\n", "R,disgust,300\n", "R,fearful,300\n", "R,happy,300\n",
+    "R,neutral,300\n", "R,sad,300\n", "R,surprised,300\n"};
+  LcdFace::Frame expressionFrames[7];
+  for (uint8_t i = 0; i < 7; ++i) {
+    assert(send(role, expressionCommands[i], 200) == LcdProtocol::RoleUpdated);
+    assert(role.role == expressions[i]);
+    assert(!role.expire(499) && role.expire(500) && role.role == LcdRole::Idle);
+    LcdFace::frameAt(expressions[i], 200, expressionFrames[i]);
+    for (const auto& glyph : expressionFrames[i]) for (uint8_t row : glyph) assert(row <= 0x1F);
+    for (uint8_t earlier = 0; earlier < i; ++earlier)
+      assert(memcmp(expressionFrames[i], expressionFrames[earlier], sizeof(LcdFace::Frame)) != 0);
+  }
 
   LcdFace::Frame open, blink, talking, resting, glanceLeft, glanceRight, happy, attentive;
   LcdFace::frameAt(LcdRole::Idle, 0, open);

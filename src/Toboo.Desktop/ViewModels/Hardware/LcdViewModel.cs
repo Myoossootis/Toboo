@@ -40,6 +40,12 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
         LcdRole.Thinking => "思考",
         LcdRole.Responding => "回应",
         LcdRole.Happy => "开心",
+        LcdRole.Neutral => "中性",
+        LcdRole.Angry => "愤怒",
+        LcdRole.Disgust => "厌恶",
+        LcdRole.Fearful => "恐惧",
+        LcdRole.Sad => "悲伤",
+        LcdRole.Surprised => "惊讶",
         _ => "待机"
     };
 
@@ -91,7 +97,7 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
                 if (!await opened.SendRoleAsync(LcdRole.Idle, RoleLifetime, token))
                     throw new TimeoutException("角色状态在串口发送前已过期。");
                 token.ThrowIfCancellationRequested();
-                Status = "已连接 · 实体屏动画已开启";
+                Status = opened.SupportsExpressions ? "已连接 · 实体屏动画已开启" : "已连接 · 七类表情需要新版 Uno 固件";
             }
             else
             {
@@ -121,11 +127,22 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
         // Leave 50ms for transport. Do not extend a sample's original 500ms validity.
         var ttl = cue is not null && double.IsFinite(cue.AgeMs) && cue.AgeMs >= 0
             ? (int)Math.Clamp(450 - cue.AgeMs, 0, 450) : 0;
+        var value = FacialExpression.Unknown;
         var valid = ttl > 0 && cue is { Score: >= 0.6 and <= 1 }
-            && Enum.TryParse<FacialExpression>(cue.Label, true, out var value) && Enum.IsDefined(value) && value != FacialExpression.Unknown
+            && Enum.TryParse(cue.Label, true, out value) && Enum.IsDefined(value) && value != FacialExpression.Unknown
             && value.ToString().ToLowerInvariant() == cue.Label;
         var chatRole = CaptureChatRole?.Invoke();
-        PreviewRole = chatRole ?? (valid ? (cue!.Label == "happy" ? LcdRole.Happy : LcdRole.Attentive) : LcdRole.Idle);
+        PreviewRole = chatRole ?? (valid ? value switch
+        {
+            FacialExpression.Angry => LcdRole.Angry,
+            FacialExpression.Disgust => LcdRole.Disgust,
+            FacialExpression.Fearful => LcdRole.Fearful,
+            FacialExpression.Happy => LcdRole.Happy,
+            FacialExpression.Neutral => LcdRole.Neutral,
+            FacialExpression.Sad => LcdRole.Sad,
+            FacialExpression.Surprised => LcdRole.Surprised,
+            _ => LcdRole.Idle
+        } : LcdRole.Idle);
 
         if (sending || !IsConnected || connection is not { } current || lifetime is null) return;
         var token = lifetime.Token;

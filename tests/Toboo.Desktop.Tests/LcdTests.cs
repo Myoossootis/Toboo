@@ -17,6 +17,7 @@ public sealed class LcdTests
         public List<(string Label, int Ttl)> Sent { get; } = [];
         public List<(LcdRole Role, int Ttl)> Roles { get; } = [];
         public bool SupportsRoles { get; init; }
+        public bool SupportsExpressions { get; init; }
         public bool Disposed { get; private set; }
         public bool Fail { get; set; }
         public TaskCompletionSource? Pending { get; set; }
@@ -98,7 +99,7 @@ public sealed class LcdTests
         Assert.Equal(2, transport.Sent.Count);
         model.Dispose(); await sending;
         Assert.False(model.IsConnected); Assert.True(transport.Disposed);
-        Assert.Equal(LcdRole.Attentive, model.PreviewRole);
+        Assert.Equal(LcdRole.Sad, model.PreviewRole);
     }
 
     [AvaloniaFact]
@@ -112,6 +113,32 @@ public sealed class LcdTests
         Assert.Equal(LcdRole.Responding, model.PreviewRole);
         Assert.False(model.IsConnected);
         Assert.Equal("回应", model.PreviewLabel);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("angry", LcdRole.Angry, "愤怒")]
+    [InlineData("disgust", LcdRole.Disgust, "厌恶")]
+    [InlineData("fearful", LcdRole.Fearful, "恐惧")]
+    [InlineData("happy", LcdRole.Happy, "开心")]
+    [InlineData("neutral", LcdRole.Neutral, "中性")]
+    [InlineData("sad", LcdRole.Sad, "悲伤")]
+    [InlineData("surprised", LcdRole.Surprised, "惊讶")]
+    public async Task EachCameraExpressionHasAPlayableRoleAndAnIndependentLease(string label, LcdRole expected, string caption)
+    {
+        var cue = new ChatExpression(label, 0.9, 100, 0);
+        var transport = new FakeConnection { SupportsRoles = true, SupportsExpressions = true };
+        using var model = new LcdViewModel(() => cue, (_, _) => Task.FromResult<ILcdConnection>(transport)) { Port = "COM-test" };
+        await model.ConnectCommand.ExecuteAsync(null);
+        await model.SendCurrentAsync();
+        Assert.Equal((expected, 350), transport.Roles[^1]);
+        Assert.Equal(caption, model.PreviewLabel);
+        var preview = new LcdFacePreview { Role = model.PreviewRole };
+        Assert.Equal(expected, preview.Role);
+
+        cue = cue with { AgeMs = 500 };
+        await model.SendCurrentAsync();
+        Assert.Equal(LcdRole.Idle, model.PreviewRole);
+        Assert.Equal(LcdRole.Idle, transport.Roles[^1].Role);
     }
 
     [AvaloniaFact]

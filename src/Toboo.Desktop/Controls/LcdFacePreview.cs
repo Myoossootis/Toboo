@@ -17,7 +17,10 @@ public sealed class LcdFacePreview : Control
     private static readonly IBrush lit = Brush.Parse("#E0EEFF");
     private static readonly Pen stroke = new(lit, 4, lineCap: PenLineCap.Round);
     private static readonly Geometry smilingEye = Geometry.Parse("M-10,4 Q0,-12 10,4");
+    private static readonly Geometry angryEye = Geometry.Parse("M-11,-7 L10,0 L10,4 Q0,8 -10,3 Z");
     private static readonly Geometry smile = Geometry.Parse("M-8,-2 Q0,7 8,-2");
+    private static readonly Geometry frown = Geometry.Parse("M-8,2 Q0,-7 8,2");
+    private static readonly Geometry grimace = Geometry.Parse("M-8,1 Q-4,-5 0,0 Q4,5 8,-1");
     private static readonly Keyframe[][] clips = LoadClips();
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(33) };
     private long roleStarted;
@@ -112,26 +115,32 @@ public sealed class LcdFacePreview : Control
         var center = Bounds.Width / 2 + pose.X * 3;
         var y = Bounds.Height / 2 - 3 + pose.Y * 2;
         var eyeGap = Math.Min(40, Bounds.Width / 4);
-        DrawEye(center - eyeGap);
-        DrawEye(center + eyeGap);
+        DrawEye(center - eyeGap, false);
+        DrawEye(center + eyeGap, true);
 
         var mouthY = y + 13;
-        if (Role == LcdRole.Happy)
+        var mouthShape = Role switch
         {
-            if (pose.Mouth > 0.7)
-                context.DrawEllipse(null, stroke, new Point(center, mouthY), 6, pose.Mouth * 2);
-            else
-            {
-                using var position = context.PushTransform(Matrix.CreateTranslation(center, mouthY));
-                context.DrawGeometry(null, stroke, smile);
-            }
+            LcdRole.Happy when pose.Mouth <= 0.7 => smile,
+            LcdRole.Sad or LcdRole.Angry => frown,
+            LcdRole.Disgust => grimace,
+            _ => null
+        };
+        if (mouthShape is not null)
+        {
+            var scale = Role == LcdRole.Angry ? Matrix.CreateScale(0.75, 0.65) : Matrix.Identity;
+            using var position = context.PushTransform(scale * Matrix.CreateTranslation(center, mouthY));
+            context.DrawGeometry(null, stroke, mouthShape);
         }
         else if (pose.Mouth > 0.4)
-            context.DrawEllipse(null, stroke, new Point(center, mouthY), 6, pose.Mouth * 2);
+        {
+            var radius = Role == LcdRole.Surprised ? 7 : Role == LcdRole.Fearful ? 4 : 6;
+            context.DrawEllipse(null, stroke, new Point(center, mouthY), radius, pose.Mouth * 2);
+        }
         else
             context.DrawLine(stroke, new Point(center - 4, mouthY), new Point(center + 4, mouthY));
 
-        void DrawEye(double x)
+        void DrawEye(double x, bool right)
         {
             if (Role == LcdRole.Happy)
             {
@@ -139,8 +148,16 @@ public sealed class LcdFacePreview : Control
                 context.DrawGeometry(null, stroke, smilingEye);
                 return;
             }
+            if (Role == LcdRole.Angry)
+            {
+                var direction = Matrix.CreateScale(right ? -1 : 1, 1);
+                using var position = context.PushTransform(direction * Matrix.CreateTranslation(x, y));
+                context.DrawGeometry(lit, null, angryEye);
+                return;
+            }
             var height = Math.Max(3, pose.Eye * 2);
-            context.DrawRectangle(lit, null, new Rect(x - 10, y - height / 2.0, 20, height), 4, 4);
+            var width = Role == LcdRole.Fearful ? 13 : 20;
+            context.DrawRectangle(lit, null, new Rect(x - width / 2.0, y - height / 2.0, width, height), 4, 4);
         }
     }
 }
