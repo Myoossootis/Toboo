@@ -14,6 +14,8 @@ public sealed class LcdTests
     private sealed class FakeConnection : ILcdConnection
     {
         public List<(string Label, int Ttl)> Sent { get; } = [];
+        public List<(LcdRole Role, int Ttl)> Roles { get; } = [];
+        public bool SupportsRoles { get; init; }
         public bool Disposed { get; private set; }
         public bool Fail { get; set; }
         public TaskCompletionSource? Pending { get; set; }
@@ -23,7 +25,38 @@ public sealed class LcdTests
             Sent.Add((label, lifetimeMilliseconds));
             if (Pending is not null) await Pending.Task.WaitAsync(cancellation);
         }
+        public Task<bool> SendRoleAsync(LcdRole role, int lifetimeMilliseconds, CancellationToken cancellation)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            Roles.Add((role, lifetimeMilliseconds));
+            return Task.FromResult(true);
+        }
         public void Dispose() => Disposed = true;
+    }
+
+    [AvaloniaFact]
+    public async Task AnimatedScreenUsesChatStateThenFreshCameraCueThenIdle()
+    {
+        var cue = new ChatExpression("happy", 0.9, 150, 0);
+        LcdRole? chatRole = LcdRole.Thinking;
+        var transport = new FakeConnection { SupportsRoles = true };
+        using var model = new LcdViewModel(() => cue, (_, _) => Task.FromResult<ILcdConnection>(transport))
+        {
+            Port = "COM-test",
+            CaptureChatRole = () => chatRole
+        };
+        await model.ConnectCommand.ExecuteAsync(null);
+        Assert.Equal((LcdRole.Idle, 1200), transport.Roles[0]);
+        await model.SendCurrentAsync();
+        Assert.Equal((LcdRole.Thinking, 1200), transport.Roles[^1]);
+        Assert.Equal("思考", model.DisplayLabel);
+        chatRole = null;
+        await model.SendCurrentAsync();
+        Assert.Equal((LcdRole.Happy, 300), transport.Roles[^1]);
+        cue = cue with { AgeMs = 499 };
+        await model.SendCurrentAsync();
+        Assert.Equal((LcdRole.Idle, 1200), transport.Roles[^1]);
+        Assert.Empty(transport.Sent);
     }
 
     [AvaloniaFact]

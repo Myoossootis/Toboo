@@ -4,15 +4,20 @@
 #include <stdint.h>
 #include <string.h>
 
+enum class LcdRole : uint8_t { Idle, Attentive, Thinking, Responding, Happy, Count };
+
 // Fixed storage, strict vocabulary and a per-observation expiry. No actuator output.
 class LcdProtocol {
 public:
-  enum Result { None, Hello, Status, Updated, Rejected };
+  enum Result { None, Hello, Capabilities, Status, Updated, RoleUpdated, Rejected };
   uint8_t expression = 7;
+  bool animated = true;
+  LcdRole role = LcdRole::Idle;
+  uint32_t roleStartedAt = 0;
   bool expire(uint32_t now) {
-    if (expression != 7 && (uint32_t)(now - updatedAt) >= lifetime) {
-      expression = 7; return true;
-    }
+    if ((uint32_t)(now - updatedAt) < lifetime) return false;
+    if (animated && role != LcdRole::Idle) { setRole(LcdRole::Idle, now); return true; }
+    if (expression != 7) { expression = 7; return true; }
     return false;
   }
   Result feed(char c, uint32_t now) {
@@ -43,30 +48,55 @@ public:
       case 6: return "(o_o)"; default: return "(?)";
     }
   }
+  static const char* roleLabel(LcdRole value) {
+    switch (value) {
+      case LcdRole::Idle: return "idle";
+      case LcdRole::Attentive: return "attentive";
+      case LcdRole::Thinking: return "thinking";
+      case LcdRole::Responding: return "responding";
+      case LcdRole::Happy: return "happy";
+      default: return "";
+    }
+  }
 private:
   char buffer[40] = {};
   uint8_t length = 0;
   bool discard = false, session = false;
   uint32_t lastByte = 0, updatedAt = 0;
   uint16_t lifetime = 0;
+  void setRole(LcdRole value, uint32_t now) {
+    if (!animated || role != value) roleStartedAt = now;
+    animated = true; role = value; expression = 7;
+  }
   Result parse(uint32_t now) {
-    if (strcmp(buffer, "TOBOO_LCD?") == 0) { session = true; expression = 7; return Hello; }
+    if (strcmp(buffer, "TOBOO_LCD?") == 0) {
+      session = true;
+      if (animated) setRole(LcdRole::Idle, now);
+      expression = 7;
+      return Hello;
+    }
     if (strcmp(buffer, "LCD_STATUS?") == 0) return Status;
-    if (!session || strncmp(buffer, "E,", 2) != 0) return Rejected;
+    if (!session) return Rejected;
+    if (strcmp(buffer, "LCD_CAPS?") == 0) return Capabilities;
+    const bool isRole = strncmp(buffer, "R,", 2) == 0;
+    if (!isRole && strncmp(buffer, "E,", 2) != 0) return Rejected;
     char* comma = strchr(buffer + 2, ',');
     if (!comma) return Rejected;
     *comma = 0;
     uint8_t value = 0;
-    while (value < 8 && strcmp(buffer + 2, label(value)) != 0) ++value;
-    if (value == 8 || !comma[1]) return Rejected;
+    const uint8_t count = isRole ? (uint8_t)LcdRole::Count : 8;
+    while (value < count && strcmp(buffer + 2, isRole ? roleLabel((LcdRole)value) : label(value)) != 0) ++value;
+    if (value == count || !comma[1]) return Rejected;
     uint16_t ttl = 0;
     for (const char* p = comma + 1; *p; ++p) {
       if (*p < '0' || *p > '9') return Rejected;
       ttl = ttl * 10 + (uint16_t)(*p - '0');
-      if (ttl > 500) return Rejected;
+      if (ttl > (isRole ? 1500 : 500)) return Rejected;
     }
     if (ttl == 0) return Rejected;
-    expression = value; updatedAt = now; lifetime = ttl; return Updated;
+    updatedAt = now; lifetime = ttl;
+    if (isRole) { setRole((LcdRole)value, now); return RoleUpdated; }
+    animated = false; expression = value; return Updated;
   }
 };
 #endif

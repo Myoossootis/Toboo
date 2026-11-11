@@ -95,7 +95,7 @@
               <TextBlock Text="{Binding Tracking.Lcd.PortsHint}" Classes="caption" TextWrapping="Wrap" />
               <Button x:Name="ConnectLcdButton" Content="连接表情屏" Command="{Binding Tracking.Lcd.ConnectCommand}" Classes="quiet" IsVisible="{Binding !Tracking.Lcd.IsConnected}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
               <Button Content="断开表情屏" Command="{Binding Tracking.Lcd.DisconnectCommand}" Classes="quiet" IsVisible="{Binding Tracking.Lcd.CanDisconnect}" />
-              <TextBlock Text="连接已烧录 LCD 固件的 Uno；开启本地视觉感知后同步表情。屏幕预览为最近已确认的发送内容。" Classes="caption" TextWrapping="Wrap" />
+              <TextBlock Text="选择表情屏 Uno 的串口。这里显示当前状态，动画在实体屏播放。" Classes="caption" TextWrapping="Wrap" />
             </StackPanel>
           </Border>
           <Button Content="传感器遥测 →" Command="{Binding OpenSensorsCommand}" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />

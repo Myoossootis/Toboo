@@ -4,9 +4,13 @@ using System.Text;
 
 namespace Toboo.Desktop.Services;
 
+internal enum LcdRole { Idle, Attentive, Thinking, Responding, Happy }
+
 internal interface ILcdConnection : IDisposable
 {
+    bool SupportsRoles { get; }
     Task SendAsync(string label, int lifetimeMilliseconds, CancellationToken cancellation);
+    Task<bool> SendRoleAsync(LcdRole role, int lifetimeMilliseconds, CancellationToken cancellation);
 }
 
 // Byte reads have a short bounded timeout, so cancellation never relies on SerialPort async support.
@@ -22,6 +26,7 @@ internal sealed class LcdConnection : ILcdConnection
 {
     private readonly ILcdSerialChannel channel;
     private int busy, disposed;
+    public bool SupportsRoles { get; private set; }
     private LcdConnection(ILcdSerialChannel channel) => this.channel = channel;
 
     internal static Task<ILcdConnection> OpenAsync(string port, CancellationToken cancellation) =>
@@ -41,6 +46,13 @@ internal sealed class LcdConnection : ILcdConnection
                 channel.WriteLine("TOBOO_LCD?");
                 if (connection.ReadLine(TimeSpan.FromSeconds(4), cancellation) != "TOBOO_LCD,1,UNO,16,2")
                     throw new IOException("UNO LCD 握手不匹配，请检查端口和固件。");
+                channel.WriteLine("LCD_CAPS?");
+                connection.SupportsRoles = connection.ReadLine(TimeSpan.FromMilliseconds(600), cancellation) switch
+                {
+                    "LCD_CAPS,ROLE1" => true,
+                    "ERR" => false,
+                    _ => throw new IOException("UNO LCD 返回了未知的固件能力。")
+                };
             }, cancellation);
             cancellation.ThrowIfCancellationRequested();
             return connection;
@@ -53,22 +65,41 @@ internal sealed class LcdConnection : ILcdConnection
         if (!Enum.TryParse<Toboo.Core.FacialExpression>(label, true, out var expression)
             || !Enum.IsDefined(expression) || expression.ToString().ToLowerInvariant() != label || lifetimeMilliseconds is < 1 or > 500)
             throw new ArgumentException("Invalid LCD cue.");
+        await SendAsync("E", label, lifetimeMilliseconds, cancellation);
+    }
+
+    public Task<bool> SendRoleAsync(LcdRole role, int lifetimeMilliseconds, CancellationToken cancellation)
+    {
+        if (!SupportsRoles) throw new InvalidOperationException("Uno 固件需要更新才能播放角色动画。");
+        if (!Enum.IsDefined(role) || lifetimeMilliseconds is < 1 or > 1500)
+            throw new ArgumentException("Invalid LCD role.");
+        return SendAsync("R", role.ToString().ToLowerInvariant(), lifetimeMilliseconds, cancellation);
+    }
+
+    private async Task<bool> SendAsync(string command, string label, int lifetimeMilliseconds, CancellationToken cancellation)
+    {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
         if (Interlocked.CompareExchange(ref busy, 1, 0) != 0)
             throw new InvalidOperationException("LCD 正在确认上一条请求，不能排队发送旧表情。");
         var started = Stopwatch.GetTimestamp();
         try
         {
-            await Task.Run(() =>
+            return await Task.Run(() =>
             {
                 cancellation.ThrowIfCancellationRequested();
                 ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
                 var elapsed = (int)Math.Ceiling(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
                 var remaining = label == "unknown" ? 1 : lifetimeMilliseconds - elapsed;
-                if (remaining < 1) throw new TimeoutException("表情在串口发送前已过期。");
-                channel.WriteLine($"E,{label},{remaining}");
-                if (ReadLine(TimeSpan.FromMilliseconds(600), cancellation) != "OK," + label)
+                if (remaining < 1)
+                {
+                    if (command == "R") return false;
+                    throw new TimeoutException("表情在串口发送前已过期。");
+                }
+                channel.WriteLine(FormattableString.Invariant($"{command},{label},{remaining}"));
+                var acknowledgement = command == "R" ? "OK,R," + label : "OK," + label;
+                if (ReadLine(TimeSpan.FromMilliseconds(600), cancellation) != acknowledgement)
                     throw new IOException("LCD 未确认本次显示请求。");
+                return true;
             }, cancellation);
         }
         finally { Volatile.Write(ref busy, 0); }
@@ -96,7 +127,6 @@ internal sealed class LcdConnection : ILcdConnection
     public void Dispose()
     {
         if (Interlocked.Exchange(ref disposed, 1) == 0) channel.Dispose();
-        // Firmware expires the final observation within 500ms, independently of the host.
     }
 
     private sealed class SerialChannel(string port) : ILcdSerialChannel

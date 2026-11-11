@@ -19,6 +19,7 @@ public sealed class TobooChatTests
     {
         public int Sends;
         public bool LoseAcknowledgement, Incompatible, MissingModel;
+        public bool StreamReply;
         public readonly List<JsonElement> Calls = [];
         public readonly List<ChatTurn> Turns = [];
         public Action? BeforeStop { get; set; }
@@ -42,7 +43,12 @@ public sealed class TobooChatTests
             {
                 var body = json.Deserialize<ChatSendRequest>(TobooChatClient.Json)!;
                 var duplicate = Turns.Any(t => t.RequestId == body.RequestId);
-                if (!duplicate) { Sends++; Turns.Add(new(body.RequestId, body.Text, "你好，我是 toboo。", body.Provider, body.Model, "completed", Sends, null)); }
+                if (!duplicate)
+                {
+                    Sends++;
+                    Turns.Add(new(body.RequestId, body.Text, StreamReply ? "" : "你好，我是 toboo。", body.Provider,
+                        body.Model, StreamReply ? "running" : "completed", Sends, null));
+                }
                 if (LoseAcknowledgement) { LoseAcknowledgement = false; throw new ChatConnectionException("连接超时", "CONNECTION"); }
                 return new ChatAcknowledgement(true, duplicate, body.RequestId);
             }
@@ -56,6 +62,28 @@ public sealed class TobooChatTests
         }
         public void Dispose() { }
     }
+    [AvaloniaFact]
+    public async Task LcdReactsToTypingThinkingStreamingAndCompletedReply()
+    {
+        var client = new FakeClient { StreamReply = true };
+        using var chat = new ChatViewModel(client, new(StateFile()));
+        await chat.ConnectAsync();
+        Assert.Null(chat.CaptureLcdRole());
+        chat.Draft = "你好";
+        Assert.Equal(LcdRole.Attentive, chat.CaptureLcdRole());
+        await chat.SendAsync();
+        Assert.Equal(LcdRole.Thinking, chat.CaptureLcdRole());
+        client.Turns[0] = client.Turns[0] with { Reply = "你好，我是 toboo。" };
+        await chat.RefreshAsync();
+        Assert.Equal(LcdRole.Responding, chat.CaptureLcdRole());
+        client.Turns[0] = client.Turns[0] with { State = "completed" };
+        await chat.RefreshAsync();
+        Assert.False(chat.RemoteRunning);
+        Assert.Equal(LcdRole.Responding, chat.CaptureLcdRole());
+        chat.NewChatCommand.Execute(null);
+        Assert.Null(chat.CaptureLcdRole());
+    }
+
     [AvaloniaFact]
     public async Task ChatIsExplicitSendOnlyAndUsesTheSelectedRouteWithoutGlobalModelCalls()
     {

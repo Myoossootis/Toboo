@@ -12,6 +12,7 @@ public sealed class LcdTransportTests
         private readonly ConcurrentQueue<byte> incoming = new();
         public ConcurrentQueue<string> Written { get; } = new();
         public string Hello { get; set; } = "TOBOO_LCD,1,UNO,16,2\r\n";
+        public string Capabilities { get; set; } = "ERR\r\n";
         public Func<string, string?> Reply { get; set; } = text => "OK," + text.Split(',')[1] + "\r\n";
         public bool Disposed { get; private set; }
         public bool Opened { get; private set; }
@@ -21,7 +22,7 @@ public sealed class LcdTransportTests
         public void WriteLine(string text)
         {
             Written.Enqueue(text);
-            var response = text == "TOBOO_LCD?" ? Hello : Reply(text);
+            var response = text switch { "TOBOO_LCD?" => Hello, "LCD_CAPS?" => Capabilities, _ => Reply(text) };
             if (response is not null) foreach (var value in Encoding.ASCII.GetBytes(response)) incoming.Enqueue(value);
         }
         public int ReadByte()
@@ -39,13 +40,27 @@ public sealed class LcdTransportTests
         var channel = new Channel();
         using var connection = await LcdConnection.OpenAsync(channel, default, TimeSpan.Zero);
         Assert.True(channel.Opened && channel.Discarded);
+        Assert.False(connection.SupportsRoles);
         await connection.SendAsync("happy", 450, default);
         await connection.SendAsync("unknown", 1, default);
         var sent = channel.Written.ToArray();
         Assert.Equal("TOBOO_LCD?", sent[0]);
-        Assert.StartsWith("E,happy,", sent[1]);
-        Assert.InRange(int.Parse(sent[1].Split(',')[2]), 1, 450);
-        Assert.Equal("E,unknown,1", sent[2]);
+        Assert.Equal("LCD_CAPS?", sent[1]);
+        Assert.StartsWith("E,happy,", sent[2]);
+        Assert.InRange(int.Parse(sent[2].Split(',')[2]), 1, 450);
+        Assert.Equal("E,unknown,1", sent[3]);
+    }
+
+    [Fact]
+    public async Task AnimatedFirmwareRequiresAnAcknowledgementForTheExactRole()
+    {
+        var channel = new Channel { Capabilities = "LCD_CAPS,ROLE1\n", Reply = _ => "OK,R,thinking\n" };
+        using var connection = await LcdConnection.OpenAsync(channel, default, TimeSpan.Zero);
+        Assert.True(connection.SupportsRoles);
+        Assert.True(await connection.SendRoleAsync(LcdRole.Thinking, 1200, default));
+        Assert.StartsWith("R,thinking,", channel.Written.Last());
+        Assert.InRange(int.Parse(channel.Written.Last().Split(',')[2]), 1, 1200);
+        await Assert.ThrowsAsync<IOException>(() => connection.SendRoleAsync(LcdRole.Happy, 450, default));
     }
 
     [Fact]
@@ -68,7 +83,7 @@ public sealed class LcdTransportTests
         var channel = new Channel();
         using var connection = await LcdConnection.OpenAsync(channel, default, TimeSpan.Zero);
         await Assert.ThrowsAsync<ArgumentException>(() => connection.SendAsync(label, ttl, default));
-        Assert.Single(channel.Written);
+        Assert.Equal(["TOBOO_LCD?", "LCD_CAPS?"], channel.Written.ToArray());
     }
 
     [Theory]

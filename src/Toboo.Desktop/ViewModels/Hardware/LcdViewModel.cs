@@ -15,6 +15,8 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
     private ILcdConnection? connection;
     private CancellationTokenSource? lifetime;
     private bool sending, disposed;
+    private const int RoleLifetime = 1200;
+    internal Func<LcdRole?>? CaptureChatRole { get; set; }
     [ObservableProperty] private string? port;
     [ObservableProperty] private string[] availablePorts = [];
     [ObservableProperty] private string portsHint = "";
@@ -74,11 +76,21 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
         {
             opened = await connect(Port.Trim(), token);
             token.ThrowIfCancellationRequested();
-            // Always erase a previous session before starting live observations.
-            await opened.SendAsync("unknown", 1, token);
+            if (opened.SupportsRoles)
+            {
+                if (!await opened.SendRoleAsync(LcdRole.Idle, RoleLifetime, token))
+                    throw new TimeoutException("角色状态在串口发送前已过期。");
+                token.ThrowIfCancellationRequested();
+                ShowRole(LcdRole.Idle);
+            }
+            else
+            {
+                await opened.SendAsync("unknown", 1, token);
+                Status = "已连接 · 旧版固件";
+            }
             token.ThrowIfCancellationRequested();
             connection = opened; opened = null;
-            IsConnected = true; Status = "已连接 · 等待有效实时表情";
+            IsConnected = true;
             timer.Start();
         }
         catch (OperationCanceledException) { if (!disposed) Status = "已断开"; }
@@ -107,6 +119,18 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
             var valid = ttl > 0 && cue is { Score: >= 0.6 and <= 1 }
                 && Enum.TryParse<FacialExpression>(cue.Label, true, out var value) && Enum.IsDefined(value) && value != FacialExpression.Unknown
                 && value.ToString().ToLowerInvariant() == cue.Label;
+            if (current.SupportsRoles)
+            {
+                var chatRole = CaptureChatRole?.Invoke();
+                var role = chatRole ?? (valid ? LcdRole.Attentive : LcdRole.Idle);
+                if (chatRole is null && valid && cue!.Label == "happy") role = LcdRole.Happy;
+                if (await current.SendRoleAsync(role, chatRole is null && valid ? ttl : RoleLifetime, token))
+                {
+                    token.ThrowIfCancellationRequested();
+                    ShowRole(role);
+                }
+                return;
+            }
             var label = valid ? cue!.Label : "unknown";
             await current.SendAsync(label, valid ? ttl : 1, token);
             token.ThrowIfCancellationRequested();
@@ -124,13 +148,27 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
         finally { sending = false; }
     }
 
+    private void ShowRole(LcdRole role)
+    {
+        (DisplayFace, DisplayLabel) = role switch
+        {
+            LcdRole.Attentive => ("(O_O)", "注意"),
+            LcdRole.Thinking => ("(o_o)", "思考"),
+            LcdRole.Responding => ("(o.O)", "回应"),
+            LcdRole.Happy => ("(^_^)", "开心"),
+            _ => ("(•_•)", "待机")
+        };
+        Status = "已连接 · 角色动画";
+    }
+
     [RelayCommand(CanExecute = nameof(CanDisconnect))]
     private void Disconnect()
     {
+        var animated = connection?.SupportsRoles == true;
         timer.Stop(); lifetime?.Cancel(); connection?.Dispose(); connection = null;
         if (!Connecting) { lifetime?.Dispose(); lifetime = null; }
         IsConnected = false; DisplayFace = "(?)"; DisplayLabel = "No valid cue";
-        Status = "已断开 · 屏幕旧表情将在 500ms 内过期";
+        Status = animated ? "已断开 · 屏幕会恢复待机" : "已断开";
     }
     private static bool IsConnectionError(Exception error) => error is IOException or InvalidOperationException
         or ArgumentException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or TimeoutException;

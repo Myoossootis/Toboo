@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -29,6 +30,7 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
     private bool stateLoaded, polling, disposed, closing, loadingPreferences;
     private string? sessionId, currentRequestId;
     private long revision = -1;
+    private long? replyCompletedAt;
     private int before;
     public event Action<bool>? Updated;
     public ObservableCollection<ChatMessageItem> Messages { get; } = [];
@@ -59,6 +61,17 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
     public string SessionTitle => sessionId is null ? "新对话" : Sessions.FirstOrDefault(s => s.Id == sessionId)?.Title ?? "toboo 独立会话";
     public string PrivacyHint => IncludeExpression ? "发送文字和有效表情摘要 · 不发送画面" : "仅发送文字 · 历史保存在本机独立目录";
     private string Style => StyleIndex switch { 1 => "gentle", 2 => "concise", _ => "natural" };
+
+    internal LcdRole? CaptureLcdRole()
+    {
+        if (IsConnected && RemoteRunning)
+            return currentRequestId is { } id && turns.TryGetValue(id, out var turn)
+                && turn.State == "running" && !string.IsNullOrWhiteSpace(turn.Reply)
+                ? LcdRole.Responding : LcdRole.Thinking;
+        if (IsConnected && replyCompletedAt is { } completed && Stopwatch.GetElapsedTime(completed).TotalMilliseconds < 900)
+            return LcdRole.Responding;
+        return string.IsNullOrWhiteSpace(Draft) ? null : LcdRole.Attentive;
+    }
 
     public ChatViewModel(ITobooChatClient? client = null, ChatStateStore? store = null, Func<ChatExpression?>? expression = null)
     {
@@ -206,6 +219,11 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
         revision = view.Revision; HasMore = before > 0;
         for (var i = 0; i < view.Turns.Length; i++) { var turn = view.Turns[i]; turns[turn.RequestId] = turn; turnOrder[turn.RequestId] = view.Before + i; }
         var active = view.Turns.LastOrDefault(t => t.State is "running" or "cancelling");
+        if (reset) replyCompletedAt = null;
+        else if (active is null && RemoteRunning && currentRequestId is { } requestId
+            && turns.TryGetValue(requestId, out var finished) && finished.State is "completed" or "truncated"
+            && !string.IsNullOrWhiteSpace(finished.Reply))
+            replyCompletedAt = Stopwatch.GetTimestamp();
         RemoteRunning = active is not null; currentRequestId = active?.RequestId ?? state.Pending?.RequestId;
         if (state.Pending is { } pending && turns.TryGetValue(pending.RequestId, out var admitted))
         {
@@ -254,6 +272,7 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
         try
         {
             Persist(state with { SessionId = null }); sessionId = null; currentRequestId = null; revision = -1;
+            replyCompletedAt = null;
             turns.Clear(); turnOrder.Clear(); Messages.Clear(); HasMore = false; Error = ""; SelectedSession = null;
             OnPropertyChanged(nameof(HasMessages)); RefreshCommands();
         }

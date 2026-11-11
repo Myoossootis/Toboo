@@ -72,12 +72,14 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     {
         Tracking = tracking;
         Chat = chat ?? new(expression: tracking.CaptureExpressionCue);
+        tracking.Lcd.CaptureChatRole = Chat.CaptureLcdRole;
         Chat.PropertyChanged += ChatChanged;
         tracking.PropertyChanged += Changed;
         tracking.Servo.PropertyChanged += Changed;
         tracking.FaceAim.PropertyChanged += Changed;
         tracking.Cameras.CollectionChanged += CamerasChanged;
     }
+
     [RelayCommand] private void Navigate(string page) => PageIndex = int.Parse(page, System.Globalization.CultureInfo.InvariantCulture);
     [RelayCommand] private void OpenAdvanced() => AdvancedRequested?.Invoke(0);
     [RelayCommand] private void OpenCalibration() { PageIndex = 1; SetupStep = 0; CalibrationExpanded = !CalibrationExpanded; }
@@ -136,6 +138,7 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     }
     public void Dispose()
     {
+        Tracking.Lcd.CaptureChatRole = null;
         Tracking.PropertyChanged -= Changed;
         Tracking.Servo.PropertyChanged -= Changed;
         Tracking.FaceAim.PropertyChanged -= Changed;
