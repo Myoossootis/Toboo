@@ -9,6 +9,12 @@ namespace Toboo.Desktop.Services;
 
 internal static class Diagnostics
 {
+    public static async Task SpeechSelfTestAsync()
+    {
+        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("本机语音需要 Windows。");
+        Write("speech-self-test.json", await WindowsSpeechService.SelfTestAsync());
+    }
+
     public static async Task SerialRuntimeSelfTestAsync()
     {
         foreach (var script in new[] { "single_servo.py", "face_follow.py", "sensor_telemetry.py" })

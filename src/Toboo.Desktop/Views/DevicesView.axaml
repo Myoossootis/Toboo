@@ -45,9 +45,10 @@
           <Border Classes="shellcard">
             <StackPanel Spacing="16">
               <StackPanel Orientation="Horizontal" Spacing="12"><icons:AppIcon Kind="Mic" /><TextBlock Text="语音" Classes="section" /></StackPanel>
-              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12"><icons:AppIcon Kind="Mic" Width="20" Height="20" /><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="语音输入" FontWeight="Medium" /><TextBlock Text="ICS43432 · 待接入" Classes="caption" /></StackPanel></Grid>
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12"><icons:AppIcon Kind="Mic" Width="20" Height="20" /><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="语音输入" FontWeight="Medium" /><TextBlock Text="{Binding Voice.InputDescription}" Classes="caption" TextWrapping="Wrap" /></StackPanel></Grid>
               <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
-              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12"><icons:AppIcon Kind="Volume" Width="20" Height="20" /><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="声音输出" FontWeight="Medium" /><TextBlock Text="语音合成与音响输出尚未接入" Classes="caption" TextWrapping="Wrap" /></StackPanel></Grid>
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12"><icons:AppIcon Kind="Volume" Width="20" Height="20" /><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="声音输出" FontWeight="Medium" /><TextBlock Text="{Binding Voice.OutputDescription}" Classes="caption" TextWrapping="Wrap" /></StackPanel></Grid>
+              <Button Content="检查本机语音" Command="{Binding Voice.InitializeCommand}" Classes="quiet" HorizontalAlignment="Left" />
             </StackPanel>
           </Border>
         </StackPanel>

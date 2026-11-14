@@ -15,7 +15,7 @@ namespace Toboo.Desktop.Tests;
 public sealed class TobooChatTests
 {
     private static string StateFile() => Path.Combine(Path.GetTempPath(), "toboo-chat-tests", Guid.NewGuid().ToString("N"), "client.json");
-    private sealed class FakeClient : ITobooChatClient
+    internal sealed class FakeClient : ITobooChatClient
     {
         public int Sends;
         public bool LoseAcknowledgement, Incompatible, MissingModel;

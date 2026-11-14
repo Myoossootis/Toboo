@@ -319,6 +319,11 @@
         "resolved": "6.0.0",
         "contentHash": "/iUeP3tq1S0XdNNoMz5C9twLSrM/TH+qElHkXWaPvuNOt+99G75NrV0OS2EqHx5wMN7popYjpc8oTjC1y16DLg=="
       },
+      "System.Speech": {
+        "type": "Transitive",
+        "resolved": "8.0.0",
+        "contentHash": "CNuiA6vb95Oe5PRjClZEBiaju31vwB8OIeCgeSBXyZL6+MS4RVVB2X/C11z0xCkooHE3Vy91nM2z76emIzR+sg=="
+      },
       "Tmds.DBus.Protocol": {
         "type": "Transitive",
         "resolved": "0.21.3",
@@ -375,9 +380,10 @@
           "Avalonia.Themes.Fluent": "[11.3.22, )",
           "CommunityToolkit.Mvvm": "[8.4.0, )",
           "System.IO.Ports": "[8.0.0, )",
-          "Toboo.Core": "[0.2.1, )",
-          "Toboo.Runtime": "[0.2.1, )",
-          "Toboo.Vision": "[0.2.1, )"
+          "System.Speech": "[8.0.0, )",
+          "Toboo.Core": "[0.2.2, )",
+          "Toboo.Runtime": "[0.2.2, )",
+          "Toboo.Vision": "[0.2.2, )"
         }
       },
       "toboo.core": {
@@ -386,8 +392,8 @@
       "toboo.runtime": {
         "type": "Project",
         "dependencies": {
-          "Toboo.Core": "[0.2.1, )",
-          "Toboo.Vision": "[0.2.1, )"
+          "Toboo.Core": "[0.2.2, )",
+          "Toboo.Vision": "[0.2.2, )"
         }
       },
       "toboo.vision": {
@@ -395,7 +401,7 @@
         "dependencies": {
           "OpenCvSharp4": "[4.10.0.20240616, )",
           "OpenCvSharp4.runtime.win": "[4.10.0.20240616, )",
-          "Toboo.Core": "[0.2.1, )"
+          "Toboo.Core": "[0.2.2, )"
         }
       }
     },
@@ -483,6 +489,11 @@
         "dependencies": {
           "runtime.native.System.IO.Ports": "8.0.0"
         }
+      },
+      "System.Speech": {
+        "type": "Transitive",
+        "resolved": "8.0.0",
+        "contentHash": "CNuiA6vb95Oe5PRjClZEBiaju31vwB8OIeCgeSBXyZL6+MS4RVVB2X/C11z0xCkooHE3Vy91nM2z76emIzR+sg=="
       }
     }
   }

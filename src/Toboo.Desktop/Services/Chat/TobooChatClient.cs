@@ -107,7 +107,7 @@ public sealed class TobooChatClient : ITobooChatClient
 }
 
 public sealed record ChatClientState(string? SessionId = null, string? Provider = null, string? Model = null,
-    string Style = "natural", bool IncludeExpression = false, ChatSendRequest? Pending = null);
+    string Style = "natural", bool IncludeExpression = false, ChatSendRequest? Pending = null, bool ReadReplies = true);
 public sealed class ChatStateStore(string? path = null) : IDisposable
 {
     private readonly string filename = path ?? Path.Combine(TobooChatClient.DirectoryPath, "client.json");

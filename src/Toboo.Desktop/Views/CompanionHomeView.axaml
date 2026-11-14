@@ -13,7 +13,7 @@
               <TextBlock Text="我在这里，听你说。" FontSize="20" Classes="muted" />
             </StackPanel>
           </Grid>
-          <Border Background="{StaticResource SubtleBrush}" CornerRadius="16" Padding="24" MaxWidth="560" HorizontalAlignment="Left" IsVisible="{Binding !Chat.HasMessages}">
+          <Border Background="{StaticResource SubtleBrush}" CornerRadius="16" Padding="24" MaxWidth="560" HorizontalAlignment="Left" IsVisible="{Binding !Chat.IsConnected}">
             <StackPanel Spacing="12">
               <TextBlock Text="先认识一下彼此" FontSize="16" FontWeight="SemiBold" />
               <TextBlock Text="连接 DeepSeek Harness，开始属于你的陪伴对话。" Classes="muted" TextWrapping="Wrap" LineHeight="24" />
@@ -50,8 +50,10 @@
         </StackPanel>
         <Border BorderBrush="{StaticResource ControlBorderBrush}" BorderThickness="1" CornerRadius="24" Padding="20,16">
           <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
-            <TextBox x:Name="ConversationInput" Classes="conversation" Text="{Binding Chat.Draft}" Watermark="说说你此刻的想法…" IsEnabled="{Binding Chat.IsConnected}" MaxLength="4000" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="96" KeyDown="ComposerKeyDown" BorderThickness="0" Background="Transparent" FontSize="16" VerticalAlignment="Center" />
-            <Button Grid.Column="1" Classes="round" IsEnabled="False" ToolTip.Tip="语音输入尚未接入"><icons:AppIcon Kind="Mic" /></Button>
+            <TextBox x:Name="ConversationInput" Classes="conversation" Text="{Binding Chat.Draft}" Watermark="说说你此刻的想法…" IsEnabled="{Binding Chat.CanEditDraft}" MaxLength="4000" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="96" KeyDown="ComposerKeyDown" BorderThickness="0" Background="Transparent" FontSize="16" VerticalAlignment="Center" />
+            <Button x:Name="VoiceHoldButton" Grid.Column="1" Classes="quiet" IsEnabled="{Binding Voice.CanUseRecordButton}" ToolTip.Tip="{Binding Voice.RecordHint}" AutomationProperties.Name="按住说话，松开发送">
+              <StackPanel Orientation="Horizontal" Spacing="6"><icons:AppIcon Kind="Mic" Width="20" Height="20" /><TextBlock Text="{Binding Voice.RecordLabel}" VerticalAlignment="Center" /></StackPanel>
+            </Button>
             <Button x:Name="SendChatButton" Grid.Column="2" Classes="round primary" Command="{Binding Chat.SendCommand}" ToolTip.Tip="发送 · Enter（Shift+Enter 换行）"><icons:AppIcon Kind="Send" Stroke="White" /></Button>
           </Grid>
         </Border>
@@ -60,6 +62,11 @@
           <TextBlock Grid.Column="1" Text="{Binding Chat.ConnectionStatus}" Classes="caption" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" />
         </Grid>
         <TextBlock Text="{Binding Chat.PrivacyHint}" Classes="caption" TextWrapping="Wrap" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+          <CheckBox Content="朗读回复" IsChecked="{Binding Chat.ReadReplies}" IsEnabled="{Binding Voice.CanSpeak}" />
+          <Button x:Name="StopVoiceButton" Grid.Column="1" Content="停止语音" Command="{Binding Voice.StopCommand}" IsVisible="{Binding Voice.CanStop}" Classes="quiet" />
+        </Grid>
+        <TextBlock Text="{Binding Voice.Status}" Classes="caption" TextWrapping="Wrap" />
       </StackPanel>
     </Grid>
     <Border Grid.Column="1" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1,0,0,0">
@@ -91,7 +98,7 @@
             <Button Content="管理视觉设备 →" Command="{Binding NavigateCommand}" CommandParameter="1" Classes="textlink" HorizontalAlignment="Left" />
           </StackPanel>
           <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
-          <TextBlock Text="麦克风与音响尚未接入" Classes="caption" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Voice.InputDescription}" Classes="caption" TextWrapping="Wrap" />
         </StackPanel>
       </ScrollViewer>
     </Border>

@@ -33,6 +33,7 @@ public sealed partial class App : Application
                 window.ViewModel.TargetIndex = 1;
                 window.Opened += async (_, _) => await window.ViewModel.RefreshCamerasAsync();
                 window.Opened += async (_, _) => await window.Shell.Chat.ConnectAsync();
+                window.Opened += async (_, _) => await window.Shell.Voice.InitializeAsync();
             }
             if (desktop.Args?.Contains("--smoke-test-ui", StringComparer.Ordinal) == true)
                 window.Opened += async (_, _) =>

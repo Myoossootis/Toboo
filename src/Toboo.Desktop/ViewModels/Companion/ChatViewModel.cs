@@ -33,6 +33,8 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
     private long? replyCompletedAt;
     private int before;
     public event Action<bool>? Updated;
+    public event Action<string>? ReplyCompleted;
+    public event Action? ConversationChanged;
     public ObservableCollection<ChatMessageItem> Messages { get; } = [];
     public ObservableCollection<ChatModelChoice> Models { get; } = [];
     public ObservableCollection<ChatSessionChoice> Sessions { get; } = [];
@@ -45,30 +47,33 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool isStopping;
     [ObservableProperty] private bool hasMore;
     [ObservableProperty] private bool includeExpression;
+    [ObservableProperty] private bool readReplies = true;
+    [ObservableProperty] private bool voiceInputActive;
     [ObservableProperty] private int styleIndex;
     [ObservableProperty] private ChatModelChoice? selectedModel;
     [ObservableProperty] private ChatSessionChoice? selectedSession;
     public bool HasMessages => Messages.Count > 0;
     public bool HasError => Error.Length > 0;
     public bool HasPending => state.Pending is not null;
-    public bool CanConnect => !IsBusy && !closing;
-    public bool CanSend => IsConnected && !IsBusy && !RemoteRunning && !HasPending && !closing && SelectedModel is not null && Draft.Trim().Length > 0 && Draft.Length <= 4000;
-    public bool CanRetry => IsConnected && HasPending && !IsBusy && !closing;
+    public bool CanConnect => !IsBusy && !closing && !VoiceInputActive;
+    public bool CanSend => IsConnected && !IsBusy && !RemoteRunning && !HasPending && !closing && !VoiceInputActive && SelectedModel is not null && Draft.Trim().Length > 0 && Draft.Length <= 4000;
+    public bool CanEditDraft => IsConnected && !VoiceInputActive;
+    public bool CanRetry => IsConnected && HasPending && !IsBusy && !closing && !VoiceInputActive;
     public bool CanStop => !IsStopping && !closing && sessionId is not null && currentRequestId is not null && (RemoteRunning || HasPending || IsBusy);
-    public bool CanChoose => IsConnected && !IsBusy && !RemoteRunning && !HasPending && !closing;
+    public bool CanChoose => IsConnected && !IsBusy && !RemoteRunning && !HasPending && !closing && !VoiceInputActive;
     public bool CanOpen => CanChoose && SelectedSession is not null;
     public bool CanLoadOlder => CanChoose && HasMore;
     public string SessionTitle => sessionId is null ? "新对话" : Sessions.FirstOrDefault(s => s.Id == sessionId)?.Title ?? "toboo 独立会话";
     public string PrivacyHint => IncludeExpression ? "发送文字和有效表情摘要 · 不发送画面" : "仅发送文字 · 历史保存在本机独立目录";
     private string Style => StyleIndex switch { 1 => "gentle", 2 => "concise", _ => "natural" };
 
-    internal LcdRole? CaptureLcdRole()
+    internal LcdRole? CaptureLcdRole(bool animateTextReply = true)
     {
         if (IsConnected && RemoteRunning)
-            return currentRequestId is { } id && turns.TryGetValue(id, out var turn)
+            return animateTextReply && currentRequestId is { } id && turns.TryGetValue(id, out var turn)
                 && turn.State == "running" && !string.IsNullOrWhiteSpace(turn.Reply)
                 ? LcdRole.Responding : LcdRole.Thinking;
-        if (IsConnected && replyCompletedAt is { } completed)
+        if (animateTextReply && IsConnected && replyCompletedAt is { } completed)
         {
             var elapsed = Stopwatch.GetElapsedTime(completed).TotalMilliseconds;
             if (elapsed < 760) return LcdRole.Responding;
@@ -86,6 +91,8 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
     partial void OnDraftChanged(string value) => RefreshCommands();
     partial void OnErrorChanged(string value) => OnPropertyChanged(nameof(HasError));
     partial void OnIsConnectedChanged(bool value) => RefreshCommands();
+    partial void OnVoiceInputActiveChanged(bool value) => RefreshCommands();
+    partial void OnReadRepliesChanged(bool value) => SavePreferences();
     partial void OnIsBusyChanged(bool value) => RefreshCommands();
     partial void OnRemoteRunningChanged(bool value) => RefreshCommands();
     partial void OnIsStoppingChanged(bool value) => RefreshCommands();
@@ -96,14 +103,14 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
     partial void OnStyleIndexChanged(int value) => SavePreferences();
     private void RefreshCommands()
     {
-        foreach (var name in new[] { nameof(CanConnect), nameof(CanSend), nameof(CanRetry), nameof(CanStop), nameof(CanChoose), nameof(CanOpen), nameof(CanLoadOlder), nameof(HasPending), nameof(SessionTitle) }) OnPropertyChanged(name);
+        foreach (var name in new[] { nameof(CanConnect), nameof(CanSend), nameof(CanEditDraft), nameof(CanRetry), nameof(CanStop), nameof(CanChoose), nameof(CanOpen), nameof(CanLoadOlder), nameof(HasPending), nameof(SessionTitle) }) OnPropertyChanged(name);
         ConnectCommand.NotifyCanExecuteChanged(); SendCommand.NotifyCanExecuteChanged(); RetryCommand.NotifyCanExecuteChanged();
         StopCommand.NotifyCanExecuteChanged(); NewChatCommand.NotifyCanExecuteChanged(); OpenSessionCommand.NotifyCanExecuteChanged(); LoadOlderCommand.NotifyCanExecuteChanged();
     }
     private void SavePreferences()
     {
         if (!stateLoaded || loadingPreferences || disposed) return;
-        try { Persist(state with { Provider = SelectedModel?.Provider ?? state.Provider, Model = SelectedModel?.Model ?? state.Model, Style = Style, IncludeExpression = IncludeExpression }); }
+        try { Persist(state with { Provider = SelectedModel?.Provider ?? state.Provider, Model = SelectedModel?.Model ?? state.Model, Style = Style, IncludeExpression = IncludeExpression, ReadReplies = ReadReplies }); }
         catch (ChatConnectionException error) { Error = error.Message; IsConnected = false; }
     }
     private void Persist(ChatClientState value) { store.Save(value); state = value; RefreshCommands(); }
@@ -124,7 +131,7 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
                 store.AcquireWriter();
                 state = store.Load(); stateLoaded = true; sessionId = state.SessionId;
                 loadingPreferences = true;
-                try { IncludeExpression = state.IncludeExpression; StyleIndex = state.Style switch { "gentle" => 1, "concise" => 2, _ => 0 }; Draft = state.Pending?.Text ?? Draft; }
+                try { IncludeExpression = state.IncludeExpression; ReadReplies = state.ReadReplies; StyleIndex = state.Style switch { "gentle" => 1, "concise" => 2, _ => 0 }; Draft = state.Pending?.Text ?? Draft; }
                 finally { loadingPreferences = false; }
                 currentRequestId = state.Pending?.RequestId;
             }
@@ -223,11 +230,15 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
         revision = view.Revision; HasMore = before > 0;
         for (var i = 0; i < view.Turns.Length; i++) { var turn = view.Turns[i]; turns[turn.RequestId] = turn; turnOrder[turn.RequestId] = view.Before + i; }
         var active = view.Turns.LastOrDefault(t => t.State is "running" or "cancelling");
+        string? completedReply = null;
         if (reset) replyCompletedAt = null;
         else if (active is null && RemoteRunning && currentRequestId is { } requestId
             && turns.TryGetValue(requestId, out var finished) && finished.State is "completed" or "truncated"
             && !string.IsNullOrWhiteSpace(finished.Reply))
+        {
             replyCompletedAt = Stopwatch.GetTimestamp();
+            completedReply = finished.Reply;
+        }
         RemoteRunning = active is not null; currentRequestId = active?.RequestId ?? state.Pending?.RequestId;
         if (state.Pending is { } pending && turns.TryGetValue(pending.RequestId, out var admitted))
         {
@@ -238,6 +249,7 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
             currentRequestId = active?.RequestId;
         }
         RenderMessages();
+        if (completedReply is not null) ReplyCompleted?.Invoke(completedReply);
     }
     private void RenderMessages()
     {
@@ -277,6 +289,7 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
         {
             Persist(state with { SessionId = null }); sessionId = null; currentRequestId = null; revision = -1;
             replyCompletedAt = null;
+            ConversationChanged?.Invoke();
             turns.Clear(); turnOrder.Clear(); Messages.Clear(); HasMore = false; Error = ""; SelectedSession = null;
             OnPropertyChanged(nameof(HasMessages)); RefreshCommands();
         }
@@ -287,7 +300,7 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
     {
         if (!CanOpen) return;
         IsBusy = true; Error = "";
-        try { sessionId = SelectedSession!.Id; Persist(state with { SessionId = sessionId }); await RefreshAsync(reset: true); }
+        try { ConversationChanged?.Invoke(); sessionId = SelectedSession!.Id; Persist(state with { SessionId = sessionId }); await RefreshAsync(reset: true); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception error) { Failed(error); }
         finally { IsBusy = false; }
@@ -324,6 +337,6 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
     {
         if (disposed) return;
         disposed = true; closing = true; timer.Stop(); timer.Tick -= Tick;
-        lifetime.Cancel(); client.Dispose(); store.Dispose(); lifetime.Dispose(); Updated = null;
+        lifetime.Cancel(); client.Dispose(); store.Dispose(); lifetime.Dispose(); Updated = null; ReplyCompleted = null; ConversationChanged = null;
     }
 }

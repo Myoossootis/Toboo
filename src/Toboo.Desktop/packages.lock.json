@@ -50,6 +50,12 @@
           "runtime.native.System.IO.Ports": "8.0.0"
         }
       },
+      "System.Speech": {
+        "type": "Direct",
+        "requested": "[8.0.0, )",
+        "resolved": "8.0.0",
+        "contentHash": "CNuiA6vb95Oe5PRjClZEBiaju31vwB8OIeCgeSBXyZL6+MS4RVVB2X/C11z0xCkooHE3Vy91nM2z76emIzR+sg=="
+      },
       "Avalonia.Angle.Windows.Natives": {
         "type": "Transitive",
         "resolved": "2.1.25547.20250602",
@@ -261,8 +267,8 @@
       "toboo.runtime": {
         "type": "Project",
         "dependencies": {
-          "Toboo.Core": "[0.2.1, )",
-          "Toboo.Vision": "[0.2.1, )"
+          "Toboo.Core": "[0.2.2, )",
+          "Toboo.Vision": "[0.2.2, )"
         }
       },
       "toboo.vision": {
@@ -270,7 +276,7 @@
         "dependencies": {
           "OpenCvSharp4": "[4.10.0.20240616, )",
           "OpenCvSharp4.runtime.win": "[4.10.0.20240616, )",
-          "Toboo.Core": "[0.2.1, )"
+          "Toboo.Core": "[0.2.2, )"
         }
       }
     },
@@ -283,6 +289,12 @@
         "dependencies": {
           "runtime.native.System.IO.Ports": "8.0.0"
         }
+      },
+      "System.Speech": {
+        "type": "Direct",
+        "requested": "[8.0.0, )",
+        "resolved": "8.0.0",
+        "contentHash": "CNuiA6vb95Oe5PRjClZEBiaju31vwB8OIeCgeSBXyZL6+MS4RVVB2X/C11z0xCkooHE3Vy91nM2z76emIzR+sg=="
       },
       "Avalonia.Angle.Windows.Natives": {
         "type": "Transitive",

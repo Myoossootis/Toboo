@@ -18,6 +18,6 @@
       <ComboBox x:Name="ChatSessionSelector" ItemsSource="{Binding Chat.Sessions}" SelectedItem="{Binding Chat.SelectedSession}" IsEnabled="{Binding Chat.CanChoose}" PlaceholderText="选择本机独立历史会话" />
       <StackPanel Orientation="Horizontal" Spacing="12"><Button Content="打开对话" Command="{Binding Chat.OpenSessionCommand}" Classes="quiet" /><Button Content="新建对话" Command="{Binding Chat.NewChatCommand}" Classes="quiet" /></StackPanel>
     </StackPanel>
-    <TextBlock Text="本机独立保存聊天记录和发送标识；不读取 Trilium 或 Harness 的其他会话。语音输入与回复尚未接入。" Classes="caption" TextWrapping="Wrap" LineHeight="20" />
+    <TextBlock Text="本机独立保存聊天记录、发送标识与朗读偏好。按住说话，松开后发送识别文字。" Classes="caption" TextWrapping="Wrap" LineHeight="20" />
   </StackPanel>
 </UserControl>

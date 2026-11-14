@@ -14,15 +14,16 @@ public sealed partial class MainWindow : Window
     public MainViewModel ViewModel { get; }
     public CompanionShellViewModel Shell { get; }
     public MainWindow() : this(new MainViewModel()) { }
-    public MainWindow(MainViewModel viewModel, ChatViewModel? chat = null)
+    public MainWindow(MainViewModel viewModel, ChatViewModel? chat = null, VoiceViewModel? voice = null)
     {
         ViewModel = viewModel;
-        Shell = new(viewModel, chat);
+        Shell = new(viewModel, chat, voice);
         InitializeComponent();
         DataContext = Shell;
         Shell.AdvancedRequested += ShowAdvanced;
         Shell.SensorsRequested += ShowSensors;
         viewModel.FramePresented += RefreshPreview;
+        Deactivated += (_, _) => { if (Shell.Voice.IsListening) Shell.Voice.Stop(); };
         SizeChanged += (_, _) => ApplyLayout();
         ApplyLayout();
     }
@@ -69,6 +70,7 @@ public sealed partial class MainWindow : Window
     protected override async void OnClosing(WindowClosingEventArgs args)
     {
         base.OnClosing(args);
+        Shell.Voice.Stop();
         if (closing) return;
         if (ViewModel.Servo.Busy && !ViewModel.IsFollowing) { args.Cancel = true; return; }
         if (ViewModel.IsRunning || Shell.Chat.RemoteRunning || Shell.Chat.HasPending || Shell.Chat.IsBusy)

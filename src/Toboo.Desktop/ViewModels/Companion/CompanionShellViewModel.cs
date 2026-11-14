@@ -10,6 +10,7 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
 {
     public MainViewModel Tracking { get; }
     public ChatViewModel Chat { get; }
+    public VoiceViewModel Voice { get; }
     public event Action<int>? AdvancedRequested;
     public event Action? SensorsRequested;
     [ObservableProperty]
@@ -41,7 +42,8 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     public bool IsDevicesPage => PageIndex == 1;
     public bool IsSettingsPage => PageIndex == 2;
     public string PageTitle => PageIndex switch { 1 => "设备", 2 => "设置", _ => "陪伴" };
-    public string RobotDetail => Chat.RemoteRunning ? "正在认真组织回复" : Tracking.IsRunning ? Tracking.IsFace && Tracking.ExpressionEnabled
+    public string RobotDetail => Voice.IsListening ? "正在听你说话" : Voice.IsSpeaking ? "正在读给你听"
+        : Chat.RemoteRunning ? "正在认真组织回复" : Tracking.IsRunning ? Tracking.IsFace && Tracking.ExpressionEnabled
         ? "正在观察可见的表情线索" : "正在预览" + Tracking.SourceLabel : "准备好了，随时开始";
     public string CameraState => Tracking.IsRunning ? Tracking.SourceLabel + " · 运行中"
         : Tracking.SelectedCamera is null ? "未开启 · 请选择摄像头" : "已发现 · 未开启";
@@ -67,11 +69,13 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
         : Tracking.SelectedCamera is null ? "5 · 选择 USB 摄像头；可先预览，再直接切换到跟随。"
         : "已就绪。预览可直接切换到跟随，保存的校准无需每次重做。";
 
-    public CompanionShellViewModel(MainViewModel tracking, ChatViewModel? chat = null)
+    public CompanionShellViewModel(MainViewModel tracking, ChatViewModel? chat = null, VoiceViewModel? voice = null)
     {
         Tracking = tracking;
         Chat = chat ?? new(expression: tracking.CaptureExpressionCue);
-        tracking.Lcd.CaptureChatRole = Chat.CaptureLcdRole;
+        Voice = voice ?? new(Chat);
+        tracking.Lcd.CaptureChatRole = () => Voice.CaptureLcdRole() ?? Chat.CaptureLcdRole(!Chat.ReadReplies || !Voice.CanSpeak);
+        Voice.PropertyChanged += VoiceChanged;
         Chat.PropertyChanged += ChatChanged;
         tracking.PropertyChanged += Changed;
         tracking.Servo.PropertyChanged += Changed;
@@ -123,6 +127,11 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
         if (args.PropertyName == nameof(ChatViewModel.RemoteRunning))
             OnPropertyChanged(nameof(RobotDetail));
     }
+    private void VoiceChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName is nameof(VoiceViewModel.IsListening) or nameof(VoiceViewModel.IsSpeaking))
+            OnPropertyChanged(nameof(RobotDetail));
+    }
     private void RefreshStatus()
     {
         OnPropertyChanged(nameof(RobotDetail));
@@ -137,6 +146,7 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     }
     public void Dispose()
     {
+        Voice.PropertyChanged -= VoiceChanged; Voice.Dispose();
         Tracking.Lcd.CaptureChatRole = null;
         Tracking.PropertyChanged -= Changed;
         Tracking.Servo.PropertyChanged -= Changed;
