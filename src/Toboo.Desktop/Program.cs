@@ -12,11 +12,18 @@ internal static class Program
         {
             if (args.Contains("--self-test", StringComparer.Ordinal)) { Diagnostics.SelfTest(); return 0; }
             if (args.Contains("--speech-self-test", StringComparer.Ordinal)) { Diagnostics.SpeechSelfTestAsync().GetAwaiter().GetResult(); return 0; }
+            var audioFile = Array.IndexOf(args, "--recognize-audio");
+            if (audioFile >= 0)
+            {
+                if (audioFile + 1 >= args.Length) throw new ArgumentException("--recognize-audio requires a local 16kHz PCM WAV file.");
+                Diagnostics.RecognizeAudioAsync(args[audioFile + 1]).GetAwaiter().GetResult(); return 0;
+            }
             if (args.Contains("--mic-self-test", StringComparer.Ordinal))
             {
                 var port = Array.IndexOf(args, "--mic-port");
                 if (port < 0 || port + 1 >= args.Length) throw new ArgumentException("--mic-self-test requires --mic-port COMx.");
-                Diagnostics.MicSelfTestAsync(args[port + 1]).GetAwaiter().GetResult(); return 0;
+                Diagnostics.MicSelfTestAsync(args[port + 1], args.Contains("--recognize", StringComparer.Ordinal),
+                    args.Contains("--save-audio", StringComparer.Ordinal)).GetAwaiter().GetResult(); return 0;
             }
             if (args.Contains("--chat-self-test", StringComparer.Ordinal)) { Diagnostics.ChatSelfTestAsync().GetAwaiter().GetResult(); return 0; }
             if (args.Contains("--serial-runtime-self-test", StringComparer.Ordinal))

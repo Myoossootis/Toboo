@@ -19,6 +19,7 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     private long listenStarted, lastWord;
     private long? repliedAt;
     private bool disposed;
+    private SpeechCapabilities? capabilities;
     [ObservableProperty] private bool initializing;
     [ObservableProperty] private bool canListen;
     [ObservableProperty] private bool canSpeak;
@@ -58,7 +59,8 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     partial void OnMicrophoneSourceIndexChanged(int value)
     {
         OnPropertyChanged(nameof(IsI2sMicrophone));
-        InputDescription = IsI2sMicrophone ? "ICS43432 · 选择 ESP32-S3 串口" : "中文识别 · 系统默认麦克风";
+        ApplyInputCapabilities();
+        Status = CanListen ? "按住说话，松开发送" : InputDescription;
         Refresh();
     }
     partial void OnMicrophonePortChanged(string? value) => Refresh();
@@ -82,12 +84,11 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
         Initializing = true;
         try
         {
-            var capabilities = speech is null
-                ? new SpeechCapabilities(false, false, "本机语音需要 Windows", "本机语音需要 Windows")
+            capabilities = speech is null
+                ? new SpeechCapabilities(false, false, "本机语音需要 Windows", "本机语音需要 Windows", false, "本机语音需要 Windows")
                 : await speech.InspectAsync(CancellationToken.None);
             if (disposed) return;
-            CanListen = capabilities.CanListen; CanSpeak = capabilities.CanSpeak;
-            InputDescription = IsI2sMicrophone ? "ICS43432 · ESP32-S3 I²S 采音" : capabilities.Input;
+            ApplyInputCapabilities(); CanSpeak = capabilities.CanSpeak;
             OutputDescription = capabilities.Output;
             Status = CanListen ? "按住说话，松开发送" : InputDescription;
         }
@@ -101,6 +102,14 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
             }
         }
         finally { Initializing = false; Refresh(); }
+    }
+
+    private void ApplyInputCapabilities()
+    {
+        CanListen = capabilities is not null && (IsI2sMicrophone ? capabilities.CanRecognizePcm : capabilities.CanListen);
+        InputDescription = IsI2sMicrophone
+            ? capabilities?.PcmInput ?? "ICS43432 · 选择 ESP32-S3 串口"
+            : capabilities?.Input ?? "中文识别 · 系统默认麦克风";
     }
 
     public Task BeginListeningAsync()
@@ -161,7 +170,7 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
         catch (OperationCanceledException) { if (!disposed) Status = "本次语音已取消"; }
         catch (Exception error)
         {
-            if (!disposed) Status = (IsI2sMicrophone ? "ICS43432 采音失败，请检查串口、合并固件和接线。" : "语音输入失败，请检查默认麦克风和中文识别组件。") + " " + error.Message;
+            if (!disposed) Status = (IsI2sMicrophone ? "模块语音输入失败。" : "语音输入失败，请检查默认麦克风和中文识别组件。") + " " + error.Message;
         }
         finally
         {
@@ -182,7 +191,7 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
         {
             if (IsI2sMicrophone) microphone.Finish();
             else speech.FinishListening();
-            input?.CancelAfter(TimeSpan.FromSeconds(IsI2sMicrophone ? 20 : 8));
+            input?.CancelAfter(TimeSpan.FromSeconds(IsI2sMicrophone ? 45 : 8));
         }
         catch (Exception) { Stop(); Status = "无法结束语音识别，请重试。"; }
     }

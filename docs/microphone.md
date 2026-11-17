@@ -40,7 +40,9 @@ $settings = Get-Content firmware/toolchain.json -Raw | ConvertFrom-Json
 
 ## 使用
 
-在「设备 → 语音」选择 `ICS43432 · ESP32-S3`，选择该板的串口。云台与麦克风可以选择相同串口。陪伴页按住说话，松开后采集数据会交给本地中文引擎识别，并发送给当前对话。音量条按对数刻度显示相对峰值，便于观察较轻的声音；识别前会去除直流偏移并做有上限的增益调整。
+在「设备 → 语音」选择 `ICS43432 · ESP32-S3`，选择该板的串口。云台与麦克风可以选择相同串口。陪伴页按住说话，看到“正在听”后开口，松开后由本地 Whisper base 模型转为中文，并发送给当前对话。模块识别不依赖 Windows 中文听写语言包；电脑默认麦克风仍使用 Windows 识别。音量条按对数刻度显示相对峰值，便于观察较轻的声音；识别前会去除直流偏移并做有上限的增益调整。
+
+便携包附带约 142 MiB 的识别模型及不到 1 MiB 的 Silero VAD 人声检测模型。先检测人声片段，再转写；未检测到人声或转写片段不确定时，不发送对话。源码运行前执行 `./scripts/prepare-speech-model.ps1`，下载固定模型并校验大小及 SHA256。权重留在本地忽略目录，模型来源见 `models/speech/model.json`，许可证见 `licenses/Whisper-MIT.txt` 和 `licenses/Silero-VAD-MIT.txt`。本机 CPU 需支持 AVX2、FMA 与 F16C。依赖的上游原生运行库要求 Windows 11 / Windows Server 2022 或更新系统；较旧系统需要自行验证兼容性。
 
 按 Esc 或停止语音会丢弃本次识别。采音最长 30 秒，CRC、序号、结束标记或设备连接异常时本次语音会失败。待机时只保留本地串口连接；原始音频在内存中处理。
 
@@ -49,6 +51,10 @@ $settings = Get-Content firmware/toolchain.json -Raw | ConvertFrom-Json
 ```powershell
 ./toboo.exe --mic-self-test --mic-port COM6
 ```
+
+该自检同时通过共享串口读取云台状态。需要核对真人语音识别时，可加 `--recognize`，开始后对模块说话约八秒，诊断会附带识别文字、片段概率和无语音概率。没有有效识别时自检返回失败。
+
+只有显式加 `--save-audio` 才会在本机诊断目录保存 `mic-debug.wav`。可以用 `./toboo.exe --recognize-audio <录音路径>` 离线复查 16kHz / 16 位单声道 WAV，不会打开麦克风、连接聊天模型或控制云台。测试录音及个人识别文字不应提交到公共仓库。
 
 ## 串口格式
 

@@ -21,6 +21,8 @@ dotnet build Toboo.sln -c Release --no-restore
 
 `TOBOO_HARNESS_TEST_SESSION` 指定预先创建的测试会话时，启用真实桥只读集成测试。测试会话应使用专门的合成对话，避免触碰个人会话。真实模型调用的完整验证脚本为 `scripts/test-toboo-harness.ps1`，会发送测试文本并消耗模型额度；不属于默认验证。
 
+执行 `scripts/prepare-speech-model.ps1` 后，`TOBOO_SPEECH_TEST_PCM` 可指定忽略目录中的 16kHz / 16 位单声道原始人声 PCM，启用原生 Whisper 识别中途取消及再次识别检查。音频需短于 31 秒，只在本机处理；未提供时明确跳过。模型准备脚本优先使用上游地址，下载不可用时尝试镜像，所有来源均须通过相同的固定哈希校验。
+
 无界面 CLI 示例：
 
 ```powershell

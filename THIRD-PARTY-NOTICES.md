@@ -9,6 +9,9 @@ The source project's publication does not grant an additional license to third-p
 | .NET runtime 8.0.33 | MIT and third-party notices; `LICENSE.txt`, `THIRD-PARTY-NOTICES.txt` in the runtime distribution; https://github.com/dotnet/runtime |
 | System.IO.Ports 8.0.0 | MIT; https://github.com/dotnet/runtime/tree/v8.0.0/src/libraries/System.IO.Ports |
 | System.Speech 8.0.0 | MIT; https://github.com/dotnet/runtime/tree/v8.0.0/src/libraries/System.Speech |
+| Whisper.net / Whisper.net.Runtime 1.9.1 | MIT and bundled native third-party terms; https://github.com/sandrohanea/whisper.net |
+| Whisper base multilingual GGML model | MIT, `licenses/Whisper-MIT.txt`; https://github.com/openai/whisper and https://github.com/ggml-org/whisper.cpp; fixed hash and download sources in `models/speech/model.json` |
+| Silero VAD 5.1.2 GGML model | MIT, `licenses/Silero-VAD-MIT.txt`; https://github.com/snakers4/silero-vad and https://huggingface.co/ggml-org/whisper-vad |
 | CPython 3.14.10 embeddable (Windows x64) | PSF and bundled third-party terms; `runtime/python/LICENSE.txt`, `licenses/Python-PSF.txt`; https://www.python.org/downloads/release/python-31410/ |
 | pyserial 3.5 | BSD; `licenses/pyserial-BSD.txt`; https://pypi.org/project/pyserial/3.5/ |
 | Avalonia 11.3.22 | MIT; https://github.com/AvaloniaUI/Avalonia |

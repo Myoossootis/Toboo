@@ -6,7 +6,8 @@ using System.Text;
 
 namespace Toboo.Desktop.Services;
 
-internal sealed record SpeechCapabilities(bool CanListen, bool CanSpeak, string Input, string Output);
+internal sealed record SpeechCapabilities(bool CanListen, bool CanSpeak, string Input, string Output,
+    bool CanRecognizePcm, string PcmInput);
 
 internal interface ISpeechService
 {
@@ -31,14 +32,16 @@ internal sealed class WindowsSpeechService : ISpeechService
         var voice = ChineseVoice(synth);
         return new SpeechCapabilities(recognizer is not null, voice is not null,
             recognizer is null ? "请在 Windows 添加中文语音识别语言包" : "中文识别 · 系统默认麦克风",
-            voice is null ? "请在 Windows 添加中文朗读声音" : voice.VoiceInfo.Name + " · 系统默认音频输出");
+            voice is null ? "请在 Windows 添加中文朗读声音" : voice.VoiceInfo.Name + " · 系统默认音频输出",
+            WhisperPcmRecognizer.UnavailableReason is null,
+            WhisperPcmRecognizer.UnavailableReason ?? "ICS43432 · Whisper 本地中文识别");
     }, cancellation);
 
     public Task<string> ListenAsync(Action started, CancellationToken cancellation)
         => RecognizeAsync(started, cancellation, null);
 
     public Task<string> RecognizePcmAsync(byte[] pcm, CancellationToken cancellation)
-        => RecognizeAsync(() => { }, cancellation, pcm);
+        => WhisperPcmRecognizer.RecognizeAsync(pcm, cancellation);
 
     private Task<string> RecognizeAsync(Action started, CancellationToken cancellation, byte[]? pcm)
     {

@@ -19,6 +19,7 @@ try {
         throw 'Publish from a clean commit or an isolated clean worktree.'
     }
     & "$PSScriptRoot/verify-public-tree.ps1"
+    & "$PSScriptRoot/prepare-speech-model.ps1"
     & "$PSScriptRoot/prepare-vc-runtime.ps1"
     $serialRuntime = & "$PSScriptRoot/prepare-serial-runtime.ps1"
     & dotnet publish src/Toboo.Desktop -c Release -r win-x64 --self-contained true -p:RestoreLockedMode=true `
@@ -90,9 +91,10 @@ try {
         hardwareOutput = 'disabled'; physicalCameraVerified = $false;
         serialRuntime = (Get-Content config/serial-runtime.json -Raw | ConvertFrom-Json)
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputPath 'build-info.json') -Encoding UTF8
-    foreach ($required in @('toboo.exe', 'coreclr.dll', 'OpenCvSharpExtern.dll', 'libSkiaSharp.dll', 'vcruntime140.dll', 'msvcp140.dll', 'models/face/face_detection_yunet_2023mar.onnx', 'models/expression/facial_expression_recognition_mobilefacenet_2022july.onnx', 'scripts/install-toboo-harness.ps1', 'integrations/toboo-harness/index.mjs')) {
+    foreach ($required in @('toboo.exe', 'coreclr.dll', 'OpenCvSharpExtern.dll', 'libSkiaSharp.dll', 'vcruntime140.dll', 'msvcp140.dll', 'models/face/face_detection_yunet_2023mar.onnx', 'models/expression/facial_expression_recognition_mobilefacenet_2022july.onnx', 'models/speech/ggml-base.bin', 'runtimes/win-x64/whisper.dll', 'scripts/install-toboo-harness.ps1', 'integrations/toboo-harness/index.mjs')) {
         if (!(Test-Path -LiteralPath (Join-Path $outputPath $required))) { throw "Missing portable dependency: $required" }
     }
+    if (!(Test-Path -LiteralPath (Join-Path $outputPath 'models/speech/ggml-silero-v5.1.2.bin'))) { throw 'Missing portable speech detector.' }
     if (Get-ChildItem -LiteralPath (Join-Path $outputPath 'models') -Filter '*.onnx' -Recurse | Where-Object { $_.Directory.Name -eq 'drone' }) { throw 'Experimental drone weights must not be bundled.' }
     [IO.Compression.ZipFile]::CreateFromDirectory($outputPath, $zipPath, [IO.Compression.CompressionLevel]::Optimal, $true)
     $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()

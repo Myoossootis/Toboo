@@ -24,6 +24,8 @@ __pycache__/
 /references/
 /课程资料/
 /models/drone/
+/models/speech/*.bin
+/models/speech/*.part
 
 # Generated experiment data, recordings, calibration and printable markers
 /artifacts/

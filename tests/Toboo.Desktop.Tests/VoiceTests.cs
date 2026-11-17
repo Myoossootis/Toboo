@@ -15,7 +15,7 @@ public sealed class VoiceTests
 {
     private sealed class Speech : ISpeechService
     {
-        public SpeechCapabilities Capabilities = new(true, true, "中文识别", "中文朗读");
+        public SpeechCapabilities Capabilities = new(true, true, "中文识别", "中文朗读", true, "ICS43432 · 本地中文识别");
         public TaskCompletionSource<string> Transcript = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Playback = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public List<string> Spoken = [];
@@ -58,6 +58,34 @@ public sealed class VoiceTests
             for (var i = 0; i < pcm.Length; i += 4) pcm[i] = 100;
             data.SetResult(pcm);
         }
+    }
+
+    [AvaloniaFact]
+    public async Task ModuleRecognitionDoesNotRequireAWindowsDictationLanguagePack()
+    {
+        using var chat = Chat(new TobooChatTests.FakeClient());
+        var speech = new Speech { Capabilities = new(false, true, "未安装系统识别", "中文朗读", true, "Whisper 本地中文识别") };
+        using var voice = new VoiceViewModel(chat, speech);
+        await chat.ConnectAsync(); await voice.InitializeAsync();
+        Assert.False(voice.CanListen);
+        voice.MicrophoneSourceIndex = 1; voice.MicrophonePort = "COM-test";
+        Assert.True(voice.CanRecord);
+        Assert.Contains("Whisper", voice.InputDescription);
+        voice.MicrophoneSourceIndex = 0;
+        Assert.False(voice.CanRecord);
+    }
+
+    [AvaloniaFact]
+    public async Task MissingModuleModelDoesNotDisableComputerMicrophone()
+    {
+        using var chat = Chat(new TobooChatTests.FakeClient());
+        var speech = new Speech { Capabilities = new(true, true, "中文识别", "中文朗读", false, "缺少识别模型") };
+        using var voice = new VoiceViewModel(chat, speech);
+        await chat.ConnectAsync(); await voice.InitializeAsync();
+        Assert.True(voice.CanRecord);
+        voice.MicrophoneSourceIndex = 1; voice.MicrophonePort = "COM-test";
+        Assert.False(voice.CanRecord);
+        Assert.Contains("缺少识别模型", voice.RecordHint);
     }
 
     [AvaloniaFact]
@@ -197,7 +225,7 @@ public sealed class VoiceTests
     {
         var client = new TobooChatTests.FakeClient();
         using var chat = Chat(client);
-        using var voice = new VoiceViewModel(chat, new Speech { Capabilities = new(false, false, "请安装中文组件", "请安装中文声音") });
+        using var voice = new VoiceViewModel(chat, new Speech { Capabilities = new(false, false, "请安装中文组件", "请安装中文声音", false, "缺少识别模型") });
         await chat.ConnectAsync(); await voice.InitializeAsync();
         Assert.False(voice.CanRecord); Assert.False(voice.CanSpeak);
         chat.Draft = "仍然可以打字";

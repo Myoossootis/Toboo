@@ -9,33 +9,109 @@ namespace Toboo.Desktop.Services;
 
 internal static class Diagnostics
 {
-    public static async Task MicSelfTestAsync(string port)
+    public static async Task MicSelfTestAsync(string port, bool recognize = false, bool saveAudio = false)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(35));
         var mic = new I2sMicrophone();
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var recording = mic.RecordAsync(port, () => ready.TrySetResult(), _ => { }, timeout.Token);
         var stop = Task.Run(async () =>
         {
             await ready.Task.WaitAsync(timeout.Token);
-            await Task.Delay(3000, timeout.Token);
+            await Task.Delay(recognize ? 8000 : 3000, timeout.Token);
             mic.Finish();
         });
         try
         {
+            // Exercise the same shared USB route used by the UI, using read-only servo queries.
+            var previousProxy = ServoTool.SerialProxy;
+            ServoTool.Result servo;
+            try
+            {
+                ServoTool.SerialProxy = name => SharedEsp32.Get(name).Proxy;
+                if (await Task.WhenAny(ready.Task, recording) == recording && !ready.Task.IsCompleted)
+                    await recording;
+                await ready.Task.WaitAsync(timeout.Token);
+                servo = await ServoTool.RunAsync(["--port", port, "--action", "inspect"], timeout.Token);
+            }
+            finally { ServoTool.SerialProxy = previousProxy; }
+            if (servo.ExitCode != 0) throw new IOException("采音期间读取云台状态失败：" + servo.Error);
             var pcm = await recording;
-            Write("mic-self-test.json", new { success = pcm.Length >= 32000 && I2sMicrophone.Peak(pcm) > 0,
+            var peak = I2sMicrophone.Peak(pcm);
+            string? recognized = null;
+            var observations = new List<object>();
+            if (saveAudio)
+            {
+                Directory.CreateDirectory(DirectoryPath);
+                using var file = File.Create(Path.Combine(DirectoryPath, "mic-debug.wav"));
+                using var wav = new BinaryWriter(file);
+                wav.Write(System.Text.Encoding.ASCII.GetBytes("RIFF")); wav.Write(36 + pcm.Length);
+                wav.Write(System.Text.Encoding.ASCII.GetBytes("WAVEfmt ")); wav.Write(16);
+                wav.Write((short)1); wav.Write((short)1); wav.Write(16000); wav.Write(32000);
+                wav.Write((short)2); wav.Write((short)16);
+                wav.Write(System.Text.Encoding.ASCII.GetBytes("data")); wav.Write(pcm.Length); wav.Write(pcm);
+            }
+            if (recognize)
+            {
+                I2sMicrophone.Normalize(pcm);
+                recognized = await WhisperPcmRecognizer.RecognizeAsync(pcm, timeout.Token,
+                    (text, probability, noSpeech, accepted) => observations.Add(new { text, probability, noSpeech, accepted }));
+            }
+            Write("mic-self-test.json", new { success = pcm.Length >= 32000 && peak > 0 && (!recognize || !string.IsNullOrWhiteSpace(recognized)),
                 source = "actual-ics43432-usb", port, samples = pcm.Length / 2, sampleRate = 16000,
-                peak = I2sMicrophone.Peak(pcm), rawAudioSaved = false, modelRequestsSent = false, movementRequested = false });
+                peak, recognized, observations, recognitionEngine = recognize ? "whisper-base-local-zh" : null,
+                servoStatusReadDuringCapture = true,
+                rawAudioSaved = saveAudio, modelRequestsSent = false, movementRequested = false });
             if (pcm.Length < 32000 || I2sMicrophone.Peak(pcm) == 0)
                 throw new IOException("没有采到有效音频，请核对接线、声道和模块。");
+            if (recognize && string.IsNullOrWhiteSpace(recognized)) throw new IOException("采音成功，但没有识别出有效语音。");
         }
         finally
         {
             timeout.Cancel();
             try { await stop; } catch (OperationCanceledException) { }
+            try { await recording; } catch (Exception) { }
             SharedEsp32.CloseAll();
         }
+    }
+
+    public static async Task RecognizeAudioAsync(string path)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        using var file = File.OpenRead(path);
+        if (file.Length > 1024 * 1024) throw new InvalidDataException("诊断录音过长。");
+        using var reader = new BinaryReader(file);
+        if (reader.ReadUInt32() != 0x46464952 || reader.ReadUInt32() + 8 != file.Length || reader.ReadUInt32() != 0x45564157)
+            throw new InvalidDataException("需要 PCM WAV 录音。");
+        byte[]? pcm = null;
+        var format = false;
+        while (file.Position + 8 <= file.Length)
+        {
+            var tag = reader.ReadUInt32();
+            var length = reader.ReadUInt32();
+            var next = file.Position + length + (length & 1);
+            if (next > file.Length) throw new InvalidDataException("WAV 数据不完整。");
+            if (tag == 0x20746D66)
+            {
+                if (length < 16 || reader.ReadUInt16() != 1 || reader.ReadUInt16() != 1 || reader.ReadUInt32() != 16000
+                    || reader.ReadUInt32() != 32000 || reader.ReadUInt16() != 2 || reader.ReadUInt16() != 16)
+                    throw new InvalidDataException("需要 16kHz / 16 位 / 单声道 PCM WAV。");
+                format = true;
+            }
+            else if (tag == 0x61746164) pcm = reader.ReadBytes(checked((int)length));
+            file.Position = next;
+        }
+        if (!format || pcm is null) throw new InvalidDataException("WAV 缺少 PCM 数据。");
+        var peak = I2sMicrophone.Peak(pcm);
+        I2sMicrophone.Normalize(pcm);
+        var observations = new List<object>();
+        var clock = Stopwatch.StartNew();
+        var text = await WhisperPcmRecognizer.RecognizeAsync(pcm, timeout.Token,
+            (text, probability, noSpeech, accepted) => observations.Add(new { text, probability, noSpeech, accepted }));
+        Write("audio-recognition.json", new { success = !string.IsNullOrWhiteSpace(text),
+            source = "local-recorded-audio", engine = "whisper-base-local-zh", recognized = text,
+            peak, elapsedSeconds = clock.Elapsed.TotalSeconds, observations,
+            microphoneUsed = false, modelRequestsSent = false, movementRequested = false });
     }
 
     public static async Task SpeechSelfTestAsync()

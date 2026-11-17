@@ -19,6 +19,10 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
     <PackageReference Include="System.Speech" Version="8.0.0" />
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
+    <Content Include="../../models/speech/*" Link="models/speech/%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../config/tracker.json" Link="tracker.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../config/face-aim.json" Link="face-aim.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
