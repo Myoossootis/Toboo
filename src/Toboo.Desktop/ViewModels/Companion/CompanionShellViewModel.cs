@@ -34,10 +34,10 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
         ? Tracking.FaceAim.Status
         : Tracking.FaceAim.GeometryMode == 0 ? "还缺相机参数，请在高级设置中配置。"
         : !Tracking.FaceAim.DirectionsConfirmed ? "请先通过微调检查两轴方向。" : "保存后会复用这组设置，无需每次重做。";
-    public bool CanAdvanceSetup => CanPrepareRobot && !Tracking.Servo.Busy && (SetupStep switch
+    public bool CanAdvanceSetup => CanPrepareRobot && !Tracking.Servo.Busy && !Tracking.Servo.PanMotionBlocked && !Tracking.Servo.TiltMotionBlocked && (SetupStep switch
     {
         0 => Tracking.Servo.FirmwareReady && Tracking.Servo.Ready,
-        1 => Tracking.Servo.TiltCalibrationSaved && !Tracking.Servo.TiltCalibrating,
+        1 => !Tracking.Servo.PanMotionBlocked && Tracking.Servo.TiltCalibrationSaved && !Tracking.Servo.TiltCalibrating,
         _ => Tracking.FaceAim.GeometryMode > 0 && Tracking.FaceAim.DirectionsConfirmed
     });
     public bool IsCompanionPage => PageIndex == 0;
@@ -60,7 +60,8 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     public bool CanPrepareRobot => !Tracking.IsFollowing && !Tracking.IsChangingMode;
     public string FollowActionLabel => Tracking.IsChangingMode ? "正在切换…"
         : Tracking.IsRunning ? "从预览切换到跟随" : "开启实物跟随";
-    public string PreparationHint => Tracking.IsFollowing ? "跟随已开启，可随时停止；停止不会切断动力。"
+    public string PreparationHint => Tracking.Servo.PanMotionBlocked || Tracking.Servo.TiltMotionBlocked ? Tracking.Servo.MotionBlockReason
+        : Tracking.IsFollowing ? "跟随已开启，可随时停止；停止不会切断动力。"
         : Tracking.IsChangingMode ? "正在结束预览并检查跟随条件…"
         : !Tracking.Servo.FirmwareReady ? "1 · 选择 ESP32 串口，连接并读状态。"
         : !Tracking.Servo.Ready ? "2 · 确认 5V 供电与机构活动空间。"
@@ -120,7 +121,7 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
             or nameof(MainViewModel.ExpressionEnabled) or nameof(MainViewModel.HasError) or nameof(MainViewModel.HasServoNotice)
             or nameof(MainViewModel.IsChangingMode) or nameof(ServoViewModel.CanControl) or nameof(ServoViewModel.FirmwareReady)
             or nameof(ServoViewModel.CanFollow) or nameof(ServoViewModel.Ready) or nameof(ServoViewModel.TiltCalibrationSaved)
-            or nameof(ServoViewModel.TiltCalibrating) or nameof(ServoViewModel.FollowReadiness)
+            or nameof(ServoViewModel.TiltCalibrating) or nameof(ServoViewModel.PanMotionBlocked) or nameof(ServoViewModel.TiltMotionBlocked) or nameof(ServoViewModel.FollowReadiness)
             or nameof(FaceAimViewModel.GeometryMode) or nameof(FaceAimViewModel.DirectionsConfirmed) or nameof(FaceAimViewModel.Status))) return;
         RefreshStatus();
     }

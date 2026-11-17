@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from single_servo import FIRMWARE_LIMITS, home, nudge, sweep, coordinated, rectangle_center, rectangle_path, once, reference  # noqa: E402
+from single_servo import Link, FIRMWARE_LIMITS, home, nudge, sweep, coordinated, rectangle_center, rectangle_path, once, reference  # noqa: E402
 
 
 class FakeLink:
@@ -37,6 +37,32 @@ class FakeLink:
 
 
 class ServoHomeTest(unittest.TestCase):
+    def test_locked_firmware_identity_is_parsed_without_opening_serial(self):
+        link = object.__new__(Link)
+        link.axis = "S1"
+        link.command = lambda *_: "HELLO,UAVTRACK_PANTILT,0.5.3-pan-locked,UART_CAPABLE,DEFAULT_DISARMED"
+        link.hello()
+        self.assertTrue(link.pan_locked)
+        self.assertEqual(link.version, "0.5.3")
+
+    def test_all_locked_identity_also_blocks_isolated_tilt_output(self):
+        link = object.__new__(Link)
+        link.axis = "S2"
+        link.command = lambda *_: "HELLO,UAVTRACK_PANTILT,0.5.3-motion-locked,UART_CAPABLE,DEFAULT_DISARMED"
+        link.hello()
+        self.assertTrue(link.motion_locked)
+        with self.assertRaisesRegex(RuntimeError, "All servo output is locked"):
+            once(link, "center", 45)
+
+    def test_pan_lock_rejects_motion_before_any_output(self):
+        link = FakeLink(103, 100)
+        link.pan_locked = True
+        for operation in (lambda: home(link), lambda: coordinated(link, [(103, 100)]),
+                          lambda: once(link, "center", 90), lambda: once(link, "move", 104)):
+            with self.assertRaisesRegex(RuntimeError, "locked"):
+                operation()
+        self.assertEqual(link.commands, [])
+
     def test_new_rectangle_and_both_diagonals_use_verified_50_to_150_window(self):
         link = PairLink(-1,-1)
         link.version="0.5.3"; link.limits=FIRMWARE_LIMITS[("UAVTRACK_PANTILT",link.version)]

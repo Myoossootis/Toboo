@@ -9,6 +9,8 @@
     <TextBlock Text="{Binding Tracking.CameraModelLabel}" Classes="caption" TextWrapping="Wrap" />
     <StackPanel DataContext="{Binding Tracking.Servo}" x:DataType="vm:ServoViewModel" Spacing="12">
       <TextBlock Text="工作边界" Classes="section" />
+      <TextBlock Text="{Binding PanBlockReason}" IsVisible="{Binding PanMotionBlocked}" TextWrapping="Wrap" Foreground="#9A4F18" />
+      <TextBlock Text="{Binding TiltBlockReason}" IsVisible="{Binding TiltMotionBlocked}" TextWrapping="Wrap" Foreground="#9A4F18" />
       <TextBlock Text="首次使用或更换舵机后校准；已验证的边界可继续复用。" Classes="caption" TextWrapping="Wrap" />
       <TextBlock Text="{Binding LastRequests}" TextWrapping="Wrap" />
       <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
@@ -19,7 +21,7 @@
       </Grid>
       <StackPanel IsEnabled="{Binding !Busy}" Spacing="8">
         <TextBlock Text="S1 左 / 右边界（请求角度）" Classes="caption" />
-        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsEnabled="{Binding !PanMotionBlocked}">
           <NumericUpDown x:Name="SetupPanMin" Value="{Binding PanMin}" Minimum="30" Maximum="175" FormatString="0" MinWidth="0" />
           <NumericUpDown Grid.Column="1" Value="{Binding PanMax}" Minimum="30" Maximum="175" FormatString="0" MinWidth="0" />
         </Grid>

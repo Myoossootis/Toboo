@@ -87,13 +87,18 @@ class Link:
             try:
                 response = self.command("HELLO", "HELLO,")
                 fields = response.split(",")
-                limits = FIRMWARE_LIMITS.get(tuple(fields[1:3]))
+                if len(fields) != 5:
+                    raise RuntimeError(f"Unexpected servo greeting: {response}")
+                self.motion_locked = fields[2] == "0.5.3-motion-locked"
+                self.pan_locked = self.motion_locked or fields[2] == "0.5.3-pan-locked"
+                version = "0.5.3" if self.pan_locked else fields[2]
+                limits = FIRMWARE_LIMITS.get((fields[1], version))
                 if fields[3:] != ["UART_CAPABLE", "DEFAULT_DISARMED"] or limits is None:
                     raise RuntimeError(f"Unexpected servo firmware: {response}")
                 if self.axis not in limits:
                     raise RuntimeError(f"Firmware {fields[2]} does not support {self.axis}")
                 self.identity = fields[1]
-                self.version = fields[2]
+                self.version = version
                 self.limits = limits
                 return response
             except TimeoutError:
@@ -123,6 +128,10 @@ class Link:
 
 
 def once(link, action, angle, *, status=None):
+    if getattr(link, "motion_locked", False) is True and action not in ("status", "disarm"):
+        raise RuntimeError("All servo output is locked pending hardware verification")
+    if link.axis == "S1" and getattr(link, "pan_locked", False) is True and action not in ("status", "disarm"):
+        raise RuntimeError("S1 output is locked: installed servo is not verified for angle positioning")
     if status is None:
         status = link.status()
     if action == "status":
@@ -188,12 +197,16 @@ def inspect_axes(link):
     if len({status["session"] for status in states.values()}) != 1:
         raise RuntimeError("ESP32 session changed while reading axis status.")
     status = next(iter(states.values()))
-    return {"firmware": link.version, "final_state": status["state"], "uart_frames_total": status["frames"], "limits": link.limits,
+    return {"firmware": link.version, "pan_output_locked": getattr(link, "pan_locked", False) is True,
+            "all_motion_locked": getattr(link, "motion_locked", False) is True,
+            "final_state": status["state"], "uart_frames_total": status["frames"], "limits": link.limits,
             "axes": {axis: {"last_requested": status["last"]} for axis, status in states.items()},
             "shaft_position": "not measured", "power_cutoff": False}
 
 
 def home(link, pan=None, tilt=None):
+    if getattr(link, "pan_locked", False) is True:
+        raise RuntimeError("Home is disabled while S1 output is locked")
     if link.version in {"0.4.0", "0.5.0", "0.5.1", "0.5.2", "0.5.3"}:
         return coordinated(link, [(90 if pan is None else pan, 45 if tilt is None else tilt)])
     axes = ("S1", "S2")
@@ -324,6 +337,8 @@ def reference(link):
 
 
 def coordinated(link, points):
+    if getattr(link, "pan_locked", False) is True:
+        raise RuntimeError("Paired motion is disabled while S1 output is locked")
     if link.version not in {"0.4.0", "0.5.0", "0.5.1", "0.5.2", "0.5.3"}:
         raise RuntimeError("Coordinated motion requires firmware 0.4.0.")
     if not points:

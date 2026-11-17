@@ -33,12 +33,17 @@ public sealed partial class ServoViewModel : ObservableObject
     [ObservableProperty] private int tiltCeiling = 90;
     [ObservableProperty] private bool tiltCalibrating = true;
     [ObservableProperty] private bool tiltCalibrationSaved;
+    [ObservableProperty] private bool panMotionBlocked;
+    [ObservableProperty] private bool tiltMotionBlocked;
+    public string PanBlockReason => "S1 输出已锁定：360°舵机尚未验证角度定位，停转点不能作为机械中心。";
+    public string TiltBlockReason => "S2 类型待核对，角度运动已锁定。旧请求范围不代表真实轴角度。";
+    public string MotionBlockReason => PanMotionBlocked && TiltMotionBlocked ? "两轴角度运动已锁定：S1 不支持角度定位，S2 类型待确认。" : TiltMotionBlocked ? TiltBlockReason : PanBlockReason;
     [ObservableProperty] private string status = "先读取串口状态。";
 
     public bool CanControl => readyFirmware && Ready && !Busy;
     public bool FirmwareReady => readyFirmware;
     public bool CanRefreshPorts => !Busy;
-    public bool CanCalibratedMotion => CanControl && TiltCalibrationSaved && !TiltCalibrating &&
+    public bool CanCalibratedMotion => !PanMotionBlocked && !TiltMotionBlocked && CanControl && TiltCalibrationSaved && !TiltCalibrating &&
         TiltFloor >= pairedTiltMin && TiltCeiling <= pairedTiltMax;
     public bool CanFollow => CanCalibratedMotion && followFirmware &&
         panLast >= PanMin && panLast <= PanMax && tiltLast >= TiltFloor && tiltLast <= TiltCeiling;
@@ -77,23 +82,23 @@ public sealed partial class ServoViewModel : ObservableObject
         RefreshControls();
     }
     public bool CanStopSweep => Busy && sweepCancellation is { IsCancellationRequested: false };
-    public bool CanPanDown => CanControl && panLast > PanMin;
-    public bool CanPanUp => CanControl && panLast < PanMax;
-    public bool CanTiltDown => CanControl && tiltLast > (TiltCalibrating ? firmwareTiltMin : TiltFloor);
-    public bool CanTiltUp => CanControl && tiltLast < (TiltCalibrating ? firmwareTiltMax : TiltCeiling);
+    public bool CanPanDown => !PanMotionBlocked && CanControl && panLast > PanMin;
+    public bool CanPanUp => !PanMotionBlocked && CanControl && panLast < PanMax;
+    public bool CanTiltDown => !TiltMotionBlocked && CanControl && tiltLast > (TiltCalibrating ? firmwareTiltMin : TiltFloor);
+    public bool CanTiltUp => !TiltMotionBlocked && CanControl && tiltLast < (TiltCalibrating ? firmwareTiltMax : TiltCeiling);
     public bool ShowTiltReference => TiltCalibrating && TiltFloor <= 45 && TiltCeiling >= 45;
-    public bool CanInitializeTilt => CanControl && ShowTiltReference;
-    public bool CanCaptureTilt => !Busy && tiltLast.HasValue;
-    public string TiltCalibrationHint => TiltCalibrating
+    public bool CanInitializeTilt => !TiltMotionBlocked && CanControl && ShowTiltReference;
+    public bool CanCaptureTilt => !TiltMotionBlocked && !Busy && tiltLast.HasValue;
+    public string TiltCalibrationHint => TiltMotionBlocked ? TiltBlockReason : TiltCalibrating
         ? !readyFirmware ? "新 S2 待校准 · 先读状态。45°–90°已试转，机械边界待确认。"
             : $"新 S2 校准中 · 每次 1°，请求范围 {firmwareTiltMin}–{firmwareTiltMax}°。45°–90°已试转；机械极限待确认。"
         : "S2 新边界已保存；中心取新边界中点。";
     public string LastRequests => $"末次指令 · S1 {AngleLabel(panLast)} / S2 {AngleLabel(tiltLast)}";
     public int CenterPan => (PanMin + PanMax + 1) / 2;
     public int CenterTilt => (TiltFloor + TiltCeiling + 1) / 2;
-    public string CenterLabel => $"中心指令 · S1 {CenterPan}° / S2 {CenterTilt}°";
-    public string WorkingBoundsLabel => $"工作区 · S1 {PanMin}–{PanMax}° / S2 {TiltFloor}–{TiltCeiling}°";
-    public string FollowReadiness => !readyFirmware ? "先读状态。"
+    public string CenterLabel => $"中心指令 · S1 {(PanMotionBlocked ? "未确定（输出锁定）" : $"{CenterPan}°")} / S2 {(TiltMotionBlocked ? "未确定（输出锁定）" : $"{CenterTilt}°")}";
+    public string WorkingBoundsLabel => $"工作区 · S1 {(PanMotionBlocked ? "旧边界停用" : $"{PanMin}–{PanMax}°")} / S2 {(TiltMotionBlocked ? "旧边界停用" : $"{TiltFloor}–{TiltCeiling}°")}";
+    public string FollowReadiness => PanMotionBlocked || TiltMotionBlocked ? MotionBlockReason : !readyFirmware ? "先读状态。"
         : !Ready ? "请确认 5V 已接、机构可动。"
         : Busy ? "串口正在使用中。"
         : !TiltCalibrationSaved || TiltCalibrating ? "先保存新 S2 的工作边界。"
@@ -117,6 +122,8 @@ public sealed partial class ServoViewModel : ObservableObject
             if (!File.Exists(this.calibrationFile)) return;
             var saved = JsonSerializer.Deserialize<Calibration>(File.ReadAllText(this.calibrationFile));
             if (saved is null) throw new InvalidDataException("校准配置为空。");
+            PanMotionBlocked = saved.PanMotionBlocked;
+            TiltMotionBlocked = saved.TiltMotionBlocked;
             if (saved.PanFloor >= PanLowerLimit && saved.PanCeiling <= PanUpperLimit && saved.PanFloor < saved.PanCeiling)
             { PanMin = saved.PanFloor; PanMax = saved.PanCeiling; }
             if (saved.TiltProfile != TiltProfileId)
@@ -124,8 +131,8 @@ public sealed partial class ServoViewModel : ObservableObject
             if (saved.TiltFloor < TiltMin || saved.TiltCeiling > TiltMax || saved.TiltFloor >= saved.TiltCeiling)
                 throw new InvalidDataException("S2 边界无效。");
             TiltFloor = saved.TiltFloor; TiltCeiling = saved.TiltCeiling;
-            TiltCalibrationSaved = saved.TiltConfirmed;
-            TiltCalibrating = !saved.TiltConfirmed;
+            TiltCalibrationSaved = saved.TiltConfirmed && !TiltMotionBlocked;
+            TiltCalibrating = !TiltCalibrationSaved;
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
         {
@@ -149,6 +156,12 @@ public sealed partial class ServoViewModel : ObservableObject
     partial void OnTiltCalibrationSavedChanged(bool value) => RefreshControls();
     partial void OnPanMinChanged(int value) => RefreshControls();
     partial void OnPanMaxChanged(int value) => RefreshControls();
+    partial void OnPanMotionBlockedChanged(bool value) { SweepReady = false; RefreshControls(); }
+    partial void OnTiltMotionBlockedChanged(bool value)
+    {
+        if (value) TiltCalibrationSaved = false;
+        SweepReady = false; OnPropertyChanged(nameof(MotionBlockReason)); RefreshControls();
+    }
     partial void OnPortChanged(string value)
     {
         readyFirmware = false;
@@ -256,6 +269,7 @@ public sealed partial class ServoViewModel : ObservableObject
     [RelayCommand]
     private void SaveCalibration()
     {
+        if (TiltMotionBlocked) { Status = TiltBlockReason; return; }
         if (Busy || !TryCalibration(out var calibration)) return;
         try
         {
@@ -282,7 +296,7 @@ public sealed partial class ServoViewModel : ObservableObject
         if (PanMin >= PanLowerLimit && PanMax <= PanUpperLimit && PanMin < PanMax &&
             TiltFloor >= TiltMin && TiltCeiling <= TiltMax && TiltFloor < TiltCeiling)
         {
-            calibration = new(CenterPan, CenterTilt, TiltFloor, PanMin, PanMax, TiltCeiling, TiltProfileId, true);
+            calibration = new(CenterPan, CenterTilt, TiltFloor, PanMin, PanMax, TiltCeiling, TiltProfileId, true, PanMotionBlocked, TiltMotionBlocked);
             return true;
         }
         Status = "请输入有效边界。S1 30–175°，S2 0–180°，下限须小于上限。范围是请求值，须先实测。";
@@ -326,6 +340,14 @@ public sealed partial class ServoViewModel : ObservableObject
             if (result.ExitCode != 0) throw new IOException(result.Error.Trim());
             using var data = JsonDocument.Parse(result.Output);
             var root = data.RootElement;
+            var lockedPan = root.TryGetProperty("pan_output_locked", out var panLock) && panLock.ValueKind == JsonValueKind.True;
+            var lockedAll = root.TryGetProperty("all_motion_locked", out var motionLock) && motionLock.ValueKind == JsonValueKind.True;
+            if (lockedPan || lockedAll)
+            {
+                PanMotionBlocked = true;
+                if (lockedAll) TiltMotionBlocked = true;
+                if (TryCalibration(out var lockedCalibration)) WriteCalibration(lockedCalibration with { TiltConfirmed = TiltCalibrationSaved });
+            }
             var axes = root.GetProperty("axes");
             panLast = ReadLast(axes, "S1");
             tiltLast = ReadLast(axes, "S2");
@@ -339,7 +361,7 @@ public sealed partial class ServoViewModel : ObservableObject
             var stopped = root.GetProperty("final_state").GetString() == "DISARMED";
             Status = !readyFirmware ? "读取成功。同步平滑运动需要固件 v0.4.0。"
                 : !stopped ? "固件状态异常，请检查连接并复位 ESP32。"
-                : success;
+                : PanMotionBlocked || TiltMotionBlocked ? MotionBlockReason + " " + success : success;
             readyFirmware &= stopped;
             if (action == "nudge" && readyFirmware)
             {
@@ -400,5 +422,5 @@ public sealed partial class ServoViewModel : ObservableObject
     private static string Number(int value) => value.ToString(CultureInfo.InvariantCulture);
     private static string AngleLabel(int? value) => value is { } angle ? $"{angle}°" : "—";
     private sealed record Calibration(int Pan, int Tilt, int TiltFloor, int PanFloor = 80, int PanCeiling = 100,
-        int TiltCeiling = 65, string TiltProfile = "", bool TiltConfirmed = false);
+        int TiltCeiling = 65, string TiltProfile = "", bool TiltConfirmed = false, bool PanMotionBlocked = false, bool TiltMotionBlocked = false);
 }

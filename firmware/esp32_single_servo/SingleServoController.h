@@ -4,7 +4,16 @@
 #include <string.h>
 #include <math.h>
 
+#ifndef TOBOO_PAN_OUTPUT_LOCKED
+#define TOBOO_PAN_OUTPUT_LOCKED 0
+#endif
+#ifndef TOBOO_ALL_SERVO_OUTPUT_LOCKED
+#define TOBOO_ALL_SERVO_OUTPUT_LOCKED 0
+#endif
+
 namespace single_servo {
+constexpr bool kAllOutputLocked = TOBOO_ALL_SERVO_OUTPUT_LOCKED != 0;
+constexpr bool kPanOutputLocked = TOBOO_PAN_OUTPUT_LOCKED != 0 || kAllOutputLocked;
 constexpr int kMinAngle[] = {30, 0, 30};
 constexpr int kMaxAngle[] = {175, 180, 90};
 constexpr int kPairMaxAngle[] = {175, 180};
@@ -13,6 +22,8 @@ constexpr int kFirstMinAngle[] = {80, 45, 60};
 inline bool validServoFrame(const char* frame, size_t length) {
   if (length != 6 || frame[0] != '$' || frame[1] < 'A' || frame[1] > 'C' || frame[5] != '#') return false;
   const int axis = frame[1] - 'A';
+  if (kAllOutputLocked) return false;
+  if (kPanOutputLocked && axis == 0) return false;
   for (size_t i = 2; i < 5; ++i) {
     if (frame[i] < '0' || frame[i] > '9') return false;
   }
@@ -99,7 +110,8 @@ class Controller {
   void command(const char* line, uint32_t now, char* out, size_t size) {
     tick(now);
     if (!strcmp(line, "HELLO")) {
-      snprintf(out, size, "HELLO,UAVTRACK_PANTILT,0.5.3,UART_CAPABLE,DEFAULT_DISARMED"); return;
+      snprintf(out, size, "HELLO,UAVTRACK_PANTILT,%s,UART_CAPABLE,DEFAULT_DISARMED",
+        kAllOutputLocked ? "0.5.3-motion-locked" : kPanOutputLocked ? "0.5.3-pan-locked" : "0.5.3"); return;
     }
     if (!strcmp(line, "STATUS")) { status(out, size, 0); return; }
     if (!strcmp(line, "STATUS_S2")) { status(out, size, 1); return; }
@@ -110,6 +122,13 @@ class Controller {
     if (!strcmp(line, "PING")) { snprintf(out, size, "PONG,S1_S2"); return; }
     if (!strcmp(line, "DISARM")) {
       stop(); snprintf(out, size, "ACK,DISARM,TX_DISABLED"); return;
+    }
+    if (kAllOutputLocked) { error(out, size, "ALL_OUTPUT_LOCKED"); return; }
+    // This build cannot position the installed S1. Reject before enabling UART,
+    // including paired/follow operations that could otherwise initialize it.
+    if (kPanOutputLocked && (strstr(line, "_S1") || strstr(line, "_BOTH") ||
+        !strncmp(line, "ARM_FOLLOW,", 11) || !strncmp(line, "KEEP_FOLLOW,", 12))) {
+      error(out, size, "PAN_OUTPUT_LOCKED"); return;
     }
     if (!strncmp(line, "ARM_FOLLOW,", 11) || !strncmp(line, "FOLLOW_BOTH,", 12) ||
         !strncmp(line, "HOLD_BOTH,", 10) || !strncmp(line, "KEEP_FOLLOW,", 12)) {

@@ -1,5 +1,11 @@
 # 台架舵机协议
 
+## S1 输出锁定构建
+
+全执行器锁定构建 `-LockAllServoOutput` 使用身份 `0.5.3-motion-locked`，同时报告 `pan_output_locked:true` 与 `all_motion_locked:true`，拒绝所有运动协议并保留状态、DISARM 和麦克风。用于两轴兼容性均未完成核对时，不能用于停转点或机械边界试探。
+
+构建选项 `-LockPanOutput` 生成 `0.5.3-pan-locked`。仅用于隔离型号不兼容或未确认的水平舵机；上位机将协议基线按 0.5.3 解析，并报告 `pan_output_locked:true`。S1、双轴和跟随操作返回 `ERR,PAN_OUTPUT_LOCKED,S1_S2`，不启用 UART，也不生成 S1 帧。状态、DISARM、麦克风和独立 S2 接口保留。此锁定不会向连续旋转舵机发送未经校准的停转信号，也不代表驱动板断电；具体限制见 [硬件接口](../docs/hardware.md)。
+
 ## v0.5.3 新 S2 逐度校准与独立保存
 
 - S2 手动协议范围为 0–180°，这是请求范围，不是装机后的安全机械范围。首次仍须显式 `CENTER_S2 ... 45`。在已观察的 45–90°外，单轴 `MOVE_S2` 每条请求最多改变 1°，否则 `ERR,CALIBRATION_STEP`；运动间隔仍至少 200ms。主机也在 ARM 前执行同一检查。

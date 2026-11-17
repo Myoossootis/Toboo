@@ -36,6 +36,13 @@ def start(**changes):
 
 
 class FollowTests(unittest.TestCase):
+    def test_locked_pan_rejects_follow_without_arming(self):
+        link = FakeLink()
+        link.pan_locked = True
+        with self.assertRaisesRegex(RuntimeError, "locked"):
+            follow(link, queue.Queue(), lambda _: None)
+        self.assertEqual(link.commands, [])
+
     def test_both_axis_follow_uses_50_to_150_and_holds_on_missing_frame(self):
         link=FakeLink(); link.version="0.5.3"; link.last=[103,100]
         inbox=queue.Queue()

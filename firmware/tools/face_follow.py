@@ -47,6 +47,8 @@ def validate_frame(message, bounds, reference, axes):
 
 
 def follow(link, inbox, emit):
+    if getattr(link, "pan_locked", False) is True:
+        raise RuntimeError("Angle follow is disabled while S1 output is locked")
     if link.version not in {"0.5.0", "0.5.1", "0.5.2", "0.5.3"}:
         raise RuntimeError("Face follow needs firmware 0.5.0; existing firmware was not modified")
     initial = read_pair(link)
