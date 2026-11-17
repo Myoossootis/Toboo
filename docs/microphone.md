@@ -8,14 +8,16 @@
 
 | ICS43432 | ESP32-S3 |
 | --- | --- |
-| VCC / VDD | 3V3 |
-| GND | GND |
+| V / VCC / VDD | 3V3 |
+| G / GND | GND |
 | SCK / BCLK | GPIO4 |
 | WS / LRCLK | GPIO5 |
-| SD / DOUT | GPIO6 |
+| DIN / SD / DOUT | GPIO6 |
 | L/R / SEL（若有） | GND |
 
-模块供电与输入信号均为 3.3V。五针模块的声道取决于板载接法，需核对商品说明或实测。GPIO17/18 继续用于已有舵机驱动板。ESP32-S3 通过原生 USB 接电脑，音频速率超过普通 115200 波特串口的容量。
+本项目使用 3.3V 供电和信号电平。Keyes KE4089 五针模块将音频数据针标作 DIN，官方引脚定义为数据输出，示例使用左声道，接到本项目 GPIO6 即可。其他五针版本的固定声道需按其板载接法核对。[Keyes 模块说明](https://www.keyesrobot.cn/projects/KE4089/zh-cn/latest/docs/KE4089%20Keyes%20STEM%E7%94%B5%E5%AD%90%E7%A7%AF%E6%9C%A8%20ICS%E9%BA%A6%E5%85%8B%E9%A3%8E%E6%A8%A1%E5%9D%97%20%E9%BB%91%E8%89%B2%E7%8E%AF%E4%BF%9D.html)
+
+GPIO17/18 继续用于已有舵机驱动板。ESP32-S3 通过原生 USB 接电脑，音频速率超过普通 115200 波特串口的容量。
 
 ## 构建和烧录
 
