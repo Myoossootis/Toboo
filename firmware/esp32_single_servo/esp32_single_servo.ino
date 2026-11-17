@@ -3,6 +3,10 @@
 #include <bootloader_random.h>
 #include <driver/uart.h>
 #include "SingleServoController.h"
+#if TOBOO_MIC_ENABLED
+#include "MicInput.h"
+MicInput microphone;
+#endif
 
 #if !CONFIG_IDF_TARGET_ESP32S3 || !ARDUINO_USB_CDC_ON_BOOT || ARDUINO_USB_MODE != 1
 #error "Use ESP32-S3 with Hardware CDC and USB CDC On Boot enabled."
@@ -59,6 +63,9 @@ void setup() {
   esp_fill_random(boot, sizeof(boot));
   bootloader_random_disable();
   controller.start(boot[0], boot[1]);
+#if TOBOO_MIC_ENABLED
+  microphone.begin();
+#endif
   // No automatic enable, centering, saved position, sweep or servo UART startup.
 }
 
@@ -74,6 +81,9 @@ void loop() {
       sendLine("ERR,FRAMING,S1_S2");
     } else if (event == single_servo::LineReader::Event::Ready) {
       const char* line = reader.line();
+#if TOBOO_MIC_ENABLED
+      if (microphone.command(line)) continue;
+#endif
       if (!strcmp(line, "INFO")) {
         snprintf(response, sizeof(response),
           "INFO,ESP32-S3,FLASH=%lu,PSRAM=%lu,TX=17,RX=18,BAUD=9600,DROPPED=%lu,S1_S2",
@@ -99,6 +109,9 @@ void loop() {
   for (int budget = 0; output.enabled && budget < 16 && Serial1.available(); ++budget) Serial1.read();
   now = millis();
   controller.tick(now);
+#if TOBOO_MIC_ENABLED
+  microphone.tick();
+#endif
   if (uint32_t(now - lastHeartbeat) >= 1000) {
     lastHeartbeat = now;
     snprintf(response, sizeof(response), "HB,%lu,%s,TX_%s,S1_S2",

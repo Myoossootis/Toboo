@@ -12,6 +12,7 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
 {
     private readonly ChatViewModel chat;
     private readonly ISpeechService? speech;
+    private readonly IMicrophoneCapture microphone;
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private CancellationTokenSource? input, output;
     private Task listeningTask = Task.CompletedTask, speakingTask = Task.CompletedTask;
@@ -27,22 +28,51 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string status = "正在检查本机语音…";
     [ObservableProperty] private string inputDescription = "使用系统默认麦克风";
     [ObservableProperty] private string outputDescription = "使用系统默认音频输出";
+    [ObservableProperty] private int microphoneSourceIndex;
+    [ObservableProperty] private string? microphonePort;
+    [ObservableProperty] private string[] microphonePorts = [];
+    [ObservableProperty] private double microphoneLevel;
+    public bool IsI2sMicrophone => MicrophoneSourceIndex == 1;
+    public bool CanConfigureMicrophone => !CanStop && !Initializing;
     public bool CanRecord => !disposed && CanListen && !IsListening && chat.IsConnected && !chat.IsBusy
-        && !chat.RemoteRunning && !chat.HasPending && chat.SelectedModel is not null && string.IsNullOrWhiteSpace(chat.Draft);
+        && !chat.RemoteRunning && !chat.HasPending && chat.SelectedModel is not null && string.IsNullOrWhiteSpace(chat.Draft)
+        && (!IsI2sMicrophone || !string.IsNullOrWhiteSpace(MicrophonePort));
     public bool CanStop => IsListening || output is not null;
     public bool CanUseRecordButton => CanRecord || IsListening;
     public string RecordLabel => IsFinishing ? "正在识别…" : IsListening ? "松开发送" : "按住说话";
     public string RecordHint => !CanListen ? InputDescription : !chat.IsConnected ? "连接 Harness 后可语音对话"
+        : IsI2sMicrophone && string.IsNullOrWhiteSpace(MicrophonePort) ? "请到设备页选择 ESP32-S3 麦克风串口"
         : !string.IsNullOrWhiteSpace(chat.Draft) ? "先发送或清空输入框，再按住说话" : "按住说话，松开发送；Esc 取消";
 
-    internal VoiceViewModel(ChatViewModel chat, ISpeechService? speech = null)
+    internal VoiceViewModel(ChatViewModel chat, ISpeechService? speech = null, IMicrophoneCapture? microphone = null)
     {
         this.chat = chat;
         this.speech = speech ?? (OperatingSystem.IsWindows() ? new WindowsSpeechService() : null);
+        this.microphone = microphone ?? new I2sMicrophone();
         chat.PropertyChanged += ChatChanged;
         chat.ReplyCompleted += ReplyCompleted;
         chat.ConversationChanged += Stop;
         timer.Tick += Tick;
+        RefreshMicrophonePorts();
+    }
+    partial void OnMicrophoneSourceIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsI2sMicrophone));
+        InputDescription = IsI2sMicrophone ? "ICS43432 · 选择 ESP32-S3 串口" : "中文识别 · 系统默认麦克风";
+        Refresh();
+    }
+    partial void OnMicrophonePortChanged(string? value) => Refresh();
+    [RelayCommand]
+    private void RefreshMicrophonePorts()
+    {
+        if (!CanConfigureMicrophone) return;
+        var selected = MicrophonePort;
+        try
+        {
+            MicrophonePorts = SerialPortCatalog.Normalize(SerialPortCatalog.List());
+            MicrophonePort = MicrophonePorts.FirstOrDefault(port => port == selected);
+        }
+        catch (Exception) { MicrophonePorts = []; MicrophonePort = null; }
     }
 
     [RelayCommand]
@@ -57,7 +87,8 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
                 : await speech.InspectAsync(CancellationToken.None);
             if (disposed) return;
             CanListen = capabilities.CanListen; CanSpeak = capabilities.CanSpeak;
-            InputDescription = capabilities.Input; OutputDescription = capabilities.Output;
+            InputDescription = IsI2sMicrophone ? "ICS43432 · ESP32-S3 I²S 采音" : capabilities.Input;
+            OutputDescription = capabilities.Output;
             Status = CanListen ? "按住说话，松开发送" : InputDescription;
         }
         catch (Exception)
@@ -93,10 +124,25 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
             await speakingTask;
             operation.Token.ThrowIfCancellationRequested();
             if (IsFinishing) return;
-            var text = await speech!.ListenAsync(() => Post(operation, () =>
+            void Started() => Post(operation, () =>
             {
                 if (!IsFinishing) Status = "正在听… 松开发送";
-            }), operation.Token);
+            });
+            string text;
+            if (IsI2sMicrophone)
+            {
+                var pcm = await microphone.RecordAsync(MicrophonePort!, Started,
+                    value => Post(operation, () => MicrophoneLevel = value * 100), operation.Token);
+                operation.Token.ThrowIfCancellationRequested();
+                if (pcm.Length < 3200 || I2sMicrophone.Peak(pcm) == 0)
+                {
+                    Status = "模块没有收到有效声音，请检查接线和声道选择。"; return;
+                }
+                Status = "正在识别模块录音…";
+                I2sMicrophone.Normalize(pcm);
+                text = await speech!.RecognizePcmAsync(pcm, operation.Token);
+            }
+            else text = await speech!.ListenAsync(Started, operation.Token);
             operation.Token.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(text)) { Status = "没有听清，请按住后再说一次。"; return; }
             if (text.Length > 4000) { Status = "这段语音太长，请分成几句说。"; return; }
@@ -115,14 +161,14 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
         catch (OperationCanceledException) { if (!disposed) Status = "本次语音已取消"; }
         catch (Exception error)
         {
-            if (!disposed) Status = "语音输入失败，请检查默认麦克风和中文识别组件。" + " " + error.Message;
+            if (!disposed) Status = (IsI2sMicrophone ? "ICS43432 采音失败，请检查串口、合并固件和接线。" : "语音输入失败，请检查默认麦克风和中文识别组件。") + " " + error.Message;
         }
         finally
         {
             if (ReferenceEquals(input, operation))
             {
                 input = null; IsListening = false; IsFinishing = false;
-                chat.VoiceInputActive = false; timer.Stop(); Refresh();
+                chat.VoiceInputActive = false; MicrophoneLevel = 0; timer.Stop(); Refresh();
             }
             operation.Dispose();
         }
@@ -132,7 +178,12 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     {
         if (!IsListening || IsFinishing || speech is null) return;
         IsFinishing = true; Status = "正在识别…"; Refresh();
-        try { speech.FinishListening(); input?.CancelAfter(TimeSpan.FromSeconds(8)); }
+        try
+        {
+            if (IsI2sMicrophone) microphone.Finish();
+            else speech.FinishListening();
+            input?.CancelAfter(TimeSpan.FromSeconds(IsI2sMicrophone ? 20 : 8));
+        }
         catch (Exception) { Stop(); Status = "无法结束语音识别，请重试。"; }
     }
 
@@ -222,6 +273,7 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(CanRecord)); OnPropertyChanged(nameof(CanStop));
         OnPropertyChanged(nameof(CanUseRecordButton));
+        OnPropertyChanged(nameof(CanConfigureMicrophone));
         OnPropertyChanged(nameof(RecordLabel)); OnPropertyChanged(nameof(RecordHint));
     }
     public void Dispose()

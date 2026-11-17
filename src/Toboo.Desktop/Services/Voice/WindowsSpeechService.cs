@@ -1,6 +1,7 @@
 using System.Runtime.Versioning;
 using System.Speech.Recognition;
 using System.Speech.Synthesis;
+using System.Speech.AudioFormat;
 using System.Text;
 
 namespace Toboo.Desktop.Services;
@@ -11,6 +12,7 @@ internal interface ISpeechService
 {
     Task<SpeechCapabilities> InspectAsync(CancellationToken cancellation);
     Task<string> ListenAsync(Action started, CancellationToken cancellation);
+    Task<string> RecognizePcmAsync(byte[] pcm, CancellationToken cancellation);
     void FinishListening();
     Task SpeakAsync(string text, Action<bool> playing, Action word, CancellationToken cancellation);
 }
@@ -33,6 +35,12 @@ internal sealed class WindowsSpeechService : ISpeechService
     }, cancellation);
 
     public Task<string> ListenAsync(Action started, CancellationToken cancellation)
+        => RecognizeAsync(started, cancellation, null);
+
+    public Task<string> RecognizePcmAsync(byte[] pcm, CancellationToken cancellation)
+        => RecognizeAsync(() => { }, cancellation, pcm);
+
+    private Task<string> RecognizeAsync(Action started, CancellationToken cancellation, byte[]? pcm)
     {
         lock (sync) finishRequested = false;
         return Task.Run(async () =>
@@ -41,6 +49,7 @@ internal sealed class WindowsSpeechService : ISpeechService
             deadline.CancelAfter(TimeSpan.FromSeconds(40));
             var info = ChineseRecognizer() ?? throw new InvalidOperationException("未安装中文语音识别语言包。");
             using var engine = new SpeechRecognitionEngine(info);
+            using var audio = pcm is null ? null : new MemoryStream(pcm, writable: false);
             var complete = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             var text = new StringBuilder();
             engine.LoadGrammar(new DictationGrammar());
@@ -69,7 +78,8 @@ internal sealed class WindowsSpeechService : ISpeechService
             {
                 deadline.Token.ThrowIfCancellationRequested();
                 lock (sync) if (finishRequested) return "";
-                engine.SetInputToDefaultAudioDevice();
+                if (audio is null) engine.SetInputToDefaultAudioDevice();
+                else engine.SetInputToAudioStream(audio, new SpeechAudioFormatInfo(16000, AudioBitsPerSample.Sixteen, AudioChannel.Mono));
                 using var cancel = deadline.Token.Register(() =>
                 {
                     lock (sync)
@@ -118,7 +128,7 @@ internal sealed class WindowsSpeechService : ISpeechService
         var voice = ChineseVoice(synth) ?? throw new InvalidOperationException("未安装中文朗读声音。");
         synth.SelectVoice(voice.VoiceInfo.Name);
         if (wave is null) synth.SetOutputToDefaultAudioDevice();
-        else synth.SetOutputToWaveStream(wave);
+        else synth.SetOutputToAudioStream(wave, new SpeechAudioFormatInfo(16000, AudioBitsPerSample.Sixteen, AudioChannel.Mono));
         var complete = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         synth.SpeakStarted += (_, _) => playing(true);
         synth.SpeakProgress += (_, _) => word();
@@ -157,12 +167,17 @@ internal sealed class WindowsSpeechService : ISpeechService
         audio.Position = 0;
         using var engine = new SpeechRecognitionEngine(info);
         engine.LoadGrammar(new DictationGrammar());
-        engine.SetInputToWaveStream(audio);
+        engine.SetInputToAudioStream(audio, new SpeechAudioFormatInfo(16000, AudioBitsPerSample.Sixteen, AudioChannel.Mono));
         var result = engine.Recognize(TimeSpan.FromSeconds(15));
         if (result is null || string.IsNullOrWhiteSpace(result.Text))
             throw new InvalidOperationException("合成语音的本地识别自检没有返回文字。");
+        var pcm = audio.ToArray();
+        I2sMicrophone.Normalize(pcm);
+        var moduleTranscript = await new WindowsSpeechService().RecognizePcmAsync(pcm, deadline.Token);
+        if (string.IsNullOrWhiteSpace(moduleTranscript)) throw new InvalidOperationException("模块 PCM 识别入口自检失败。");
         return new { success = true, source = "synthetic-chinese-speech", recognizer = info.Id,
-            recognized = result.Text, confidence = result.Confidence, waveBytes = audio.Length, playbackStarts = starts, wordEvents = words,
+            recognized = result.Text, confidence = result.Confidence, pcmBytes = audio.Length, playbackStarts = starts, wordEvents = words,
+            modulePcmRecognized = moduleTranscript,
             microphoneUsed = false, speakerUsed = false, modelRequestsSent = false };
     });
 }

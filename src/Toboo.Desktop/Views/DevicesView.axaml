@@ -46,6 +46,14 @@
             <StackPanel Spacing="16">
               <StackPanel Orientation="Horizontal" Spacing="12"><icons:AppIcon Kind="Mic" /><TextBlock Text="语音" Classes="section" /></StackPanel>
               <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12"><icons:AppIcon Kind="Mic" Width="20" Height="20" /><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="语音输入" FontWeight="Medium" /><TextBlock Text="{Binding Voice.InputDescription}" Classes="caption" TextWrapping="Wrap" /></StackPanel></Grid>
+              <ComboBox x:Name="MicrophoneSourceSelector" SelectedIndex="{Binding Voice.MicrophoneSourceIndex}" IsEnabled="{Binding Voice.CanConfigureMicrophone}" HorizontalAlignment="Stretch">
+                <ComboBoxItem Content="电脑默认麦克风" /><ComboBoxItem Content="ICS43432 · ESP32-S3" />
+              </ComboBox>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding Voice.IsI2sMicrophone}">
+                <ComboBox x:Name="MicrophonePortSelector" ItemsSource="{Binding Voice.MicrophonePorts}" SelectedItem="{Binding Voice.MicrophonePort}" PlaceholderText="选择 ESP32-S3 串口" IsEnabled="{Binding Voice.CanConfigureMicrophone}" HorizontalAlignment="Stretch" />
+                <Button Grid.Column="1" Content="刷新" Command="{Binding Voice.RefreshMicrophonePortsCommand}" Classes="quiet" IsEnabled="{Binding Voice.CanConfigureMicrophone}" />
+              </Grid>
+              <ProgressBar Minimum="0" Maximum="100" Value="{Binding Voice.MicrophoneLevel}" Height="6" IsVisible="{Binding Voice.IsI2sMicrophone}" />
               <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
               <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12"><icons:AppIcon Kind="Volume" Width="20" Height="20" /><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="声音输出" FontWeight="Medium" /><TextBlock Text="{Binding Voice.OutputDescription}" Classes="caption" TextWrapping="Wrap" /></StackPanel></Grid>
               <Button Content="检查本机语音" Command="{Binding Voice.InitializeCommand}" Classes="quiet" HorizontalAlignment="Left" />

@@ -26,7 +26,7 @@
             <Border Classes="shellcard" Margin="0,24,0,0"><StackPanel Spacing="24">
               <TextBlock Text="你的数据如何处理" Classes="section" />
               <StackPanel Spacing="8"><TextBlock Text="图像在本机分析" FontWeight="SemiBold" /><TextBlock Text="表情识别在电脑上运行，不向云端上传摄像头画面。它提供可见表情线索，不判断真实心理情绪。" Classes="muted" TextWrapping="Wrap" LineHeight="24" /></StackPanel>
-              <StackPanel Spacing="8"><TextBlock Text="语音在本机处理" FontWeight="SemiBold" /><TextBlock Text="按住按钮时使用默认麦克风，Windows 本地引擎把语音转成文字，松开后经 Harness 发送文字。按 Esc 可取消。朗读使用系统中文声音，原始音频不会保存。" Classes="muted" TextWrapping="Wrap" LineHeight="24" /></StackPanel>
+              <StackPanel Spacing="8"><TextBlock Text="语音在本机处理" FontWeight="SemiBold" /><TextBlock Text="按住按钮时采集所选麦克风，Windows 本地引擎把语音转成文字，松开后经 Harness 发送文字。按 Esc 可取消。朗读使用系统中文声音，原始音频不会保存。" Classes="muted" TextWrapping="Wrap" LineHeight="24" /></StackPanel>
               <Border Height="1" Background="{StaticResource SurfaceBorderBrush}" />
               <StackPanel Spacing="8"><TextBlock Text="实验记录" FontWeight="SemiBold" /><TextBlock Text="运行视觉会话时，会在本机保存检测与控制请求日志；启用表情识别后也记录分类分数和拒判原因。原始摄像头画面不会自动录像。" Classes="muted" TextWrapping="Wrap" LineHeight="24" /></StackPanel>
               <StackPanel Spacing="8"><TextBlock Text="在线对话与记录" FontWeight="SemiBold" /><TextBlock Text="点击发送后，文字会经 Harness 发送给所选模型服务。附带表情线索默认关闭；开启后也只发送有效摘要，不上传画面。模型服务按其账号与计费设置运行。聊天记录保存在本机 .toboo-harness 的独立目录，发送状态会先保存，以便断线后核对并防止重复发送。" Classes="muted" TextWrapping="Wrap" LineHeight="24" /></StackPanel>

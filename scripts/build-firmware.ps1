@@ -1,6 +1,7 @@
 ﻿param(
     [string]$Compiler = 'g++',
-    [ValidateSet('bench', 'single')][string]$Target = 'bench'
+    [ValidateSet('bench', 'single')][string]$Target = 'bench',
+    [switch]$EnableMicrophone
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,7 +24,9 @@ try {
     })) { throw 'Pinned ESP32 core is not installed.' }
 
     $isSingle = $Target -eq 'single'
+    if ($EnableMicrophone -and !$isSingle) { throw 'Microphone requires the single-servo firmware target.' }
     $artifactName = if ($isSingle) { 'esp32-single' } else { 'esp32-bench' }
+    if ($EnableMicrophone) { $artifactName = 'esp32-mic-servo' }
     $sketchName = if ($isSingle) { 'esp32_single_servo' } else { 'esp32_bench' }
     $testSource = if ($isSingle) { 'single_servo_controller_test.cpp' } else { 'bench_controller_test.cpp' }
     $outputPath = Join-Path $repositoryPath "artifacts/$artifactName/build"
@@ -33,7 +36,14 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Firmware host test compilation failed.' }
     & $testExe
     if ($LASTEXITCODE -ne 0) { throw 'Firmware host tests failed.' }
-    & $cli compile --config-file $config --fqbn $settings.fqbn --warnings all `
+    if ($EnableMicrophone) {
+        & $Compiler -std=c++11 -Wall -Wextra -Werror -pedantic firmware/tests/mic_wire_test.cpp -o "$outputPath/mic_wire_test.exe"
+        if ($LASTEXITCODE -ne 0) { throw 'Microphone wire test compilation failed.' }
+        & "$outputPath/mic_wire_test.exe"
+        if ($LASTEXITCODE -ne 0) { throw 'Microphone wire tests failed.' }
+    }
+    $extra = if ($EnableMicrophone) { @('--build-property', 'compiler.cpp.extra_flags=-DTOBOO_MIC_ENABLED=1') } else { @() }
+    & $cli compile --config-file $config --fqbn $settings.fqbn --warnings all @extra `
         --build-path (Join-Path $repositoryPath "tmp/esp32-tools/build-$Target") `
         --output-dir $outputPath "firmware/$sketchName"
     if ($LASTEXITCODE -ne 0) { throw 'ESP32 firmware compilation failed.' }

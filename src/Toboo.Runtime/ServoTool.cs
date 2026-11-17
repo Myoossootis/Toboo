@@ -4,6 +4,7 @@ namespace Toboo.Runtime;
 
 internal static class ServoTool
 {
+    internal static Func<string, (string Url, string Token)>? SerialProxy { get; set; }
     internal sealed record Result(int ExitCode, string Output, string Error);
 
     internal static Task<Result> RunAsync(IEnumerable<string> args, CancellationToken cancellationToken = default) =>
@@ -60,6 +61,8 @@ internal static class ServoTool
         start.Environment["PYTHONDONTWRITEBYTECODE"] = "1";
         start.Environment.Remove("PYTHONHOME");
         start.Environment.Remove("PYTHONPATH");
+        start.Environment.Remove("TOBOO_SERIAL_URL");
+        start.Environment.Remove("TOBOO_SERIAL_TOKEN");
         start.ArgumentList.Add("-I");
         start.ArgumentList.Add("-B");
         start.ArgumentList.Add("-X");
@@ -72,7 +75,15 @@ internal static class ServoTool
             start.ArgumentList.Add(Path.GetDirectoryName(scriptPath)!);
         }
         start.ArgumentList.Add(scriptPath);
-        foreach (var argument in args) start.ArgumentList.Add(argument);
+        var arguments = args.ToArray();
+        var portIndex = Array.IndexOf(arguments, "--port");
+        if (script != "sensor_telemetry.py" && portIndex >= 0 && portIndex + 1 < arguments.Length && SerialProxy is { } proxy)
+        {
+            var endpoint = proxy(arguments[portIndex + 1]);
+            start.Environment["TOBOO_SERIAL_URL"] = endpoint.Url;
+            start.Environment["TOBOO_SERIAL_TOKEN"] = endpoint.Token;
+        }
+        foreach (var argument in arguments) start.ArgumentList.Add(argument);
         return start;
     }
 

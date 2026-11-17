@@ -9,6 +9,35 @@ namespace Toboo.Desktop.Services;
 
 internal static class Diagnostics
 {
+    public static async Task MicSelfTestAsync(string port)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var mic = new I2sMicrophone();
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var recording = mic.RecordAsync(port, () => ready.TrySetResult(), _ => { }, timeout.Token);
+        var stop = Task.Run(async () =>
+        {
+            await ready.Task.WaitAsync(timeout.Token);
+            await Task.Delay(3000, timeout.Token);
+            mic.Finish();
+        });
+        try
+        {
+            var pcm = await recording;
+            Write("mic-self-test.json", new { success = pcm.Length >= 32000 && I2sMicrophone.Peak(pcm) > 0,
+                source = "actual-ics43432-usb", port, samples = pcm.Length / 2, sampleRate = 16000,
+                peak = I2sMicrophone.Peak(pcm), rawAudioSaved = false, modelRequestsSent = false, movementRequested = false });
+            if (pcm.Length < 32000 || I2sMicrophone.Peak(pcm) == 0)
+                throw new IOException("没有采到有效音频，请核对接线、声道和模块。");
+        }
+        finally
+        {
+            timeout.Cancel();
+            try { await stop; } catch (OperationCanceledException) { }
+            SharedEsp32.CloseAll();
+        }
+    }
+
     public static async Task SpeechSelfTestAsync()
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("本机语音需要 Windows。");

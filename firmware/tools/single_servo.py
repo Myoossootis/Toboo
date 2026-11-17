@@ -1,6 +1,7 @@
 """Manual bench-servo requests over USB; defaults to read-only status."""
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 
@@ -37,6 +38,15 @@ class Link:
         self.open()
 
     def open(self):
+        proxy = os.environ.get("TOBOO_SERIAL_URL")
+        if proxy:
+            token = os.environ.get("TOBOO_SERIAL_TOKEN", "")
+            if not proxy.startswith("socket://127.0.0.1:") or len(token) != 64 or any(c not in "0123456789ABCDEF" for c in token):
+                raise RuntimeError("Invalid owned serial proxy")
+            self.io = serial.serial_for_url(proxy, baudrate=115200, timeout=0.02, write_timeout=1)
+            self.io.write(("AUTH," + token + "\n").encode("ascii"))
+            self.buffer.clear()
+            return
         self.io = serial.Serial(baudrate=115200, timeout=0.02, write_timeout=1)
         self.io.dtr = False
         self.io.rts = False

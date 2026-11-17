@@ -19,7 +19,7 @@ public sealed class VoiceTests
         public TaskCompletionSource<string> Transcript = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Playback = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public List<string> Spoken = [];
-        public int Listens, Finishes;
+        public int Listens, Finishes, PcmCalls;
         public bool IgnoreCancellation;
         public Action<bool>? Playing;
         public Action? Word;
@@ -30,6 +30,10 @@ public sealed class VoiceTests
             return IgnoreCancellation ? Transcript.Task : Transcript.Task.WaitAsync(cancellation);
         }
         public void FinishListening() => Finishes++;
+        public Task<string> RecognizePcmAsync(byte[] pcm, CancellationToken cancellation)
+        {
+            PcmCalls++; return Transcript.Task.WaitAsync(cancellation);
+        }
         public async Task SpeakAsync(string text, Action<bool> playing, Action word, CancellationToken cancellation)
         {
             Spoken.Add(text); Playing = playing; Word = word; playing(true); word();
@@ -40,6 +44,41 @@ public sealed class VoiceTests
 
     private static ChatViewModel Chat(TobooChatTests.FakeClient client) => new(client,
         new(Path.Combine(Path.GetTempPath(), "toboo-voice-tests", Guid.NewGuid().ToString("N"), "client.json")));
+
+    private sealed class Microphone : IMicrophoneCapture
+    {
+        private readonly TaskCompletionSource<byte[]> data = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task<byte[]> RecordAsync(string port, Action started, Action<double> level, CancellationToken cancellation)
+        {
+            started(); level(0.5); return data.Task.WaitAsync(cancellation);
+        }
+        public void Finish()
+        {
+            var pcm = new byte[6400];
+            for (var i = 0; i < pcm.Length; i += 4) pcm[i] = 100;
+            data.SetResult(pcm);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task ModuleRecordingUsesPcmRecognitionAndTheExistingChatSend()
+    {
+        var client = new TobooChatTests.FakeClient { StreamReply = true };
+        using var chat = Chat(client);
+        var speech = new Speech();
+        using var voice = new VoiceViewModel(chat, speech, new Microphone());
+        await chat.ConnectAsync(); await voice.InitializeAsync();
+        voice.MicrophoneSourceIndex = 1; voice.MicrophonePort = "COM-test";
+        var recording = voice.BeginListeningAsync();
+        Assert.True(voice.IsListening);
+        voice.FinishListening();
+        speech.Transcript.SetResult("这是模块采音");
+        await recording;
+        Assert.Equal(0, speech.Listens);
+        Assert.Equal(1, speech.PcmCalls);
+        Assert.Equal("这是模块采音", client.Turns.Single().Text);
+        Assert.Equal(0, voice.MicrophoneLevel);
+    }
 
     [AvaloniaFact]
     public async Task HoldReleaseSendsOnceAndReadsOnlyTheNewCompletedReply()
@@ -219,6 +258,32 @@ public sealed class VoiceTests
         await restored.ConnectAsync();
         Assert.False(restored.ReadReplies);
         Assert.True(System.Text.Json.JsonSerializer.Deserialize<ChatClientState>("{}")!.ReadReplies);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(1440, 900)]
+    [InlineData(980, 700)]
+    public async Task ModuleSelectorRendersAtBothWidthsWithoutOpeningHardware(int width, int height)
+    {
+        using var tracking = new MainViewModel();
+        var window = new MainWindow(tracking) { Width = width, Height = height };
+        try
+        {
+            window.Show(); window.Shell.PageIndex = 1;
+            var view = window.FindControl<DevicesView>("DevicesView")!;
+            view.FindControl<ComboBox>("MicrophoneSourceSelector")!.SelectedIndex = 1;
+            await Task.Delay(30);
+            Assert.True(window.Shell.Voice.IsI2sMicrophone);
+            Assert.True(view.FindControl<ComboBox>("MicrophonePortSelector")!.IsEffectivelyVisible);
+            Assert.Null(window.Shell.Voice.MicrophonePort);
+            Assert.False(tracking.Servo.Ready);
+            view.FindControl<ScrollViewer>("DeviceScroll")!.ScrollToEnd();
+            using var bitmap = window.CaptureRenderedFrame();
+            var directory = Path.Combine(Workspace(), "artifacts", "voice-preview");
+            Directory.CreateDirectory(directory);
+            bitmap!.Save(Path.Combine(directory, $"module-{width}.png"));
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaFact]

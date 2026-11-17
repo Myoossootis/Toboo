@@ -13,6 +13,8 @@
 
 Uno LCD 的接线、固定依赖、构建和上传见 [表情屏说明](../docs/lcd.md)。`uno_lcd` 与 `uno_sensors` 当前为二选一固件，串口独占。
 
+ICS43432 可通过 `build-firmware.ps1 -Target single -EnableMicrophone` 与云台合并构建，接线、共享串口和实测步骤见 [麦克风说明](../docs/microphone.md)。
+
 ## 准备环境
 
 使用 `toolchain.json` 固定的 Arduino CLI 1.5.1 和 ESP32 core 3.3.12。工具隔离在忽略目录 `tmp/esp32-tools/`，不修改系统 Arduino IDE。

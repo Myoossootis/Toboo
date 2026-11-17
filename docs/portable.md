@@ -6,7 +6,7 @@
 
 摄像头和表情分析在本地运行。陪伴页和设备页可以直接预览角色动画。实体 LCD1602 通过独立的 Uno 同步状态，先下载对应版本的 Uno 固件并按 `docs/lcd.md` 烧录，再在设备页选择 Uno 的串口。串口支持随包提供，舵机与传感器工具使用包内运行环境，请保留 `runtime` 和 `firmware` 文件夹。
 
-语音使用 Windows 已安装的中文识别引擎和中文声音。连接 Harness 后按住说话、松开发送，回复会自动朗读；按 Esc 可取消识别，「停止语音」可打断朗读。使用系统默认麦克风与音频输出。缺少语言组件时，按 `docs/getting-started.md` 的说明配置 Windows 中文语音，再到设备页检查。ICS43432 硬件采音仍待实物接入。
+语音使用 Windows 已安装的中文识别引擎和中文声音。连接 Harness 后按住说话、松开发送，回复会自动朗读；按 Esc 可取消识别，「停止语音」可打断朗读。默认使用电脑麦克风，在设备页可切换 ICS43432 并选择 ESP32-S3 串口，接线及合并固件见 `docs/microphone.md`。音频输出使用系统默认设备。缺少语言组件时，按 `docs/getting-started.md` 的说明配置 Windows 中文语音，再到设备页检查。
 
 诊断信息写入本目录的 `diagnostics/`。原有设置保留在 `%LOCALAPPDATA%\PanTiltTracker\`；聊天私有数据在 `%USERPROFILE%\.toboo-harness\`。不要公开个人数据与连接文件。
 
