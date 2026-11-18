@@ -32,15 +32,19 @@ public sealed class ArucoTargetDetector : IDisposable
             default: throw new ArgumentException("Expected Gray8, BGR8 or BGRA8.", nameof(image));
         }
 
+        var points = FindCorners(gray);
+        if (points is null)
+            return new(frameNumber, capturedAt, image.Width, image.Height, null, null);
+        return new(frameNumber, capturedAt, image.Width, image.Height,
+            points.Average(point => (double)point.X), points.Average(point => (double)point.Y));
+    }
+
+    internal Point2f[]? FindCorners(Mat gray)
+    {
         CvAruco.DetectMarkers(gray, dictionary, out var corners, out var ids, parameters, out _);
         var matches = Enumerable.Range(0, ids.Length).Where(index => ids[index] == targetId).ToArray();
         // Duplicate IDs are ambiguous: hold position instead of selecting an arbitrary target.
-        if (matches.Length != 1)
-            return new(frameNumber, capturedAt, image.Width, image.Height, null, null);
-
-        var points = corners[matches[0]];
-        return new(frameNumber, capturedAt, image.Width, image.Height,
-            points.Average(point => (double)point.X), points.Average(point => (double)point.Y));
+        return matches.Length == 1 ? corners[matches[0]] : null;
     }
 
     public static Mat CreateMarker(int id = 7, int sidePixels = 600)

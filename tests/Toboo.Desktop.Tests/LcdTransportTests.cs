@@ -14,6 +14,7 @@ public sealed class LcdTransportTests
         public string Hello { get; set; } = "TOBOO_LCD,1,UNO,16,2\r\n";
         public string Capabilities { get; set; } = "ERR\r\n";
         public string Faces { get; set; } = "ERR\r\n";
+        public string RangeCapabilities { get; set; } = "ERR\r\n";
         public Func<string, string?> Reply { get; set; } = text => "OK," + text.Split(',')[1] + "\r\n";
         public bool Disposed { get; private set; }
         public bool Opened { get; private set; }
@@ -23,7 +24,8 @@ public sealed class LcdTransportTests
         public void WriteLine(string text)
         {
             Written.Enqueue(text);
-            var response = text switch { "TOBOO_LCD?" => Hello, "LCD_CAPS?" => Capabilities, "LCD_FACES?" => Faces, _ => Reply(text) };
+            var response = text switch { "TOBOO_LCD?" => Hello, "LCD_CAPS?" => Capabilities, "LCD_FACES?" => Faces,
+                "LCD_RANGE_CAPS?" => RangeCapabilities, _ => Reply(text) };
             if (response is not null) foreach (var value in Encoding.ASCII.GetBytes(response)) incoming.Enqueue(value);
         }
         public int ReadByte()
@@ -75,6 +77,42 @@ public sealed class LcdTransportTests
         Assert.True(await connection.SendRoleAsync(LcdRole.Sad, 400, default));
         Assert.Contains("LCD_FACES?", channel.Written);
         Assert.StartsWith($"R,{sentRole},", channel.Written.Last());
+    }
+
+    [Fact]
+    public async Task RangeAndLcdShareOneRequestStreamAndDrainAnEmittedRequestOnCancellation()
+    {
+        using var receivedRange = new ManualResetEventSlim();
+        using var releaseReply = new ManualResetEventSlim();
+        var channel = new Channel
+        {
+            Capabilities = "LCD_CAPS,ROLE1\n", Faces = "LCD_FACES,7\n", RangeCapabilities = "LCD_RANGE_CAPS,1\n",
+            Reply = text =>
+            {
+                if (text != "LCD_RANGE?") return "OK,R,thinking\n";
+                receivedRange.Set();
+                Assert.True(releaseReply.Wait(TimeSpan.FromSeconds(4)));
+                return "LCD_RANGE,275\n";
+            }
+        };
+        using var line = await LcdConnection.OpenAsync(channel, default, TimeSpan.Zero);
+        Assert.True(line.SupportsRange);
+        using var cancel = new CancellationTokenSource();
+        var range = line.ReadRangeAsync(cancel.Token);
+        try
+        {
+            Assert.True(receivedRange.Wait(TimeSpan.FromSeconds(4)));
+            var lcd = line.SendRoleAsync(LcdRole.Thinking, 1200, default);
+            Assert.Equal("LCD_RANGE?", channel.Written.Last());
+            cancel.Cancel(); releaseReply.Set();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => range);
+            Assert.True(await lcd);
+        }
+        finally { releaseReply.Set(); }
+        Assert.Equal(275, (await line.ReadRangeAsync(default))?.Millimeters);
+        channel.Reply = _ => "LCD_RANGE,0\n";
+        var invalid = await line.ReadRangeAsync(default);
+        Assert.NotNull(invalid); Assert.Null(invalid.Value.Millimeters);
     }
 
     [Fact]

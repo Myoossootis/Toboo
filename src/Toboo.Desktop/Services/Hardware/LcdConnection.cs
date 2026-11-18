@@ -7,10 +7,14 @@ namespace Toboo.Desktop.Services;
 // Roles after Happy require the seven-expression firmware.
 public enum LcdRole { Idle, Attentive, Thinking, Responding, Happy, Neutral, Angry, Disgust, Fearful, Sad, Surprised }
 
+internal readonly record struct UnoRangeReading(long Timestamp, int? Millimeters);
+
 internal interface ILcdConnection : IDisposable
 {
     bool SupportsRoles { get; }
     bool SupportsExpressions { get; }
+    bool SupportsRange => false;
+    Task<UnoRangeReading?> ReadRangeAsync(CancellationToken cancellation) => Task.FromResult<UnoRangeReading?>(null);
     Task SendAsync(string label, int lifetimeMilliseconds, CancellationToken cancellation);
     Task<bool> SendRoleAsync(LcdRole role, int lifetimeMilliseconds, CancellationToken cancellation);
 }
@@ -27,9 +31,11 @@ internal interface ILcdSerialChannel : IDisposable
 internal sealed class LcdConnection : ILcdConnection
 {
     private readonly ILcdSerialChannel channel;
+    private readonly SemaphoreSlim wire = new(1, 1);
     private int busy, disposed;
     public bool SupportsRoles { get; private set; }
     public bool SupportsExpressions { get; private set; }
+    public bool SupportsRange { get; private set; }
     private LcdConnection(ILcdSerialChannel channel) => this.channel = channel;
 
     internal static Task<ILcdConnection> OpenAsync(string port, CancellationToken cancellation) =>
@@ -66,11 +72,55 @@ internal sealed class LcdConnection : ILcdConnection
                         _ => throw new IOException("UNO LCD 返回了未知的表情能力。")
                     };
                 }
+                if (connection.SupportsExpressions)
+                {
+                    channel.WriteLine("LCD_RANGE_CAPS?");
+                    connection.SupportsRange = connection.ReadLine(TimeSpan.FromMilliseconds(600), cancellation) switch
+                    {
+                        "LCD_RANGE_CAPS,1" => true,
+                        "ERR" => false,
+                        _ => throw new IOException("UNO 返回了未知的测距能力。")
+                    };
+                }
             }, cancellation);
             cancellation.ThrowIfCancellationRequested();
             return connection;
         }
         catch { connection.Dispose(); throw; }
+    }
+
+    public async Task<UnoRangeReading?> ReadRangeAsync(CancellationToken cancellation)
+    {
+        if (!SupportsRange || !wire.Wait(0)) return null;
+        try
+        {
+            var reading = await Task.Run<UnoRangeReading?>(() =>
+            {
+                cancellation.ThrowIfCancellationRequested();
+                ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
+                var start = Stopwatch.GetTimestamp();
+                channel.WriteLine("LCD_RANGE?");
+                // Finish draining an emitted request even if the map closes during its reply.
+                var reply = ReadLine(TimeSpan.FromMilliseconds(350), CancellationToken.None);
+                var end = Stopwatch.GetTimestamp();
+                if (reply == "LCD_RANGE,WAIT") return null;
+                if (!reply.StartsWith("LCD_RANGE,", StringComparison.Ordinal) ||
+                    !int.TryParse(reply.AsSpan(10), System.Globalization.NumberStyles.None,
+                        System.Globalization.CultureInfo.InvariantCulture, out var mm) || (mm != 0 && mm is < 20 or > 4000))
+                    throw new IOException("Uno 返回了无效测距数据。");
+                return new(start + (end - start) / 2,
+                    mm != 0 && Stopwatch.GetElapsedTime(start, end).TotalMilliseconds <= 100 ? mm : null);
+            }, cancellation);
+            cancellation.ThrowIfCancellationRequested();
+            return reading;
+        }
+        catch (Exception error) when (error is IOException or TimeoutException)
+        {
+            // A late range reply must never be read as the next LCD acknowledgement.
+            Dispose();
+            throw;
+        }
+        finally { wire.Release(); }
     }
 
     public async Task SendAsync(string label, int lifetimeMilliseconds, CancellationToken cancellation)
@@ -96,8 +146,11 @@ internal sealed class LcdConnection : ILcdConnection
         if (Interlocked.CompareExchange(ref busy, 1, 0) != 0)
             throw new InvalidOperationException("LCD 正在确认上一条请求，不能排队发送旧表情。");
         var started = Stopwatch.GetTimestamp();
+        var ownsWire = false;
         try
         {
+            await wire.WaitAsync(cancellation);
+            ownsWire = true;
             return await Task.Run(() =>
             {
                 cancellation.ThrowIfCancellationRequested();
@@ -116,7 +169,11 @@ internal sealed class LcdConnection : ILcdConnection
                 return true;
             }, cancellation);
         }
-        finally { Volatile.Write(ref busy, 0); }
+        finally
+        {
+            if (ownsWire) wire.Release();
+            Volatile.Write(ref busy, 0);
+        }
     }
 
     private string ReadLine(TimeSpan timeout, CancellationToken cancellation)

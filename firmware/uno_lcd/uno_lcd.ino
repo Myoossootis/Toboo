@@ -4,6 +4,14 @@
 #include <hd44780.h>
 #include <hd44780ioClass/hd44780_I2Cexp.h>
 #include "LcdFace.h"
+#include "LcdRange.h"
+
+#ifndef TOBOO_LCD_ULTRASONIC
+#define TOBOO_LCD_ULTRASONIC 0
+#endif
+const uint8_t triggerPin = 7, echoPin = 8;
+uint32_t lastRangeAt = 0;
+bool hasRanged = false;
 
 hd44780_I2Cexp lcd; // Detect backpack address and pin mapping; no assumed 0x27.
 LcdProtocol protocol;
@@ -55,6 +63,9 @@ void draw(uint32_t now, bool immediate = false) {
 }
 void setup() {
   Serial.begin(115200);
+#if TOBOO_LCD_ULTRASONIC
+  pinMode(triggerPin, OUTPUT); digitalWrite(triggerPin, LOW); pinMode(echoPin, INPUT);
+#endif
   Wire.begin();
   Wire.setWireTimeout(25000, true);
   lcdStatus = lcd.begin(16, 2);
@@ -74,6 +85,26 @@ void loop() {
       Serial.println(F("LCD_CAPS,ROLE1"));
     } else if (result == LcdProtocol::Faces) {
       Serial.println(F("LCD_FACES,7"));
+    } else if (result == LcdProtocol::RangeCapabilities) {
+#if TOBOO_LCD_ULTRASONIC
+      Serial.println(F("LCD_RANGE_CAPS,1"));
+#else
+      Serial.println(F("ERR"));
+#endif
+    } else if (result == LcdProtocol::Range) {
+#if TOBOO_LCD_ULTRASONIC
+      if (hasRanged && (uint32_t)(now - lastRangeAt) < 65) {
+        Serial.println(F("LCD_RANGE,WAIT"));
+      } else {
+        hasRanged = true; lastRangeAt = now;
+        digitalWrite(triggerPin, LOW); delayMicroseconds(2);
+        digitalWrite(triggerPin, HIGH); delayMicroseconds(10); digitalWrite(triggerPin, LOW);
+        const auto duration = pulseIn(echoPin, HIGH, 25000UL);
+        Serial.print(F("LCD_RANGE,")); Serial.println(lcdDistanceMm(duration));
+      }
+#else
+      Serial.println(F("ERR"));
+#endif
     } else if (result == LcdProtocol::Updated || result == LcdProtocol::RoleUpdated) {
       draw(now, true);
       if (lcdStatus != 0) { Serial.print(F("TOBOO_LCD_ERROR,")); Serial.println(lcdStatus); }

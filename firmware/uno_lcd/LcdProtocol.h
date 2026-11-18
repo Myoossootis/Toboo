@@ -11,7 +11,7 @@ enum class LcdRole : uint8_t {
 // Fixed storage, strict vocabulary and a per-observation expiry. No actuator output.
 class LcdProtocol {
 public:
-  enum Result { None, Hello, Capabilities, Faces, Status, Updated, RoleUpdated, Rejected };
+  enum Result { None, Hello, Capabilities, Faces, Status, Updated, RoleUpdated, RangeCapabilities, Range, Rejected };
   uint8_t expression = 7;
   bool animated = true;
   LcdRole role = LcdRole::Idle;
@@ -87,6 +87,8 @@ private:
     if (!session) return Rejected;
     if (strcmp(buffer, "LCD_CAPS?") == 0) return Capabilities;
     if (strcmp(buffer, "LCD_FACES?") == 0) return Faces;
+    if (strcmp(buffer, "LCD_RANGE_CAPS?") == 0) return RangeCapabilities;
+    if (strcmp(buffer, "LCD_RANGE?") == 0) return Range;
     const bool isRole = strncmp(buffer, "R,", 2) == 0;
     if (!isRole && strncmp(buffer, "E,", 2) != 0) return Rejected;
     char* comma = strchr(buffer + 2, ',');

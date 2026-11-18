@@ -34,6 +34,7 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
     private bool isConnected;
     public bool CanConnect => !disposed && !Connecting && !IsConnected;
     public bool CanDisconnect => Connecting || IsConnected;
+    internal bool CanReadRange => IsConnected && connection?.SupportsRange == true;
     public string PreviewLabel => PreviewRole switch
     {
         LcdRole.Attentive => "注意",
@@ -97,7 +98,8 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
                 if (!await opened.SendRoleAsync(LcdRole.Idle, RoleLifetime, token))
                     throw new TimeoutException("角色状态在串口发送前已过期。");
                 token.ThrowIfCancellationRequested();
-                Status = opened.SupportsExpressions ? "已连接 · 实体屏动画已开启" : "已连接 · 七类表情需要新版 Uno 固件";
+                Status = opened.SupportsRange ? "已连接 · 表情屏与超声波可共用" :
+                    opened.SupportsExpressions ? "已连接 · 实体屏动画已开启" : "已连接 · 七类表情需要新版 Uno 固件";
             }
             else
             {
@@ -119,6 +121,18 @@ public sealed partial class LcdViewModel : ObservableObject, IDisposable
     }
 
     private async void Tick(object? sender, EventArgs args) => await SendCurrentAsync();
+
+    internal async Task<UnoRangeReading?> ReadRangeAsync(CancellationToken cancellation)
+    {
+        if (!CanReadRange || connection is not { } current) return null;
+        try { return await current.ReadRangeAsync(cancellation); }
+        catch (Exception error) when (IsConnectionError(error))
+        {
+            if (ReferenceEquals(current, connection))
+            { Disconnect(); Status = "Uno 测距连接已断开 · " + error.Message; }
+            throw;
+        }
+    }
 
     internal async Task SendCurrentAsync()
     {

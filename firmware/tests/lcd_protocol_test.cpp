@@ -1,4 +1,5 @@
 #include "../uno_lcd/LcdFace.h"
+#include "../uno_lcd/LcdRange.h"
 #include <assert.h>
 #include <stdio.h>
 
@@ -9,6 +10,7 @@ LcdProtocol::Result send(LcdProtocol& p, const char* line, uint32_t now) {
 }
 int main() {
   LcdProtocol p;
+  assert(send(p, "LCD_RANGE?\n", 0) == LcdProtocol::Rejected);
   assert(p.expression == 7);
   assert(send(p, "E,happy,400\n", 0) == LcdProtocol::Rejected);
   assert(send(p, "TOBOO_LCD?\r\n", 1) == LcdProtocol::Hello);
@@ -52,6 +54,11 @@ int main() {
   assert(send(role, "R,idle,1200\n", 110) == LcdProtocol::RoleUpdated);
   assert(role.animated && role.roleStartedAt == 110 && role.expression == 7);
   assert(send(role, "LCD_FACES?\n", 115) == LcdProtocol::Faces);
+  assert(send(role, "LCD_RANGE_CAPS?\n", 116) == LcdProtocol::RangeCapabilities);
+  assert(send(role, "LCD_RANGE?\n", 117) == LcdProtocol::Range);
+  assert(role.role == LcdRole::Idle && role.roleStartedAt == 110);
+  assert(lcdDistanceMm(0) == 0 && lcdDistanceMm(100) == 0 && lcdDistanceMm(120) == 20);
+  assert(lcdDistanceMm(1000) == 171 && lcdDistanceMm(23500) == 0 && lcdDistanceMm(UINT32_MAX) == 0);
 
   const LcdRole expressions[] = {LcdRole::Angry, LcdRole::Disgust, LcdRole::Fearful, LcdRole::Happy,
     LcdRole::Neutral, LcdRole::Sad, LcdRole::Surprised};

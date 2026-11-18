@@ -22,6 +22,7 @@ public sealed partial class MainWindow : Window
         DataContext = Shell;
         Shell.AdvancedRequested += ShowAdvanced;
         Shell.SensorsRequested += ShowSensors;
+        Shell.MappingRequested += ShowMapping;
         viewModel.FramePresented += RefreshPreview;
         Deactivated += (_, _) => { if (Shell.Voice.IsListening) Shell.Voice.Stop(); };
         SizeChanged += (_, _) => ApplyLayout();
@@ -59,6 +60,14 @@ public sealed partial class MainWindow : Window
         sensorWindow = new SensorWindow();
         sensorWindow.Closed += (_, _) => sensorWindow = null;
         sensorWindow.Show(this);
+    }
+
+    private async void ShowMapping()
+    {
+        if (!Shell.CanOpenMapping) return;
+        // The mapping window owns the selected camera while the main device controls are modal.
+        sensorWindow?.Close(); advancedWindow?.Close();
+        await new MappingWindow(ViewModel.SelectedCamera, ViewModel.Lcd).ShowDialog(this);
     }
     private void DragWindow(object? sender, PointerPressedEventArgs args)
     {

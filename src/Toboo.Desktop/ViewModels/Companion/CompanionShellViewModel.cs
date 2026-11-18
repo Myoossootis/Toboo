@@ -15,6 +15,7 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     public VoiceViewModel Voice { get; }
     public event Action<int>? AdvancedRequested;
     public event Action? SensorsRequested;
+    public event Action? MappingRequested;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsCompanionPage), nameof(IsDevicesPage), nameof(IsSettingsPage), nameof(PageTitle))]
     private int pageIndex;
@@ -56,6 +57,7 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     public string StopLabel => Tracking.IsFollowing ? "停止跟随" : "停止感知";
     public bool HasNotice => Tracking.HasError || Tracking.HasServoNotice;
     public bool CanStartVision => Tracking.CanStart && Tracking.SelectedCamera is not null;
+    public bool CanOpenMapping => Tracking.CanConfigure && !Tracking.Servo.Busy;
     public bool CanFollow => Tracking.CanStartFollow && Tracking.FaceAim.GeometryMode > 0 && Tracking.SelectedCamera is not null;
     public bool CanPrepareRobot => !Tracking.IsFollowing && !Tracking.IsChangingMode;
     public string FollowActionLabel => Tracking.IsChangingMode ? "正在切换…"
@@ -102,6 +104,11 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     [RelayCommand] private void UsePreviewDimensions() => Tracking.UsePreviewDimensionsForCalibration();
     [RelayCommand] private void OpenExpression() => AdvancedRequested?.Invoke(4);
     [RelayCommand] private void OpenSensors() => SensorsRequested?.Invoke();
+    [RelayCommand(CanExecute = nameof(CanOpenMapping))]
+    private void OpenMapping()
+    {
+        if (CanOpenMapping) MappingRequested?.Invoke();
+    }
     [RelayCommand] private void ShowPrivacy() => SettingsSection = 2;
     [RelayCommand(CanExecute = nameof(CanStartVision))]
     private async Task StartVisionAsync()
@@ -120,7 +127,7 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
             or nameof(MainViewModel.ExpressionEnabled) or nameof(MainViewModel.HasError) or nameof(MainViewModel.HasServoNotice)
             or nameof(MainViewModel.IsChangingMode) or nameof(ServoViewModel.CanControl) or nameof(ServoViewModel.FirmwareReady)
             or nameof(ServoViewModel.CanFollow) or nameof(ServoViewModel.Ready) or nameof(ServoViewModel.TiltCalibrationSaved)
-            or nameof(ServoViewModel.TiltCalibrating) or nameof(ServoViewModel.PanMotionBlocked) or nameof(ServoViewModel.TiltMotionBlocked) or nameof(ServoViewModel.FollowReadiness)
+            or nameof(ServoViewModel.TiltCalibrating) or nameof(ServoViewModel.PanMotionBlocked) or nameof(ServoViewModel.TiltMotionBlocked) or nameof(ServoViewModel.FollowReadiness) or nameof(ServoViewModel.Busy)
             or nameof(FaceAimViewModel.GeometryMode) or nameof(FaceAimViewModel.DirectionsConfirmed) or nameof(FaceAimViewModel.Status))) return;
         RefreshStatus();
     }
@@ -141,6 +148,7 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
         OnPropertyChanged(nameof(CameraState)); OnPropertyChanged(nameof(RobotConnection));
         OnPropertyChanged(nameof(SourceCaption)); OnPropertyChanged(nameof(CanFollow));
         OnPropertyChanged(nameof(CanStartVision)); OnPropertyChanged(nameof(FollowState));
+        OpenMappingCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanPrepareRobot)); OnPropertyChanged(nameof(PreparationHint)); OnPropertyChanged(nameof(FollowActionLabel));
         OnPropertyChanged(nameof(CanAdvanceSetup)); AdvanceSetupCommand.NotifyCanExecuteChanged(); PreviousSetupStepCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(SetupMessage));
@@ -157,6 +165,6 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
         Tracking.FaceAim.PropertyChanged -= Changed;
         Tracking.Cameras.CollectionChanged -= CamerasChanged;
         Chat.PropertyChanged -= ChatChanged; Chat.Dispose();
-        AdvancedRequested = null; SensorsRequested = null;
+        AdvancedRequested = null; SensorsRequested = null; MappingRequested = null;
     }
 }
