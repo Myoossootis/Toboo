@@ -8,6 +8,8 @@
 
 连接 Harness 后按住说话、松开发送，回复会自动朗读；按 Esc 可取消识别，「停止语音」可打断朗读。默认电脑麦克风使用 Windows 中文识别，在设备页切换 ICS43432 并选择 ESP32-S3 串口后，使用随包附带的 Whisper 模型在本地识别。接线、合并固件及 CPU / 系统要求见 `docs/microphone.md`。朗读使用 Windows 中文声音和系统默认音频输出，缺少朗读组件时按 `docs/getting-started.md` 配置。
 
+本版本另提供禁止执行器输出的 ESP32-S3 N16R8 采音固件。桌面更新不会自动烧录或解除已有运动锁定。360°连续旋转舵机不能使用当前角度定位与机械边界流程；更换定位型后也须重新核对请求参考、方向和范围，见 `docs/hardware.md`。
+
 诊断信息写入本目录的 `diagnostics/`。原有设置保留在 `%LOCALAPPDATA%\PanTiltTracker\`；聊天私有数据在 `%USERPROFILE%\.toboo-harness\`。不要公开个人数据与连接文件。
 
 版本及构建提交见 `build-info.json`，第三方声明见 `THIRD-PARTY-NOTICES.md` 和 `licenses/`。

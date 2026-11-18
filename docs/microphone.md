@@ -24,19 +24,23 @@ GPIO17/18 继续用于已有舵机驱动板。ESP32-S3 通过原生 USB 接电�
 使用仓库固定的 Arduino CLI 1.5.1 与 ESP32 Arduino core 3.3.12。
 
 ```powershell
-./scripts/build-firmware.ps1 -Target single -EnableMicrophone
+./scripts/build-firmware.ps1 -Target single -EnableMicrophone -LockAllServoOutput
 ```
 
-输出位于 `artifacts/esp32-mic-servo/build/`。合并固件沿用云台协议、会话校验、默认未使能状态及独立超时处理。采音在独立 FreeRTOS 任务中进行，通过有界队列送回主循环。麦克风命令不改变舵机使能、角度或标定。
+初次只接入语音或舵机类型尚未核对时，使用上面的全输出锁定构建，输出位于 `artifacts/esp32-mic-servo-motionlocked/build/`，身份为 `0.5.3-motion-locked`，保留采音与只读状态并拒绝执行器指令。采音在独立 FreeRTOS 任务中进行，通过有界队列送回主循环。麦克风命令不改变舵机使能、角度或标定。
+
+只有已核对为角度定位型且完成机构标定的装置，才应考虑不带 `-LockAllServoOutput` 的构建；它输出到 `artifacts/esp32-mic-servo/build/`，沿用云台协议、会话校验、默认未使能状态及超时停发。连续旋转型不能依靠这套协议实现角度限位，停发不等于实际停转。完整限制见 [硬件接口](hardware.md)。
 
 烧录前退出占用 ESP32 的程序，确认实际串口。以下 COM6 是示例。
 
 ```powershell
 $settings = Get-Content firmware/toolchain.json -Raw | ConvertFrom-Json
-./tmp/esp32-tools/cli/arduino-cli.exe upload --config-file tmp/esp32-tools/arduino-cli.yaml --fqbn $settings.fqbn --port COM6 --input-dir artifacts/esp32-mic-servo/build --verify
+./tmp/esp32-tools/cli/arduino-cli.exe upload --config-file tmp/esp32-tools/arduino-cli.yaml --fqbn $settings.fqbn --port COM6 --input-dir artifacts/esp32-mic-servo-motionlocked/build --verify
 ```
 
-重新连接 toboo 后，在设备页重新读云台状态。
+重新连接 toboo 后，在设备页读取状态。发现锁定固件时，应用会保存锁定状态；读取或保存边界不会恢复运动。
+
+Release 的 `toboo-0.2.3-esp32s3-n16r8-ics43432-motion-locked.bin` 为完整合并镜像，仅适用于上述 ESP32-S3 N16R8 配置，使用 Espressif 烧录工具时写入偏移为 `0x0`。整片镜像会覆盖目标闪存中的原有内容；其他板型应按固定工具链自行构建。烧录不自动执行机械标定。
 
 ## 使用
 

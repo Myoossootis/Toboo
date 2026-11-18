@@ -35,9 +35,17 @@ try {
     Copy-Item tmp/portable-deps/ui/u4 (Join-Path $licensePath 'Microsoft-VC-runtime-en.rtf')
     Copy-Item tmp/portable-deps/ui/u28 (Join-Path $licensePath 'Microsoft-VC-runtime-zh-CN.rtf')
     Copy-Item docs/portable.md (Join-Path $outputPath 'README-portable-zh-CN.md')
-    Copy-Item -LiteralPath docs -Destination (Join-Path $outputPath 'docs') -Recurse
+    # Never publish ignored local additions that happen to be inside docs/licenses.
+    $publicDocuments = @(& git ls-files -- docs licenses)
+    if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate public documentation.' }
+    foreach ($relative in $publicDocuments) {
+        $destination = Join-Path $outputPath $relative
+        New-Item -ItemType Directory -Force (Split-Path -Parent $destination) | Out-Null
+        Copy-Item -LiteralPath $relative -Destination $destination
+    }
     New-Item -ItemType Directory -Force (Join-Path $outputPath 'scripts') | Out-Null
     Copy-Item scripts/install-toboo-harness.ps1 (Join-Path $outputPath 'scripts/install-toboo-harness.ps1')
+    Copy-Item scripts/prepare-speech-model.ps1 (Join-Path $outputPath 'scripts/prepare-speech-model.ps1')
     # Ship only committed firmware sources, never local board logs or tool caches.
     $firmwareFiles = @(& git ls-files firmware)
     if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate firmware sources.' }
@@ -53,7 +61,6 @@ try {
         Copy-Item -LiteralPath (Join-Path 'integrations/toboo-harness' $file) -Destination $bridgePath
     }
     Copy-Item THIRD-PARTY-NOTICES.md $outputPath
-    Copy-Item licenses/* $licensePath
     $serialDestination = Join-Path $outputPath 'runtime/python'
     New-Item -ItemType Directory -Force (Split-Path -Parent $serialDestination) | Out-Null
     Copy-Item -LiteralPath $serialRuntime -Destination $serialDestination -Recurse
@@ -89,6 +96,7 @@ try {
         platform = 'win-x64'; selfContained = $true; vcRuntime = '14.44.35211.0';
         vcInstallerSha256 = (Get-FileHash tmp/portable-deps/vc_redist.x64.exe -Algorithm SHA256).Hash;
         hardwareOutput = 'disabled'; physicalCameraVerified = $false;
+        automaticFirmwareFlashing = $false; startupActuatorEnable = $false;
         serialRuntime = (Get-Content config/serial-runtime.json -Raw | ConvertFrom-Json)
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputPath 'build-info.json') -Encoding UTF8
     foreach ($required in @('toboo.exe', 'coreclr.dll', 'OpenCvSharpExtern.dll', 'libSkiaSharp.dll', 'vcruntime140.dll', 'msvcp140.dll', 'models/face/face_detection_yunet_2023mar.onnx', 'models/expression/facial_expression_recognition_mobilefacenet_2022july.onnx', 'models/speech/ggml-base.bin', 'runtimes/win-x64/whisper.dll', 'scripts/install-toboo-harness.ps1', 'integrations/toboo-harness/index.mjs')) {

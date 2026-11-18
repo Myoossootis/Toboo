@@ -65,7 +65,7 @@
 GitHub Release 提供对应版本的 `toboo-版本号-uno-lcd.hex` 预编译固件。使用 Arduino CLI 和 Arduino AVR core 可直接写入 Uno。先断开 toboo 的表情屏连接，将示例中的 COM7、文件名和路径换成实际值。
 
 ```powershell
-arduino-cli upload --fqbn arduino:avr:uno --port COM7 --input-file ./toboo-0.2.2-uno-lcd.hex --verify
+arduino-cli upload --fqbn arduino:avr:uno --port COM7 --input-file ./toboo-0.2.3-uno-lcd.hex --verify
 ```
 
 需要从源码构建时，使用以下隔离工具环境。

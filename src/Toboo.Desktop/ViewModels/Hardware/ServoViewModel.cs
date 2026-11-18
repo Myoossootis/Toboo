@@ -35,9 +35,9 @@ public sealed partial class ServoViewModel : ObservableObject
     [ObservableProperty] private bool tiltCalibrationSaved;
     [ObservableProperty] private bool panMotionBlocked;
     [ObservableProperty] private bool tiltMotionBlocked;
-    public string PanBlockReason => "S1 输出已锁定：360°舵机尚未验证角度定位，停转点不能作为机械中心。";
-    public string TiltBlockReason => "S2 类型待核对，角度运动已锁定。旧请求范围不代表真实轴角度。";
-    public string MotionBlockReason => PanMotionBlocked && TiltMotionBlocked ? "两轴角度运动已锁定：S1 不支持角度定位，S2 类型待确认。" : TiltMotionBlocked ? TiltBlockReason : PanBlockReason;
+    public string PanBlockReason => "S1 输出已锁定。请核对定位类型、请求参考和工作边界；连续旋转舵机不能用于角度定位。";
+    public string TiltBlockReason => "S2 输出已锁定。请核对定位类型、请求参考和工作边界；旧请求范围不代表真实轴角度。";
+    public string MotionBlockReason => PanMotionBlocked && TiltMotionBlocked ? "两轴输出已锁定，读取状态或保存边界不会恢复运动。" : TiltMotionBlocked ? TiltBlockReason : PanBlockReason;
     [ObservableProperty] private string status = "先读取串口状态。";
 
     public bool CanControl => readyFirmware && Ready && !Busy;

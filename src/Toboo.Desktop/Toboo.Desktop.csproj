@@ -21,7 +21,11 @@
     <PackageReference Include="System.Speech" Version="8.0.0" />
     <PackageReference Include="Whisper.net" Version="1.9.1" />
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
-    <Content Include="../../models/speech/*" Link="models/speech/%(Filename)%(Extension)"
+    <Content Include="../../models/speech/model.json" Link="models/speech/model.json"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../models/speech/ggml-base.bin" Link="models/speech/ggml-base.bin" Condition="Exists('../../models/speech/ggml-base.bin')"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../models/speech/ggml-silero-v5.1.2.bin" Link="models/speech/ggml-silero-v5.1.2.bin" Condition="Exists('../../models/speech/ggml-silero-v5.1.2.bin')"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../config/tracker.json" Link="tracker.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../config/face-aim.json" Link="face-aim.json" CopyToOutputDirectory="PreserveNewest" />

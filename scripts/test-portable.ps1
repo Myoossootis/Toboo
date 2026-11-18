@@ -1,4 +1,4 @@
-﻿param([Parameter(Mandatory = $true)][string]$ZipPath, [int]$CameraIndex = -1, [string]$BaseZipPath, [string]$LcdPort)
+param([Parameter(Mandatory = $true)][string]$ZipPath, [int]$CameraIndex = -1, [string]$BaseZipPath, [string]$LcdPort, [switch]$SpeechSelfTest)
 $ErrorActionPreference = 'Stop'
 $repositoryPath = Split-Path -Parent $PSScriptRoot
 $resolvedZip = (Resolve-Path -LiteralPath $ZipPath).Path
@@ -34,9 +34,22 @@ foreach ($required in @('README-portable-zh-CN.md', 'docs/harness.md', 'docs/lcd
     if (!(Test-Path -LiteralPath (Join-Path $appPath $required))) { throw "Missing packaged feature dependency: $required" }
 }
 $unexpected = @(Get-ChildItem -LiteralPath $appPath -Recurse -Force -File | Where-Object {
-    $_.FullName.Substring($appPath.Length + 1) -match '^(local|hardware|output|data|calibration|tmp|artifacts)[\\/]|(^|[\\/])(connection|client)\.json$|(^|[\\/])AGENTS\.md$'
+    $_.FullName.Substring($appPath.Length + 1) -match '^(local|hardware|output|data|calibration|tmp|artifacts)[\\/]|(^|[\\/])(connection|client)\.json$|(^|[\\/])AGENTS\.md$|\.local\.json$|\.(wav|pcm|mp3|mp4|avi|jsonl)$'
 })
 if ($unexpected.Count) { throw 'Local-only files found in the portable package.' }
+if (!(Test-Path -LiteralPath (Join-Path $appPath 'scripts/prepare-speech-model.ps1'))) { throw 'Missing speech model repair script.' }
+$speechModel = Get-Content -LiteralPath (Join-Path $appPath 'models/speech/model.json') -Raw | ConvertFrom-Json
+foreach ($model in @($speechModel, $speechModel.vad)) {
+    $path = Join-Path $appPath ('models/speech/' + $model.file)
+    if (!(Test-Path -LiteralPath $path) -or (Get-Item -LiteralPath $path).Length -ne $model.bytes -or
+        (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $model.sha256) {
+        throw "Packaged speech model failed size/SHA256 verification: $($model.file)"
+    }
+}
+foreach ($library in @('whisper.dll', 'ggml-whisper.dll', 'ggml-base-whisper.dll', 'ggml-cpu-whisper.dll')) {
+    if (!(Test-Path -LiteralPath (Join-Path $appPath "runtimes/win-x64/$library"))) { throw "Missing speech runtime: $library" }
+}
+Write-Host 'PASS: packaged Whisper/Silero model hashes and CPU runtime files.'
 $runtimeConfig = Get-Content -LiteralPath (Join-Path $appPath 'toboo.runtimeconfig.json') -Raw | ConvertFrom-Json
 if (!$runtimeConfig.runtimeOptions.includedFrameworks -or $runtimeConfig.runtimeOptions.framework) {
     throw 'Expected a self-contained runtime configuration.'
@@ -53,7 +66,9 @@ try {
     $env:PYTHONHOME = Join-Path $testPath 'wrong-python-home'
     $env:PYTHONPATH = Join-Path $testPath 'wrong-python-modules'
     $uiArguments = if ($CameraIndex -ge 0) { "--smoke-test-ui --camera-index $CameraIndex" } else { '--smoke-test-ui' }
-    foreach ($argument in @('--self-test', '--serial-runtime-self-test', $uiArguments)) {
+    $checks = @('--self-test', '--serial-runtime-self-test', $uiArguments)
+    if ($SpeechSelfTest) { $checks += '--speech-self-test' }
+    foreach ($argument in $checks) {
         $process = Start-Process -FilePath $executable -ArgumentList $argument -WorkingDirectory $appPath -WindowStyle Hidden -PassThru
         $null = $process.Handle
         if (!$process.WaitForExit(30000)) {
@@ -82,6 +97,14 @@ try {
     Write-Host "PASS: extracted ZIP, app-local $($selfTest.framework), native OpenCV, and $($uiTest.frames) desktop frames from $mode."
     Write-Host 'Actuator output is disabled. Other camera/computer combinations remain unverified.'
     Write-Host 'PASS: bundled servo, face-follow and sensor helper imports with system Python unavailable and hostile Python environment variables.'
+    if ($SpeechSelfTest) {
+        $speech = Get-Content -LiteralPath (Join-Path $appPath 'diagnostics/speech-self-test.json') -Raw | ConvertFrom-Json
+        if (!$speech.success -or $speech.source -ne 'synthetic-chinese-speech' -or $speech.microphoneUsed -or $speech.speakerUsed -or
+            $speech.modelRequestsSent -or [string]::IsNullOrWhiteSpace($speech.modulePcmRecognized)) {
+            throw 'Packaged synthetic speech recognition checks did not pass.'
+        }
+        Write-Host 'PASS: synthetic Chinese speech through Windows recognition, local Whisper and synthesis events; no microphone, speaker or model service used.'
+    }
     Write-Host "Reports: $appPath/diagnostics"
     if ($LcdPort) {
         if ($LcdPort -notmatch '^COM[1-9][0-9]*$') { throw 'Specify the confirmed UNO COM port explicitly.' }

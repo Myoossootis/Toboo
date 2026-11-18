@@ -4,6 +4,8 @@ Windows 桌面陪伴机器人原型：在一个界面中完成 AI 对话、摄�
 
 **[下载最新 Windows x64 版本](https://github.com/Myoossootis/Toboo/releases/latest)** · [开始使用](docs/getting-started.md) · [开发说明](docs/development.md) · [架构](docs/architecture.md)
 
+[v0.2.3 更新说明](docs/releases/v0.2.3.md)：中文语音对话、ICS43432 共享串口采音、七类表情动画与执行器输出锁定。
+
 ## 启动
 
 下载 Release 中的 `toboo-版本号-win-x64-portable.zip`，**完整解压后双击 `toboo.exe`**。便携包自带 .NET 运行时，无需安装 SDK。
