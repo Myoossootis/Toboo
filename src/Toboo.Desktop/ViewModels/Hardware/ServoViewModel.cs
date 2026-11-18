@@ -107,7 +107,8 @@ public sealed partial class ServoViewModel : ObservableObject
         : "两轴请求与工作边界已就绪。";
     public bool CanPattern => CanCalibratedMotion && SweepReady;
 
-    public ServoViewModel() : this(ServoTool.RunAsync) { }
+    public ServoViewModel() : this((args, cancellation) =>
+        ServoTool.RunAsync(args, cancellation, port => SharedEsp32.Get(port).Proxy)) { }
 
     internal ServoViewModel(Func<IEnumerable<string>, CancellationToken, Task<ServoTool.Result>> runTool,
         string? calibrationFile = null, Func<string[]>? getPorts = null)

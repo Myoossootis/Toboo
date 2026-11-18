@@ -40,7 +40,7 @@ $settings = Get-Content firmware/toolchain.json -Raw | ConvertFrom-Json
 
 重新连接 toboo 后，在设备页读取状态。发现锁定固件时，应用会保存锁定状态；读取或保存边界不会恢复运动。
 
-Release 的 `toboo-0.2.3-esp32s3-n16r8-ics43432-motion-locked.bin` 为完整合并镜像，仅适用于上述 ESP32-S3 N16R8 配置，使用 Espressif 烧录工具时写入偏移为 `0x0`。整片镜像会覆盖目标闪存中的原有内容；其他板型应按固定工具链自行构建。烧录不自动执行机械标定。
+Release 的 `toboo-0.2.4-esp32s3-n16r8-ics43432-motion-locked.bin` 为完整合并镜像，仅适用于上述 ESP32-S3 N16R8 配置，使用 Espressif 烧录工具时写入偏移为 `0x0`。整片镜像会覆盖目标闪存中的原有内容；其他板型应按固定工具链自行构建。烧录不自动执行机械标定。
 
 ## 使用
 

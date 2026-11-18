@@ -77,7 +77,6 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
         Tracking = tracking;
         Chat = chat ?? new(expression: tracking.CaptureExpressionCue);
         Voice = voice ?? new(Chat);
-        ServoTool.SerialProxy = port => SharedEsp32.Get(port).Proxy;
         tracking.Lcd.CaptureChatRole = () => Voice.CaptureLcdRole() ?? Chat.CaptureLcdRole(!Chat.ReadReplies || !Voice.CanSpeak);
         Voice.PropertyChanged += VoiceChanged;
         Chat.PropertyChanged += ChatChanged;
@@ -151,7 +150,7 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     public void Dispose()
     {
         Voice.PropertyChanged -= VoiceChanged; Voice.Dispose();
-        ServoTool.SerialProxy = null; SharedEsp32.CloseAll();
+        SharedEsp32.CloseAll();
         Tracking.Lcd.CaptureChatRole = null;
         Tracking.PropertyChanged -= Changed;
         Tracking.Servo.PropertyChanged -= Changed;

@@ -24,17 +24,11 @@ internal static class Diagnostics
         try
         {
             // Exercise the same shared USB route used by the UI, using read-only servo queries.
-            var previousProxy = ServoTool.SerialProxy;
-            ServoTool.Result servo;
-            try
-            {
-                ServoTool.SerialProxy = name => SharedEsp32.Get(name).Proxy;
-                if (await Task.WhenAny(ready.Task, recording) == recording && !ready.Task.IsCompleted)
-                    await recording;
-                await ready.Task.WaitAsync(timeout.Token);
-                servo = await ServoTool.RunAsync(["--port", port, "--action", "inspect"], timeout.Token);
-            }
-            finally { ServoTool.SerialProxy = previousProxy; }
+            if (await Task.WhenAny(ready.Task, recording) == recording && !ready.Task.IsCompleted)
+                await recording;
+            await ready.Task.WaitAsync(timeout.Token);
+            var servo = await ServoTool.RunAsync(["--port", port, "--action", "inspect"], timeout.Token,
+                name => SharedEsp32.Get(name).Proxy);
             if (servo.ExitCode != 0) throw new IOException("采音期间读取云台状态失败：" + servo.Error);
             var pcm = await recording;
             var peak = I2sMicrophone.Peak(pcm);

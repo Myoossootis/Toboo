@@ -33,6 +33,39 @@ public sealed class ServoRuntimeTests : IDisposable
     }
 
     [Fact]
+    public void ProxyBindingIsExplicitAndNeverTouchesSensorPorts()
+    {
+        Add("portable.mode"); Add("runtime/python/python.exe");
+        Add("firmware/tools/single_servo.py"); Add("firmware/tools/sensor_telemetry.py");
+        var connections = 0;
+        (string, string) Connect(string port)
+        {
+            connections++; Assert.Equal("COM-not-a-device", port);
+            return ("socket://127.0.0.1:12345", new string('A', 64));
+        }
+        var start = ServoTool.CreateStartInfo(root, "single_servo.py", ["--port", "COM-not-a-device"]);
+        Assert.Equal(0, connections);
+        Assert.False(start.Environment.ContainsKey("TOBOO_SERIAL_URL"));
+        ServoTool.ApplySerialProxy(start, "single_servo.py", Connect);
+        Assert.Equal(1, connections);
+        Assert.Equal("socket://127.0.0.1:12345", start.Environment["TOBOO_SERIAL_URL"]);
+        var sensor = ServoTool.CreateStartInfo(root, "sensor_telemetry.py", ["--port", "COM-not-a-device"]);
+        ServoTool.ApplySerialProxy(sensor, "sensor_telemetry.py", Connect);
+        Assert.Equal(1, connections);
+        using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
+        Assert.ThrowsAny<OperationCanceledException>(() => ServoTool.ApplySerialProxy(start, "single_servo.py", Connect, cancelled.Token));
+        Assert.Equal(1, connections);
+    }
+
+    [Fact]
+    public async Task CancelledExecutionCannotResolveOrOpenAnyPort()
+    {
+        using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ServoTool.RunAsync(["--port", "COM-not-a-device"], cancelled.Token,
+            _ => throw new InvalidOperationException("Must not connect")));
+    }
+
+    [Fact]
     public void IncompletePortableCannotFallBackToAParentCheckout()
     {
         Add("Toboo.sln"); Add("tmp/esp32-tools/host/Scripts/python.exe");

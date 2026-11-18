@@ -4,15 +4,18 @@ namespace Toboo.Runtime;
 
 internal static class ServoTool
 {
-    internal static Func<string, (string Url, string Token)>? SerialProxy { get; set; }
     internal sealed record Result(int ExitCode, string Output, string Error);
 
-    internal static Task<Result> RunAsync(IEnumerable<string> args, CancellationToken cancellationToken = default) =>
-        RunScriptAsync("single_servo.py", args, cancellationToken);
+    internal static Task<Result> RunAsync(IEnumerable<string> args, CancellationToken cancellationToken = default,
+        Func<string, (string Url, string Token)>? serialProxy = null) =>
+        RunScriptAsync("single_servo.py", args, cancellationToken, serialProxy);
 
-    internal static async Task<Result> RunScriptAsync(string script, IEnumerable<string> args, CancellationToken cancellationToken = default)
+    internal static async Task<Result> RunScriptAsync(string script, IEnumerable<string> args, CancellationToken cancellationToken = default,
+        Func<string, (string Url, string Token)>? serialProxy = null)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var start = CreateStartInfo(script, args);
+        ApplySerialProxy(start, script, serialProxy, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         using var process = Process.Start(start) ?? throw new IOException("无法启动舵机串口工具。");
         var output = process.StandardOutput.ReadToEndAsync();
@@ -76,15 +79,23 @@ internal static class ServoTool
         }
         start.ArgumentList.Add(scriptPath);
         var arguments = args.ToArray();
-        var portIndex = Array.IndexOf(arguments, "--port");
-        if (script != "sensor_telemetry.py" && portIndex >= 0 && portIndex + 1 < arguments.Length && SerialProxy is { } proxy)
-        {
-            var endpoint = proxy(arguments[portIndex + 1]);
-            start.Environment["TOBOO_SERIAL_URL"] = endpoint.Url;
-            start.Environment["TOBOO_SERIAL_TOKEN"] = endpoint.Token;
-        }
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
         return start;
+    }
+
+    // Explicit execution boundary: parameter inspection never resolves a physical port.
+    internal static void ApplySerialProxy(ProcessStartInfo start, string script,
+        Func<string, (string Url, string Token)>? connect, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (connect is null || script is not ("single_servo.py" or "face_follow.py")) return;
+        var arguments = start.ArgumentList.ToArray();
+        var portIndex = Array.IndexOf(arguments, "--port");
+        if (portIndex < 0 || portIndex + 1 >= arguments.Length) return;
+        var endpoint = connect(arguments[portIndex + 1]);
+        cancellationToken.ThrowIfCancellationRequested();
+        start.Environment["TOBOO_SERIAL_URL"] = endpoint.Url;
+        start.Environment["TOBOO_SERIAL_TOKEN"] = endpoint.Token;
     }
 
     private static string FindRuntimeRoot(string baseDirectory)

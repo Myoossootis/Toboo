@@ -28,6 +28,7 @@ internal sealed class FaceServoSession : IAsyncDisposable
         Directory.CreateDirectory(folder);
         var log = Path.Combine(folder, $"{DateTime.Now:yyyyMMdd-HHmmss-fffffff}-face-follow.jsonl");
         var start = ServoTool.CreateStartInfo("face_follow.py", ["--port", port, "--log", log, "--execute"]);
+        ServoTool.ApplySerialProxy(start, "face_follow.py", name => SharedEsp32.Get(name).Proxy, token);
         start.RedirectStandardInput = true;
         var session = new FaceServoSession(Process.Start(start) ?? throw new IOException("无法启动跟随串口工具。"), bounds, axes);
         try
