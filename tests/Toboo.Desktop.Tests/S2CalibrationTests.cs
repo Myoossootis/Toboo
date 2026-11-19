@@ -8,6 +8,44 @@ namespace Toboo.Desktop.Tests;
 
 public sealed class S2CalibrationTests
 {
+    [Theory]
+    [InlineData(90)]
+    [InlineData(95)]
+    public async Task ExplicitPanCenterIsUsedByHomeAndSurvivesCalibrationSave(int center)
+    {
+        var file = TemporaryFile();
+        try
+        {
+            File.WriteAllText(file, JsonSerializer.Serialize(new
+            {
+                Pan = center, PanCenter = center, PanFloor = 30, PanCeiling = 175,
+                Tilt = 100, TiltFloor = 50, TiltCeiling = 150,
+                TiltProfile = ServoViewModel.TiltProfileId, TiltConfirmed = true
+            }));
+            string[]? home = null;
+            var model = new ServoViewModel((arguments, _) =>
+            {
+                var args = arguments.ToArray();
+                if (args.Contains("home")) home = args;
+                return Task.FromResult(Report(center, 100));
+            }, file, () => ["COM6"]);
+            model.Ready = true;
+            await model.InspectCommand.ExecuteAsync(null);
+            Assert.Equal(center, model.CenterPan);
+            Assert.True(model.CanFollow);
+            await model.HomeCommand.ExecuteAsync(null);
+            Assert.NotNull(home);
+            Assert.Equal(center.ToString(), home[Array.IndexOf(home, "--pan-home") + 1]);
+            Assert.Equal("100", home[Array.IndexOf(home, "--tilt-home") + 1]);
+            model.SaveCalibrationCommand.Execute(null);
+            var reopened = new ServoViewModel((_, _) => Task.FromResult(Report(center, 100)), file, () => ["COM6"]);
+            Assert.Equal(center, reopened.CenterPan);
+            Assert.Equal(30, reopened.PanMin);
+            Assert.Equal(175, reopened.PanMax);
+        }
+        finally { File.Delete(file); }
+    }
+
     [Fact]
     public async Task Verified50To150BoundsAreSharedByHomePatternAndFollowWithoutOld45Reference()
     {

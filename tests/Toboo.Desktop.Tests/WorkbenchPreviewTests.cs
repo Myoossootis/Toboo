@@ -17,7 +17,9 @@ public sealed class WorkbenchPreviewTests
         var workspace = Workspace();
         var output = Path.Combine(workspace, "artifacts", "ui-refactor-preview");
         Directory.CreateDirectory(output);
-        using var model = new MainViewModel(output);
+        var isolatedServo = new ServoViewModel((_, _) => throw new InvalidOperationException("Preview has no serial transport"),
+            Path.Combine(output, Guid.NewGuid() + ".local.json"), () => []);
+        using var model = new MainViewModel(output, servo: isolatedServo);
         var window = new AdvancedWindow(model) { Width = width, Height = height };
         Task? running = null;
         try

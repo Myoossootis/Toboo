@@ -441,8 +441,12 @@ def rectangle_path(center, left, right, bottom, top, *, tilt_limits=(35, 65)):
             lower_right, upper_right, lower_left, upper_left, center]
 
 
-def rectangle_center(left, right, bottom, top):
-    return ((left + right + 1) // 2, (bottom + top + 1) // 2)
+def rectangle_center(left, right, bottom, top, *, pan=None, tilt=None):
+    center = (pan if pan is not None else (left + right + 1) // 2,
+              tilt if tilt is not None else (bottom + top + 1) // 2)
+    if not left <= center[0] <= right or not bottom <= center[1] <= top:
+        raise ValueError("Center must lie inside the configured rectangle.")
+    return center
 
 
 if __name__ == "__main__":
@@ -482,13 +486,13 @@ if __name__ == "__main__":
         link.hello()
         if args.action == "home":
             if link.version in {"0.4.0", "0.5.0", "0.5.1", "0.5.2", "0.5.3"}:
-                center = rectangle_center(args.left, args.right, args.bottom, args.top)
+                center = rectangle_center(args.left, args.right, args.bottom, args.top, pan=args.pan_home, tilt=args.tilt_home)
                 rectangle_path(center, args.left, args.right, args.bottom, args.top, tilt_limits=pair_limits(link)["S2"])
                 report = coordinated(link, [center])
             else:
                 report = home(link, args.pan_home, args.tilt_home)
         elif args.action == "pattern":
-            points = rectangle_path(rectangle_center(args.left, args.right, args.bottom, args.top),
+            points = rectangle_path(rectangle_center(args.left, args.right, args.bottom, args.top, pan=args.pan_home, tilt=args.tilt_home),
                                     args.left, args.right, args.bottom, args.top, tilt_limits=pair_limits(link)["S2"])
             report = coordinated(link, points)
         elif args.action == "inspect":

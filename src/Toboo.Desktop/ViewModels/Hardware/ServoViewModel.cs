@@ -22,6 +22,7 @@ public sealed partial class ServoViewModel : ObservableObject
     private int firmwareTiltMin = 35, firmwareTiltMax = 90, pairedTiltMin = 35, pairedTiltMax = 65;
     private CancellationTokenSource? sweepCancellation;
     private int? panLast, tiltLast;
+    private int? savedPanCenter;
 
     [ObservableProperty] private string port = "COM6";
     [ObservableProperty] private string[] availablePorts = [];
@@ -44,7 +45,7 @@ public sealed partial class ServoViewModel : ObservableObject
     public bool FirmwareReady => readyFirmware;
     public bool CanRefreshPorts => !Busy;
     public bool CanCalibratedMotion => !PanMotionBlocked && !TiltMotionBlocked && CanControl && TiltCalibrationSaved && !TiltCalibrating &&
-        TiltFloor >= pairedTiltMin && TiltCeiling <= pairedTiltMax;
+        TiltFloor >= pairedTiltMin && TiltCeiling <= pairedTiltMax && CenterPan >= PanMin && CenterPan <= PanMax;
     public bool CanFollow => CanCalibratedMotion && followFirmware &&
         panLast >= PanMin && panLast <= PanMax && tiltLast >= TiltFloor && tiltLast <= TiltCeiling;
     public int[] FollowBounds => [PanMin, PanMax, TiltFloor, TiltCeiling];
@@ -94,7 +95,7 @@ public sealed partial class ServoViewModel : ObservableObject
             : $"新 S2 校准中 · 每次 1°，请求范围 {firmwareTiltMin}–{firmwareTiltMax}°。45°–90°已试转；机械极限待确认。"
         : "S2 新边界已保存；中心取新边界中点。";
     public string LastRequests => $"末次指令 · S1 {AngleLabel(panLast)} / S2 {AngleLabel(tiltLast)}";
-    public int CenterPan => (PanMin + PanMax + 1) / 2;
+    public int CenterPan => savedPanCenter ?? (PanMin + PanMax + 1) / 2;
     public int CenterTilt => (TiltFloor + TiltCeiling + 1) / 2;
     public string CenterLabel => $"中心指令 · S1 {(PanMotionBlocked ? "未确定（输出锁定）" : $"{CenterPan}°")} / S2 {(TiltMotionBlocked ? "未确定（输出锁定）" : $"{CenterTilt}°")}";
     public string WorkingBoundsLabel => $"工作区 · S1 {(PanMotionBlocked ? "旧边界停用" : $"{PanMin}–{PanMax}°")} / S2 {(TiltMotionBlocked ? "旧边界停用" : $"{TiltFloor}–{TiltCeiling}°")}";
@@ -125,6 +126,7 @@ public sealed partial class ServoViewModel : ObservableObject
             if (saved is null) throw new InvalidDataException("校准配置为空。");
             PanMotionBlocked = saved.PanMotionBlocked;
             TiltMotionBlocked = saved.TiltMotionBlocked;
+            savedPanCenter = saved.PanCenter;
             if (saved.PanFloor >= PanLowerLimit && saved.PanCeiling <= PanUpperLimit && saved.PanFloor < saved.PanCeiling)
             { PanMin = saved.PanFloor; PanMax = saved.PanCeiling; }
             if (saved.TiltProfile != TiltProfileId)
@@ -248,7 +250,8 @@ public sealed partial class ServoViewModel : ObservableObject
 
     private static string[] BoundaryArguments(Calibration calibration) =>
         ["--left", Number(calibration.PanFloor), "--right", Number(calibration.PanCeiling),
-         "--bottom", Number(calibration.TiltFloor), "--top", Number(calibration.TiltCeiling), "--execute"];
+         "--bottom", Number(calibration.TiltFloor), "--top", Number(calibration.TiltCeiling),
+         "--pan-home", Number(calibration.Pan), "--tilt-home", Number(calibration.Tilt), "--execute"];
 
     private async Task RunMotionAsync(string action, string[] arguments, string success)
     {
@@ -295,12 +298,13 @@ public sealed partial class ServoViewModel : ObservableObject
     private bool TryCalibration(out Calibration calibration)
     {
         if (PanMin >= PanLowerLimit && PanMax <= PanUpperLimit && PanMin < PanMax &&
-            TiltFloor >= TiltMin && TiltCeiling <= TiltMax && TiltFloor < TiltCeiling)
+            TiltFloor >= TiltMin && TiltCeiling <= TiltMax && TiltFloor < TiltCeiling &&
+            CenterPan >= PanMin && CenterPan <= PanMax)
         {
-            calibration = new(CenterPan, CenterTilt, TiltFloor, PanMin, PanMax, TiltCeiling, TiltProfileId, true, PanMotionBlocked, TiltMotionBlocked);
+            calibration = new(CenterPan, CenterTilt, TiltFloor, PanMin, PanMax, TiltCeiling, TiltProfileId, true, PanMotionBlocked, TiltMotionBlocked, savedPanCenter);
             return true;
         }
-        Status = "请输入有效边界。S1 30–175°，S2 0–180°，下限须小于上限。范围是请求值，须先实测。";
+        Status = "请输入有效边界。S1 30–175°，S2 0–180°，下限须小于上限，中心须位于边界内。范围是请求值，须先实测。";
         calibration = null!;
         return false;
     }
@@ -423,5 +427,6 @@ public sealed partial class ServoViewModel : ObservableObject
     private static string Number(int value) => value.ToString(CultureInfo.InvariantCulture);
     private static string AngleLabel(int? value) => value is { } angle ? $"{angle}°" : "—";
     private sealed record Calibration(int Pan, int Tilt, int TiltFloor, int PanFloor = 80, int PanCeiling = 100,
-        int TiltCeiling = 65, string TiltProfile = "", bool TiltConfirmed = false, bool PanMotionBlocked = false, bool TiltMotionBlocked = false);
+        int TiltCeiling = 65, string TiltProfile = "", bool TiltConfirmed = false, bool PanMotionBlocked = false, bool TiltMotionBlocked = false,
+        int? PanCenter = null);
 }

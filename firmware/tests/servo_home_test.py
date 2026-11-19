@@ -37,6 +37,16 @@ class FakeLink:
 
 
 class ServoHomeTest(unittest.TestCase):
+    def test_explicit_center_is_kept_inside_asymmetric_bounds(self):
+        center = rectangle_center(30, 175, 50, 150, pan=90, tilt=100)
+        self.assertEqual(center, (90, 100))
+        path = rectangle_path(center, 30, 175, 50, 150, tilt_limits=(0, 180))
+        self.assertEqual(path[0], (90, 100))
+        self.assertEqual(path[-1], (90, 100))
+        self.assertEqual(rectangle_center(30, 175, 50, 150), (103, 100))
+        with self.assertRaises(ValueError):
+            rectangle_center(30, 175, 50, 150, pan=20)
+
     def test_locked_firmware_identity_is_parsed_without_opening_serial(self):
         link = object.__new__(Link)
         link.axis = "S1"
