@@ -1,0 +1,10 @@
+{
+  "file": "midas-small-v21.onnx",
+  "source": "https://github.com/isl-org/MiDaS/releases/download/v2_1/model-small.onnx",
+  "bytes": 66764249,
+  "sha256": "2d8c6cb8f415229daf1eb041024208e2608c9f98e17c81cc7c6ecb449c56fd58",
+  "license": "MIT",
+  "reference": "https://github.com/isl-org/MiDaS/blob/v2_1/tf/run_onnx.py",
+  "input": "RGB float32 0..1 NCHW 1x3x256x256, cubic resize. Normalization is embedded in this ONNX export.",
+  "output": "Relative inverse depth. Preview geometry uses a normalized inverse-depth display transform in arbitrary units."
+}

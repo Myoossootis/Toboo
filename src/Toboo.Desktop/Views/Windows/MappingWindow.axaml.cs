@@ -25,6 +25,8 @@ public sealed partial class MappingWindow : Window
     private CancellationTokenSource? active;
     private Task? cameraJob;
     private Bitmap? preview;
+    private Bitmap? depthPreview;
+    private bool hasDepthPreview;
     private long origin;
     private bool reading, closeAfterStop, calibrating;
     private int requestSample, sampleWidth, sampleHeight;
@@ -42,7 +44,6 @@ public sealed partial class MappingWindow : Window
         DeviceStatus.Text = $"{camera?.Name ?? "未选择 USB 摄像头"} · {UnoStatus()}";
         StartButton.IsEnabled = camera is not null;
         LoadCalibration();
-        CalibrationOptions.IsExpanded = camera is not null && intrinsics is null;
     }
 
     private sealed record SavedCalibration(int CameraIndex, string CameraName, MappingIntrinsics Intrinsics);
@@ -83,12 +84,16 @@ public sealed partial class MappingWindow : Window
         origin = Stopwatch.GetTimestamp();
         var opening = active = new();
         var cancel = opening.Token;
-        StartButton.IsEnabled = DemoButton.IsEnabled = MountInputs.IsEnabled = false;
+        StartButton.IsEnabled = DemoButton.IsEnabled = PhotoButton.IsEnabled = MountInputs.IsEnabled = false;
         StopButton.IsEnabled = true;
         SampleButton.IsEnabled = !calibrating;
         CameraPreview.Source = null;
         preview?.Dispose();
         preview = null;
+        hasDepthPreview = false;
+        DepthPreview.Source = null; depthPreview?.Dispose(); depthPreview = null;
+        Cloud.Show([]);
+        DepthStatus.Text = "正在载入深度模型…";
         CameraPlaceholder.IsVisible = true;
         CameraPlaceholder.Text = "正在打开摄像头…";
         PoseStatus.Text = "正在打开相机…";
@@ -104,7 +109,16 @@ public sealed partial class MappingWindow : Window
         {
             await Task.Run(() => MappingCameraSession.RunAsync(index, new(), started,
                 () => Volatile.Read(ref intrinsics), tagMeters, () => Interlocked.Exchange(ref requestSample, 0) != 0,
-                async frame => await Dispatcher.UIThread.InvokeAsync(() => Present(frame, token)), token), token);
+                async frame => await Dispatcher.UIThread.InvokeAsync(() => Present(frame, token)), token,
+                async (depth, at) => await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!token.IsCancellationRequested)
+                        PresentDepth(depth, $"实时估计 · 输入距今 {Stopwatch.GetElapsedTime(started).TotalSeconds - at.TotalSeconds:0.0} s");
+                }),
+                message => Dispatcher.UIThread.Post(() =>
+                {
+                    if (!token.IsCancellationRequested) DepthStatus.Text = "深度预览不可用 · " + message;
+                })), token);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception error) when (error is IOException or InvalidOperationException or OpenCvSharp.OpenCVException)
@@ -115,10 +129,11 @@ public sealed partial class MappingWindow : Window
             opening.Dispose();
             Interlocked.Exchange(ref requestSample, 0);
             StartButton.IsEnabled = camera is not null;
-            DemoButton.IsEnabled = MountInputs.IsEnabled = true;
+            DemoButton.IsEnabled = PhotoButton.IsEnabled = MountInputs.IsEnabled = true;
             StopButton.IsEnabled = SampleButton.IsEnabled = false;
             Advice.Text = "采集已停止";
             RangeStatus.Text = "距离 — · 采集已停止";
+            DepthStatus.Text = "已停止 · 保留最后一帧";
             CameraPlaceholder.Text = "摄像头未开启";
             Map.Show(map, false);
         }
@@ -130,9 +145,7 @@ public sealed partial class MappingWindow : Window
         var now = Stopwatch.GetElapsedTime(origin);
         var pose = now - frame.At <= ObstacleMap.PairWindow ? frame.Pose : null;
         map.ObservePose(frame.At, pose);
-        using var stream = new MemoryStream(frame.Jpeg);
-        var next = new Bitmap(stream);
-        var old = preview; preview = next; CameraPreview.Source = next; old?.Dispose();
+        if (!hasDepthPreview || frame.ChessboardRequested) ReplaceImage(CameraPreview, ref preview, frame.Jpeg);
         CameraPlaceholder.IsVisible = false;
         PoseStatus.Text = pose is { } located
             ? $"ArUco 7 已定位 · X {located.Position.X:0.00} m · Z {located.Position.Z:0.00} m"
@@ -257,6 +270,89 @@ public sealed partial class MappingWindow : Window
 
     private void ShowDemo(object? sender, RoutedEventArgs args) => DisplayDemo();
 
+    private static void ReplaceImage(Image target, ref Bitmap? current, byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes);
+        var next = new Bitmap(stream);
+        var previous = current;
+        current = next; target.Source = next; previous?.Dispose();
+    }
+
+    private void PresentDepth(DepthPreviewFrame frame, string source)
+    {
+        ReplaceImage(CameraPreview, ref preview, frame.ColorJpeg);
+        ReplaceImage(DepthPreview, ref depthPreview, frame.DepthPng);
+        CameraPlaceholder.IsVisible = false;
+        hasDepthPreview = true;
+        Cloud.Show(frame.Points);
+        DepthStatus.Text = $"{source} · {frame.InferenceMilliseconds:0} ms · {frame.Points.Length:N0} 个采样点";
+    }
+
+    private void ResetCloudView(object? sender, RoutedEventArgs args) => Cloud.ResetView();
+
+    private async void OpenPhoto(object? sender, RoutedEventArgs args)
+    {
+        try
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new()
+            {
+                Title = "选择空间预览照片", AllowMultiple = false,
+                FileTypeFilter = [FilePickerFileTypes.ImageAll]
+            });
+            if (files.FirstOrDefault()?.TryGetLocalPath() is { } path) await LoadPhotoAsync(path);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or NotSupportedException)
+        { DepthStatus.Text = "打开照片失败 · " + error.Message; }
+    }
+
+    internal Task LoadPhotoAsync(string path)
+    {
+        if (active is not null) return Task.CompletedTask;
+        var opening = active = new();
+        cameraJob = InferPhotoAsync(path, opening);
+        return cameraJob;
+    }
+
+    private async Task InferPhotoAsync(string path, CancellationTokenSource opening)
+    {
+        var token = opening.Token;
+        timer.Stop(); map = null; Map.Show(null, false);
+        StartButton.IsEnabled = PhotoButton.IsEnabled = DemoButton.IsEnabled = MountInputs.IsEnabled = false;
+        StopButton.IsEnabled = true;
+        Cloud.Show([]);
+        CameraPreview.Source = DepthPreview.Source = null;
+        preview?.Dispose(); preview = null; depthPreview?.Dispose(); depthPreview = null;
+        CameraPlaceholder.IsVisible = true;
+        CameraPlaceholder.Text = "正在分析照片…";
+        DeviceStatus.Text = "照片分析 · 本机相对深度估计";
+        DepthStatus.Text = "正在载入模型并推理…";
+        Advice.Text = "照片模式"; RangeStatus.Text = "实测距离 —";
+        PoseStatus.Text = "照片预览"; MapStatus.Text = "实时定位后积累地图";
+        try
+        {
+            var result = await Task.Run(() =>
+            {
+                using var image = OpenCvSharp.Cv2.ImDecode(File.ReadAllBytes(path), OpenCvSharp.ImreadModes.Color);
+                using var model = new RelativeDepthPreview();
+                return model.Infer(image);
+            }, token);
+            token.ThrowIfCancellationRequested();
+            PresentDepth(result, "照片估计");
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { DepthStatus.Text = "照片分析已停止"; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+            OpenCvSharp.OpenCVException or ArgumentException)
+        { DepthStatus.Text = "照片分析失败 · " + error.Message; }
+        finally
+        {
+            active = null; opening.Dispose();
+            StartButton.IsEnabled = camera is not null;
+            PhotoButton.IsEnabled = DemoButton.IsEnabled = MountInputs.IsEnabled = true;
+            StopButton.IsEnabled = false;
+            CameraPlaceholder.Text = "打开照片或开启摄像头";
+        }
+    }
+
     internal void DisplayDemo()
     {
         if (active is not null) return;
@@ -274,10 +370,7 @@ public sealed partial class MappingWindow : Window
         map = example;
         DeviceStatus.Text = "合成演示 · 同一个纸箱从不同位置被观测";
         PoseStatus.Text = "合成位姿与距离 · 摄像头未开启";
-        CameraPreview.Source = null;
-        preview?.Dispose(); preview = null;
-        CameraPlaceholder.IsVisible = true;
-        CameraPlaceholder.Text = "摄像头未开启";
+        PresentDepth(RelativeDepthPreview.CreateDemo(), "合成几何演示");
         CalibrationOptions.IsExpanded = false;
         UpdateMap(TimeSpan.FromMilliseconds(26 * 80));
     }
@@ -301,6 +394,8 @@ public sealed partial class MappingWindow : Window
     {
         timer.Stop(); timer.Tick -= PollRange;
         CameraPreview.Source = null; preview?.Dispose();
+        DepthPreview.Source = null; depthPreview?.Dispose();
+        Cloud.Show([]);
         base.OnClosed(args);
     }
 }

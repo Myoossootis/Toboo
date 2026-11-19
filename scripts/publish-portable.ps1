@@ -20,6 +20,7 @@ try {
     }
     & "$PSScriptRoot/verify-public-tree.ps1"
     & "$PSScriptRoot/prepare-speech-model.ps1"
+    & "$PSScriptRoot/prepare-depth-model.ps1"
     & "$PSScriptRoot/prepare-vc-runtime.ps1"
     $serialRuntime = & "$PSScriptRoot/prepare-serial-runtime.ps1"
     & dotnet publish src/Toboo.Desktop -c Release -r win-x64 --self-contained true -p:RestoreLockedMode=true `
@@ -46,6 +47,7 @@ try {
     New-Item -ItemType Directory -Force (Join-Path $outputPath 'scripts') | Out-Null
     Copy-Item scripts/install-toboo-harness.ps1 (Join-Path $outputPath 'scripts/install-toboo-harness.ps1')
     Copy-Item scripts/prepare-speech-model.ps1 (Join-Path $outputPath 'scripts/prepare-speech-model.ps1')
+    Copy-Item scripts/prepare-depth-model.ps1 (Join-Path $outputPath 'scripts/prepare-depth-model.ps1')
     # Ship only committed firmware sources, never local board logs or tool caches.
     $firmwareFiles = @(& git ls-files firmware)
     if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate firmware sources.' }
@@ -103,6 +105,7 @@ try {
         if (!(Test-Path -LiteralPath (Join-Path $outputPath $required))) { throw "Missing portable dependency: $required" }
     }
     if (!(Test-Path -LiteralPath (Join-Path $outputPath 'models/speech/ggml-silero-v5.1.2.bin'))) { throw 'Missing portable speech detector.' }
+    if (!(Test-Path -LiteralPath (Join-Path $outputPath 'models/depth/midas-small-v21.onnx'))) { throw 'Missing portable depth model.' }
     if (Get-ChildItem -LiteralPath (Join-Path $outputPath 'models') -Filter '*.onnx' -Recurse | Where-Object { $_.Directory.Name -eq 'drone' }) { throw 'Experimental drone weights must not be bundled.' }
     [IO.Compression.ZipFile]::CreateFromDirectory($outputPath, $zipPath, [IO.Compression.CompressionLevel]::Optimal, $true)
     $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()

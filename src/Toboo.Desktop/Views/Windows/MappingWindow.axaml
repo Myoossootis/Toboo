@@ -1,48 +1,72 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="using:Toboo.Desktop.Controls" x:Class="Toboo.Desktop.MappingWindow"
-        Title="Toboo · 二维建图" Width="1050" Height="760" MinWidth="760" MinHeight="570"
+        Title="Toboo · 空间感知" Width="1240" Height="880" MinWidth="940" MinHeight="650"
         WindowStartupLocation="CenterOwner" Background="{StaticResource WorkspaceBrush}">
   <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Margin="24" Spacing="16">
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+    <StackPanel Margin="22" Spacing="14">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
         <StackPanel Spacing="5">
-          <TextBlock Text="二维建图" FontSize="27" FontWeight="SemiBold" />
+          <TextBlock Text="空间感知" FontSize="27" FontWeight="SemiBold" />
           <TextBlock x:Name="DeviceStatus" Classes="caption" TextWrapping="Wrap" />
         </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Button x:Name="DemoButton" Content="合成演示" Click="ShowDemo" Classes="quiet" />
-          <Button x:Name="StartButton" Content="开启摄像头" Click="StartCamera" />
-          <Button x:Name="StopButton" Content="停止" Click="StopCamera" IsEnabled="False" Classes="quiet" />
-        </StackPanel>
+        <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+          <Button x:Name="PhotoButton" Content="打开照片" Click="OpenPhoto" Classes="quiet" Margin="0,0,8,4" />
+          <Button x:Name="DemoButton" Content="合成演示" Click="ShowDemo" Classes="quiet" Margin="0,0,8,4" />
+          <Button x:Name="StartButton" Content="开启摄像头" Click="StartCamera" Margin="0,0,8,4" />
+          <Button x:Name="StopButton" Content="停止" Click="StopCamera" IsEnabled="False" Classes="quiet" Margin="0,0,0,4" />
+        </WrapPanel>
       </Grid>
-      <Border Classes="card" Padding="16" Background="{StaticResource SubtleBrush}">
-        <StackPanel Spacing="6">
-          <TextBlock x:Name="Advice" Text="等待采集" FontSize="20" FontWeight="SemiBold" />
-          <TextBlock x:Name="RangeStatus" Text="距离 —" TextWrapping="Wrap" />
+      <Grid ColumnDefinitions="340,*" ColumnSpacing="14">
+        <StackPanel Spacing="12">
+          <Border Classes="card" Padding="12">
+            <StackPanel Spacing="6">
+              <TextBlock Text="彩色画面" Classes="section" />
+              <Border Height="210" Background="{StaticResource StageBrush}" CornerRadius="8" ClipToBounds="True">
+                <Grid>
+                  <TextBlock x:Name="CameraPlaceholder" Text="打开照片或开启摄像头" Foreground="#CBDAD8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <Image x:Name="CameraPreview" Stretch="Uniform" />
+                </Grid>
+              </Border>
+              <TextBlock x:Name="PoseStatus" Text="等待图像" TextWrapping="Wrap" Classes="caption" />
+            </StackPanel>
+          </Border>
+          <Border Classes="card" Padding="12">
+            <StackPanel Spacing="6">
+              <TextBlock Text="相对深度 · 估计" Classes="section" />
+              <Border Height="180" Background="{StaticResource StageBrush}" CornerRadius="8" ClipToBounds="True">
+                <Image x:Name="DepthPreview" Stretch="Uniform" />
+              </Border>
+              <TextBlock Text="暖色近 · 冷色远 · 每帧相对远近" Classes="caption" />
+            </StackPanel>
+          </Border>
+          <Border Classes="card" Padding="12">
+            <StackPanel Spacing="6">
+              <TextBlock Text="ArUco 俯视地图" Classes="section" />
+              <controls:ObstacleMapView x:Name="Map" Height="160" />
+              <TextBlock x:Name="MapStatus" Text="固定 7 号标记定位后积累轨迹和回波" TextWrapping="Wrap" Classes="caption" />
+            </StackPanel>
+          </Border>
         </StackPanel>
-      </Border>
-      <Grid ColumnDefinitions="2*,3*" ColumnSpacing="14">
-        <Border Classes="card" Padding="14">
-          <StackPanel Spacing="8">
-            <TextBlock Text="摄像头" Classes="section" />
-            <Border Height="260" Background="{StaticResource StageBrush}" CornerRadius="8" ClipToBounds="True">
-              <Grid>
-                <TextBlock x:Name="CameraPlaceholder" Text="摄像头未开启" Foreground="#CBDAD8"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" />
-                <Image x:Name="CameraPreview" Stretch="Uniform" />
+        <StackPanel Grid.Column="1" Spacing="12">
+          <Border Classes="card" Padding="14" Background="#102C32">
+            <StackPanel Spacing="9">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="三维点云 · 相对深度" FontSize="18" FontWeight="SemiBold" Foreground="#E1F4F0" />
+                <Button Grid.Column="1" Content="复位视角" Click="ResetCloudView" Classes="quiet" />
               </Grid>
-            </Border>
-            <TextBlock x:Name="PoseStatus" Text="等待标定与 ArUco 7" TextWrapping="Wrap" Classes="caption" />
-          </StackPanel>
-        </Border>
-        <Border Grid.Column="1" Classes="card" Padding="14">
-          <StackPanel Spacing="8">
-            <TextBlock Text="俯视地图" Classes="section" />
-            <controls:ObstacleMapView x:Name="Map" Height="300" />
-            <TextBlock Text="青色轨迹 · 橙色回波 · 深色标记原点 · 底部标尺 1 m" TextWrapping="Wrap" Classes="caption" />
-            <TextBlock x:Name="MapStatus" Text="0 次回波入图" TextWrapping="Wrap" Classes="caption" />
-          </StackPanel>
-        </Border>
+              <TextBlock Text="拖拽旋转 · 滚轮缩放" Foreground="#A6CAC4" FontSize="12" />
+              <controls:PointCloudView x:Name="Cloud" Height="485" />
+              <TextBlock x:Name="DepthStatus" Text="等待图像 · 在本机估计深度" Foreground="#B8D8D1" TextWrapping="Wrap" />
+              <TextBlock Text="单帧相对形状 · 空间比例待验证" Foreground="#95B6B0" FontSize="12" />
+            </StackPanel>
+          </Border>
+          <Border Classes="card" Padding="16" Background="{StaticResource SubtleBrush}">
+            <StackPanel Spacing="6">
+              <TextBlock x:Name="Advice" Text="等待测距" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock x:Name="RangeStatus" Text="距离 —" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
       </Grid>
       <Expander x:Name="CalibrationOptions" Header="相机标定与安装参数">
         <Border Classes="card" Padding="14" Margin="0,8,0,0">
@@ -52,7 +76,7 @@
               <Button Content="保存棋盘格和标记" Click="SavePatterns" Classes="quiet" Margin="0,0,8,4" />
               <Button x:Name="SampleButton" Content="采集棋盘格画面" Click="SampleCalibration" IsEnabled="False" Classes="quiet" Margin="0,0,8,4" />
             </WrapPanel>
-            <TextBlock Text="开启摄像头后，从不同位置和角度采集 12 张清晰的棋盘格。建图时把标记正向贴于竖直墙面。" Classes="caption" TextWrapping="Wrap" />
+            <TextBlock Text="点云可直接预览。ArUco 地图需要先采集 12 张棋盘格标定，并把 7 号标记固定在竖直墙面。" Classes="caption" TextWrapping="Wrap" />
             <Grid x:Name="MountInputs" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="9">
               <StackPanel Spacing="3"><TextBlock Text="标记黑边 (mm)" TextWrapping="Wrap" /><NumericUpDown x:Name="TagSize" Value="100" Minimum="40" Maximum="500" FormatString="0" /></StackPanel>
               <StackPanel Grid.Column="1" Spacing="3"><TextBlock Text="探头向右 (mm)" TextWrapping="Wrap" /><NumericUpDown x:Name="RightOffset" Value="0" Minimum="-300" Maximum="300" FormatString="0" /></StackPanel>

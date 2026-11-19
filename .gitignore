@@ -26,6 +26,8 @@ __pycache__/
 /models/drone/
 /models/speech/*.bin
 /models/speech/*.part
+/models/depth/*.onnx
+/models/depth/*.part
 
 # Generated experiment data, recordings, calibration and printable markers
 /artifacts/

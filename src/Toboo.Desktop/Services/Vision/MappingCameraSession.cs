@@ -12,11 +12,15 @@ internal static class MappingCameraSession
 {
     public static async Task RunAsync(int device, CameraSettings settings, long origin,
         Func<MappingIntrinsics?> calibration, double tagMeters, Func<bool> takeChessboard,
-        Func<MappingFrame, Task> present, CancellationToken cancellation)
+        Func<MappingFrame, Task> present, CancellationToken cancellation,
+        Func<DepthPreviewFrame, TimeSpan, Task>? presentDepth = null, Action<string>? depthFailed = null)
     {
         settings.Validate();
         using var closing = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         using var buffer = new LatestFrameBuffer();
+        using var depthBuffer = new LatestFrameBuffer();
+        var depth = presentDepth is null ? Task.CompletedTask : Task.Run(() =>
+            DepthPreviewWorker.RunAsync(depthBuffer, presentDepth, depthFailed ?? (_ => { }), closing.Token));
         var producer = Task.Run(() =>
         {
             using var camera = new VideoCapture(device, settings.Backend);
@@ -55,6 +59,8 @@ internal static class MappingCameraSession
                 lastFrame = frame.CapturedAt;
                 if (Stopwatch.GetElapsedTime(origin) - frame.CapturedAt > ObstacleMap.PairWindow) continue;
                 var image = frame.Image;
+                if (presentDepth is not null && !depth.IsCompleted)
+                    depthBuffer.Publish(new(frame.Number, frame.CapturedAt, image.Clone()));
                 switch (image.Channels())
                 {
                     case 1: image.CopyTo(gray); break;
@@ -79,7 +85,7 @@ internal static class MappingCameraSession
         finally
         {
             closing.Cancel();
-            await producer;
+            await Task.WhenAll(producer, depth);
         }
     }
 }
