@@ -22,7 +22,8 @@ public sealed partial class MainWindow : Window
         DataContext = Shell;
         Shell.AdvancedRequested += ShowAdvanced;
         Shell.SensorsRequested += ShowSensors;
-        Shell.MappingRequested += ShowMapping;
+        SpatialView.Configure(viewModel);
+        Shell.StopCalibrationAsync = SpatialView.StopAsync;
         viewModel.FramePresented += RefreshPreview;
         Deactivated += (_, _) => { if (Shell.Voice.IsListening) Shell.Voice.Stop(); };
         SizeChanged += (_, _) => ApplyLayout();
@@ -62,13 +63,6 @@ public sealed partial class MainWindow : Window
         sensorWindow.Show(this);
     }
 
-    private async void ShowMapping()
-    {
-        if (!Shell.CanOpenMapping) return;
-        // The mapping window owns the selected camera while the main device controls are modal.
-        sensorWindow?.Close(); advancedWindow?.Close();
-        await new MappingWindow(ViewModel.SelectedCamera, ViewModel.Lcd).ShowDialog(this);
-    }
     private void DragWindow(object? sender, PointerPressedEventArgs args)
     {
         if (args.GetCurrentPoint(this).Properties.IsLeftButtonPressed) BeginMoveDrag(args);
@@ -82,9 +76,10 @@ public sealed partial class MainWindow : Window
         Shell.Voice.Stop();
         if (closing) return;
         if (ViewModel.Servo.Busy && !ViewModel.IsFollowing) { args.Cancel = true; return; }
-        if (ViewModel.IsRunning || Shell.Chat.RemoteRunning || Shell.Chat.HasPending || Shell.Chat.IsBusy)
+        if (ViewModel.IsRunning || SpatialView.IsBusy || Shell.Chat.RemoteRunning || Shell.Chat.HasPending || Shell.Chat.IsBusy)
         {
             args.Cancel = true; IsEnabled = false;
+            await SpatialView.StopAsync();
             await ViewModel.StopAsync();
             await Shell.Chat.ShutdownAsync();
             closing = true; Close();
@@ -93,6 +88,7 @@ public sealed partial class MainWindow : Window
     protected override void OnClosed(EventArgs args)
     {
         advancedWindow?.Close(); sensorWindow?.Close();
+        SpatialView.Dispose();
         ViewModel.FramePresented -= RefreshPreview;
         Shell.Dispose(); ViewModel.Dispose();
         base.OnClosed(args);

@@ -4,6 +4,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
 using Toboo.Vision;
 using Toboo.Desktop.Controls;
+using Toboo.Desktop.Views;
 using Xunit;
 
 namespace Toboo.Desktop.Tests;
@@ -13,18 +14,19 @@ public sealed class MappingPreviewTests
     [AvaloniaFact]
     public async Task DemoShowsTrajectoryAndNearObstacleWithoutDevices()
     {
-        var window = new MappingWindow();
+        using var view = new SpatialCalibrationView();
+        var window = new Window { Content = view, Width = 1240, Height = 880 };
         try
         {
             window.Show();
-            Assert.False(window.FindControl<Button>("StartButton")!.IsEnabled);
-            window.FindControl<Button>("DemoButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Assert.Contains("合成演示", window.FindControl<TextBlock>("DeviceStatus")!.Text);
-            Assert.Contains("停止建议", window.FindControl<TextBlock>("Advice")!.Text);
-            Assert.Contains("27 次回波入图 · 27 个轨迹点", window.FindControl<TextBlock>("MapStatus")!.Text);
-            Assert.NotNull(window.FindControl<Image>("CameraPreview")!.Source);
-            Assert.NotNull(window.FindControl<Image>("DepthPreview")!.Source);
-            Assert.True(window.FindControl<PointCloudView>("Cloud")!.PointCount > 8000);
+            Assert.False(view.FindControl<Button>("StartButton")!.IsEnabled);
+            view.FindControl<Button>("DemoButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Contains("合成演示", view.FindControl<TextBlock>("DeviceStatus")!.Text);
+            Assert.Contains("停止建议", view.FindControl<TextBlock>("Advice")!.Text);
+            Assert.Contains("27 次回波入图 · 27 个轨迹点", view.FindControl<TextBlock>("MapStatus")!.Text);
+            Assert.NotNull(view.FindControl<Image>("CameraPreview")!.Source);
+            Assert.NotNull(view.FindControl<Image>("DepthPreview")!.Source);
+            Assert.True(view.FindControl<PointCloudView>("Cloud")!.PointCount > 8000);
             await Task.Delay(60);
             using var screenshot = window.CaptureRenderedFrame();
             Assert.NotNull(screenshot);
@@ -39,19 +41,19 @@ public sealed class MappingPreviewTests
             MarkerMappingVision.WritePatterns(artifacts);
             if (File.Exists(Environment.GetEnvironmentVariable("TOBOO_DEPTH_TEST_IMAGE")) &&
                 File.Exists(RelativeDepthPreview.DefaultModelPath))
-                await VerifyLocalPhotoAsync(window);
+                await VerifyLocalPhotoAsync(view, window);
         }
-        finally { window.Close(); }
+        finally { await view.StopAsync(); window.Close(); }
     }
 
-    private static async Task VerifyLocalPhotoAsync(MappingWindow window)
+    private static async Task VerifyLocalPhotoAsync(SpatialCalibrationView view, Window window)
     {
-        await window.LoadPhotoAsync(Environment.GetEnvironmentVariable("TOBOO_DEPTH_TEST_IMAGE")!);
-        Assert.Contains("照片估计", window.FindControl<TextBlock>("DepthStatus")!.Text);
-        Assert.True(window.FindControl<PointCloudView>("Cloud")!.PointCount > 8000);
-        Assert.Equal("实测距离 —", window.FindControl<TextBlock>("RangeStatus")!.Text);
-        Assert.NotNull(window.FindControl<Image>("DepthPreview")!.Source);
-        Assert.True(window.FindControl<Button>("PhotoButton")!.IsEnabled);
+        await view.LoadPhotoAsync(Environment.GetEnvironmentVariable("TOBOO_DEPTH_TEST_IMAGE")!);
+        Assert.Contains("照片估计", view.FindControl<TextBlock>("DepthStatus")!.Text);
+        Assert.True(view.FindControl<PointCloudView>("Cloud")!.PointCount > 8000);
+        Assert.Equal("实测距离 —", view.FindControl<TextBlock>("RangeStatus")!.Text);
+        Assert.NotNull(view.FindControl<Image>("DepthPreview")!.Source);
+        Assert.True(view.FindControl<Button>("PhotoButton")!.IsEnabled);
         await Task.Delay(80);
         using var screenshot = window.CaptureRenderedFrame();
         Assert.NotNull(screenshot);
@@ -62,15 +64,16 @@ public sealed class MappingPreviewTests
     [AvaloniaFact]
     public async Task InvalidPhotoReportsFailureAndAllowsRetry()
     {
-        var window = new MappingWindow();
+        using var view = new SpatialCalibrationView();
+        var window = new Window { Content = view, Width = 1240, Height = 880 };
         try
         {
             window.Show();
-            await window.LoadPhotoAsync(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".jpg"));
-            Assert.Contains("照片分析失败", window.FindControl<TextBlock>("DepthStatus")!.Text);
-            Assert.True(window.FindControl<Button>("PhotoButton")!.IsEnabled);
-            Assert.False(window.FindControl<Button>("StopButton")!.IsEnabled);
+            await view.LoadPhotoAsync(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".jpg"));
+            Assert.Contains("照片分析失败", view.FindControl<TextBlock>("DepthStatus")!.Text);
+            Assert.True(view.FindControl<Button>("PhotoButton")!.IsEnabled);
+            Assert.False(view.FindControl<Button>("StopButton")!.IsEnabled);
         }
-        finally { window.Close(); }
+        finally { await view.StopAsync(); window.Close(); }
     }
 }

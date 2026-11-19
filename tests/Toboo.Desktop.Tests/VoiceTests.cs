@@ -13,6 +13,74 @@ namespace Toboo.Desktop.Tests;
 
 public sealed class VoiceTests
 {
+    [AvaloniaTheory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task LocalVoiceCommandWorksWithoutHarnessAndKeepsChatDraftUntouched(int source)
+    {
+        var client = new TobooChatTests.FakeClient();
+        using var chat = Chat(client);
+        var speech = new Speech();
+        using var voice = new VoiceViewModel(chat, speech, new Microphone());
+        var commands = 0;
+        voice.LocalCommandHandler = (text, cancellation) =>
+        {
+            cancellation.ThrowIfCancellationRequested();
+            Assert.Equal("打开摄像机跟随。", text);
+            commands++;
+            return Task.FromResult<string?>("正在开启摄像机跟随。");
+        };
+        await voice.InitializeAsync();
+        voice.MicrophoneSourceIndex = source;
+        voice.MicrophonePort = "COM-test";
+        Assert.False(chat.IsConnected);
+        Assert.True(voice.CanRecord);
+        var recording = voice.BeginListeningAsync();
+        voice.FinishListening();
+        speech.Transcript.SetResult("打开摄像机跟随。");
+        await recording;
+        Assert.Equal(1, commands);
+        Assert.Equal(0, client.Sends);
+        Assert.Equal("", chat.Draft);
+        Assert.Contains("正在开启", voice.Status);
+        Assert.False(voice.IsListening);
+    }
+
+    [AvaloniaFact]
+    public async Task CancelledRecognitionCannotTriggerALocalHardwareCommand()
+    {
+        using var chat = Chat(new TobooChatTests.FakeClient());
+        var speech = new Speech { IgnoreCancellation = true };
+        using var voice = new VoiceViewModel(chat, speech);
+        var commands = 0;
+        voice.LocalCommandHandler = (_, _) => { commands++; return Task.FromResult<string?>("started"); };
+        await voice.InitializeAsync();
+        var recording = voice.BeginListeningAsync();
+        voice.FinishListening();
+        voice.Stop();
+        speech.Transcript.SetResult("打开摄像机跟随");
+        await recording;
+        Assert.Equal(0, commands);
+        Assert.Equal("", chat.Draft);
+    }
+
+    [AvaloniaFact]
+    public async Task UnmatchedOfflineSpeechLeavesTheCommandButtonAvailableForRetry()
+    {
+        using var chat = Chat(new TobooChatTests.FakeClient());
+        var speech = new Speech();
+        using var voice = new VoiceViewModel(chat, speech);
+        voice.LocalCommandHandler = (_, _) => Task.FromResult<string?>(null);
+        await voice.InitializeAsync();
+        var recording = voice.BeginListeningAsync();
+        voice.FinishListening();
+        speech.Transcript.SetResult("你好");
+        await recording;
+        Assert.Equal("", chat.Draft);
+        Assert.True(voice.CanRecord);
+        Assert.Contains("未匹配", voice.Status);
+    }
+
     private sealed class Speech : ISpeechService
     {
         public SpeechCapabilities Capabilities = new(true, true, "中文识别", "中文朗读", true, "ICS43432 · 本地中文识别");

@@ -56,6 +56,8 @@ internal sealed class WindowsSpeechService : ISpeechService
             var complete = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             var text = new StringBuilder();
             engine.LoadGrammar(new DictationGrammar());
+            engine.LoadGrammar(new Grammar(new GrammarBuilder("打开摄像机跟随") { Culture = info.Culture })
+                { Name = "TobooFollowCommand" });
             engine.InitialSilenceTimeout = TimeSpan.FromSeconds(30);
             engine.BabbleTimeout = TimeSpan.FromSeconds(15);
             engine.EndSilenceTimeout = TimeSpan.FromMilliseconds(600);

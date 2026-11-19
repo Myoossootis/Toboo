@@ -20,6 +20,12 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     private long? repliedAt;
     private bool disposed;
     private SpeechCapabilities? capabilities;
+    private Func<string, CancellationToken, Task<string?>>? localCommandHandler;
+    internal Func<string, CancellationToken, Task<string?>>? LocalCommandHandler
+    {
+        get => localCommandHandler;
+        set { localCommandHandler = value; Refresh(); }
+    }
     [ObservableProperty] private bool initializing;
     [ObservableProperty] private bool canListen;
     [ObservableProperty] private bool canSpeak;
@@ -35,13 +41,15 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     [ObservableProperty] private double microphoneLevel;
     public bool IsI2sMicrophone => MicrophoneSourceIndex == 1;
     public bool CanConfigureMicrophone => !CanStop && !Initializing;
-    public bool CanRecord => !disposed && CanListen && !IsListening && chat.IsConnected && !chat.IsBusy
-        && !chat.RemoteRunning && !chat.HasPending && chat.SelectedModel is not null && string.IsNullOrWhiteSpace(chat.Draft)
+    public bool CanRecord => !disposed && CanListen && !IsListening && !chat.IsBusy
+        && !chat.RemoteRunning && !chat.HasPending && (localCommandHandler is not null || chat.IsConnected && chat.SelectedModel is not null)
+        && string.IsNullOrWhiteSpace(chat.Draft)
         && (!IsI2sMicrophone || !string.IsNullOrWhiteSpace(MicrophonePort));
     public bool CanStop => IsListening || output is not null;
     public bool CanUseRecordButton => CanRecord || IsListening;
     public string RecordLabel => IsFinishing ? "正在识别…" : IsListening ? "松开发送" : "按住说话";
-    public string RecordHint => !CanListen ? InputDescription : !chat.IsConnected ? "连接 Harness 后可语音对话"
+    public string RecordHint => !CanListen ? InputDescription : !chat.IsConnected
+        ? localCommandHandler is not null ? "可说“打开摄像机跟随”；语音对话需连接 Harness" : "连接 Harness 后可语音对话"
         : IsI2sMicrophone && string.IsNullOrWhiteSpace(MicrophonePort) ? "请到设备页选择 ESP32-S3 麦克风串口"
         : !string.IsNullOrWhiteSpace(chat.Draft) ? "先发送或清空输入框，再按住说话" : "按住说话，松开发送；Esc 取消";
 
@@ -157,6 +165,17 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
             if (text.Length > 4000) { Status = "这段语音太长，请分成几句说。"; return; }
             // The draft stays editable after transcription, including on an uncertain send.
             var released = IsFinishing;
+            if (released && localCommandHandler is not null)
+            {
+                var result = await localCommandHandler(text.Trim(), operation.Token);
+                operation.Token.ThrowIfCancellationRequested();
+                if (result is not null) { Status = result; return; }
+                if (!chat.IsConnected)
+                {
+                    Status = "未匹配本地语音命令。可说“打开摄像机跟随”，或连接 Harness 后语音对话。";
+                    return;
+                }
+            }
             chat.Draft = text.Trim();
             chat.VoiceInputActive = false;
             IsListening = false; IsFinishing = false; timer.Stop(); Refresh();

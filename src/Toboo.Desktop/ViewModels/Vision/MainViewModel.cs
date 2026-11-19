@@ -92,7 +92,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private bool isChangingMode;
     [ObservableProperty] private string cameraModelLabel = "相机角度模型：待配置，可先预览表情。";
     public string OutputLabel => IsFollowing ? "人脸实物跟随 · 请求角度" : "视觉预览 · 独立于舵机";
-    public bool CanStartFollow => !IsChangingMode && !IsFollowing && IsFace && IsCameraSource &&
+    public bool CanStartFollow => !CalibrationActive && !IsChangingMode && !IsFollowing && IsFace && IsCameraSource &&
         Servo.CanFollow && FaceAim.DirectionsConfirmed && (CanStart || (IsRunning && !cameraFaulted));
     public string PreviewStartLabel => IsFace ? "仅预览（不转动）" : "开始实验";
     public string FollowStartHint => IsRunning
@@ -126,8 +126,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public bool LiveFaceConfirmed { get; private set; }
     public ObservableCollection<CameraDevice> Cameras { get; } = [];
     public event Action? FramePresented;
-    public bool CanConfigure => !IsRunning && !IsLoadingPreview && !IsChangingMode;
-    private bool CanBeginSession => !IsRunning && !IsLoadingPreview && !(IsCameraSource && cameraFaulted);
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanConfigure), nameof(CanStart), nameof(CanStartFollow))]
+    private bool calibrationActive;
+    public bool CanConfigure => !IsRunning && !IsLoadingPreview && !IsChangingMode && !CalibrationActive;
+    private bool CanBeginSession => !IsRunning && !IsLoadingPreview && !CalibrationActive && !(IsCameraSource && cameraFaulted);
     public bool IsVideoSource => SourceIndex == 2;
     public bool IsCsrt => IsVideoSource && AlgorithmIndex == 1;
     public bool CanChooseTarget => !IsSimulation && (!IsVideoSource || AlgorithmIndex == 0);

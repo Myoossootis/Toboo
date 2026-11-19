@@ -1,12 +1,10 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:controls="using:Toboo.Desktop.Controls" x:Class="Toboo.Desktop.MappingWindow"
-        Title="Toboo · 空间感知" Width="1240" Height="880" MinWidth="940" MinHeight="650"
-        WindowStartupLocation="CenterOwner" Background="{StaticResource WorkspaceBrush}">
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Toboo.Desktop.Controls" x:Class="Toboo.Desktop.Views.SpatialCalibrationView">
   <ScrollViewer HorizontalScrollBarVisibility="Disabled">
     <StackPanel Margin="22" Spacing="14">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
         <StackPanel Spacing="5">
-          <TextBlock Text="空间感知" FontSize="27" FontWeight="SemiBold" />
+          <TextBlock Text="视觉标定与空间感知" FontSize="27" FontWeight="SemiBold" />
           <TextBlock x:Name="DeviceStatus" Classes="caption" TextWrapping="Wrap" />
         </StackPanel>
         <WrapPanel Grid.Column="1" VerticalAlignment="Center">
@@ -15,6 +13,11 @@
           <Button x:Name="StartButton" Content="开启摄像头" Click="StartCamera" Margin="0,0,8,4" />
           <Button x:Name="StopButton" Content="停止" Click="StopCamera" IsEnabled="False" Classes="quiet" Margin="0,0,0,4" />
         </WrapPanel>
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <ComboBox x:Name="CameraSelector" PlaceholderText="选择 USB 摄像头"
+                  HorizontalAlignment="Stretch" SelectionChanged="CameraChanged" />
+        <Button x:Name="RefreshCameraButton" Grid.Column="1" Content="刷新摄像头" Click="RefreshCameras" Classes="quiet" />
       </Grid>
       <Grid ColumnDefinitions="340,*" ColumnSpacing="14">
         <StackPanel Spacing="12">
@@ -90,4 +93,4 @@
       </Expander>
     </StackPanel>
   </ScrollViewer>
-</Window>
+</UserControl>

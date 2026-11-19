@@ -110,7 +110,6 @@
             </StackPanel>
           </Border>
           <Button Content="传感器遥测 →" Command="{Binding OpenSensorsCommand}" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
-          <Button Content="空间感知 · 点云与建图 →" Command="{Binding OpenMappingCommand}" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
         </StackPanel>
       </Grid>
       <Border Background="{StaticResource SubtleBrush}" CornerRadius="12" Padding="16">

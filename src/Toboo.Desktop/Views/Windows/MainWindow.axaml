@@ -24,6 +24,9 @@
             <Button x:Name="DevicesNav" Classes="navigation" Classes.selected="{Binding IsDevicesPage}" Command="{Binding NavigateCommand}" CommandParameter="1" ToolTip.Tip="设备">
               <StackPanel Orientation="Horizontal" Spacing="20"><icons:AppIcon Kind="Robot" /><TextBlock Text="设备" Classes="navlabel" /></StackPanel>
             </Button>
+            <Button x:Name="CalibrationNav" Classes="navigation" Classes.selected="{Binding IsCalibrationPage}" Command="{Binding NavigateCommand}" CommandParameter="3" ToolTip.Tip="视觉标定">
+              <StackPanel Orientation="Horizontal" Spacing="20"><icons:AppIcon Kind="Camera" /><TextBlock Text="视觉标定" Classes="navlabel" /></StackPanel>
+            </Button>
             <Button x:Name="SettingsNav" Classes="navigation" Classes.selected="{Binding IsSettingsPage}" Command="{Binding NavigateCommand}" CommandParameter="2" ToolTip.Tip="设置">
               <StackPanel Orientation="Horizontal" Spacing="20"><icons:AppIcon Kind="Settings" /><TextBlock Text="设置" Classes="navlabel" /></StackPanel>
             </Button>
@@ -42,7 +45,7 @@
           <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="16">
             <Border Background="Transparent" PointerPressed="DragWindow"><TextBlock Text="{Binding PageTitle}" FontSize="20" FontWeight="SemiBold" Margin="24,0" VerticalAlignment="Center" /></Border>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-              <Button x:Name="GlobalStopButton" Content="{Binding StopLabel}" Classes="quiet" Command="{Binding Tracking.StopCommand}" IsVisible="{Binding Tracking.IsRunning}" />
+              <Button x:Name="GlobalStopButton" Content="{Binding StopLabel}" Classes="quiet" Command="{Binding StopCaptureCommand}" IsVisible="{Binding IsAnyVisionRunning}" />
               <Button Content="设备管理" Classes="quiet" Command="{Binding NavigateCommand}" CommandParameter="1" />
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal">
@@ -56,11 +59,13 @@
           <StackPanel Spacing="8" Margin="24,12,24,0" IsVisible="{Binding HasNotice}">
             <Border Background="#FBEDE8" CornerRadius="8" Padding="12" IsVisible="{Binding Tracking.HasError}"><TextBlock Text="{Binding Tracking.ErrorMessage}" Foreground="#9A4331" TextWrapping="Wrap" /></Border>
             <Border Background="#FFF4D6" CornerRadius="8" Padding="12" IsVisible="{Binding Tracking.HasServoNotice}"><TextBlock Text="{Binding Tracking.ServoNotice}" Foreground="#805A16" TextWrapping="Wrap" /></Border>
+            <Border Background="{StaticResource SubtleBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasVoiceCommandNotice}"><TextBlock Text="{Binding VoiceCommandNotice}" TextWrapping="Wrap" /></Border>
           </StackPanel>
           <Grid Grid.Row="1">
             <views:CompanionHomeView x:Name="HomeView" IsVisible="{Binding IsCompanionPage}" />
             <views:DevicesView x:Name="DevicesView" IsVisible="{Binding IsDevicesPage}" />
             <views:PreferencesView x:Name="PreferencesView" IsVisible="{Binding IsSettingsPage}" />
+            <views:SpatialCalibrationView x:Name="SpatialView" IsVisible="{Binding IsCalibrationPage}" />
           </Grid>
         </Grid>
       </Grid>

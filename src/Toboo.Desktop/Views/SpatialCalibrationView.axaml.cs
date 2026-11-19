@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -11,12 +12,13 @@ using Toboo.Desktop.Services;
 using Toboo.Desktop.ViewModels;
 using Toboo.Vision;
 
-namespace Toboo.Desktop;
+namespace Toboo.Desktop.Views;
 
-public sealed partial class MappingWindow : Window
+public sealed partial class SpatialCalibrationView : UserControl, IDisposable
 {
-    private readonly CameraDevice? camera;
-    private readonly LcdViewModel? lcd;
+    private CameraDevice? camera;
+    private LcdViewModel? lcd;
+    private MainViewModel? tracking;
     private readonly string calibrationPath;
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly List<OpenCvSharp.Point2f[]> samples = [];
@@ -28,12 +30,12 @@ public sealed partial class MappingWindow : Window
     private Bitmap? depthPreview;
     private bool hasDepthPreview;
     private long origin;
-    private bool reading, closeAfterStop, calibrating;
+    private bool reading, calibrating, disposed;
     private int requestSample, sampleWidth, sampleHeight;
 
-    public MappingWindow() : this(null, null) { }
+    public SpatialCalibrationView() : this(null, null) { }
 
-    internal MappingWindow(CameraDevice? camera, LcdViewModel? lcd, string? calibrationPath = null)
+    internal SpatialCalibrationView(CameraDevice? camera, LcdViewModel? lcd, string? calibrationPath = null)
     {
         this.camera = camera;
         this.lcd = lcd;
@@ -44,6 +46,48 @@ public sealed partial class MappingWindow : Window
         DeviceStatus.Text = $"{camera?.Name ?? "未选择 USB 摄像头"} · {UnoStatus()}";
         StartButton.IsEnabled = camera is not null;
         LoadCalibration();
+    }
+
+    internal bool IsBusy => active is not null;
+
+    internal void Configure(MainViewModel model)
+    {
+        tracking = model;
+        tracking.PropertyChanged += TrackingChanged;
+        lcd = model.Lcd;
+        CameraSelector.ItemsSource = model.Cameras;
+        CameraSelector.SelectedItem = model.SelectedCamera;
+        DeviceStatus.Text = $"{camera?.Name ?? "请选择 USB 摄像头"} · {UnoStatus()}";
+    }
+
+    private void TrackingChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(MainViewModel.SelectedCamera) && !IsBusy)
+            CameraSelector.SelectedItem = tracking?.SelectedCamera;
+    }
+
+    private void CameraChanged(object? sender, SelectionChangedEventArgs args)
+    {
+        if (IsBusy) return;
+        camera = CameraSelector.SelectedItem as CameraDevice;
+        if (tracking is not null) tracking.SelectedCamera = camera;
+        intrinsics = null; samples.Clear();
+        StartButton.IsEnabled = camera is not null;
+        DeviceStatus.Text = $"{camera?.Name ?? "请选择 USB 摄像头"} · {UnoStatus()}";
+        LoadCalibration();
+    }
+
+    private async void RefreshCameras(object? sender, RoutedEventArgs args)
+    {
+        if (IsBusy || tracking is null) return;
+        await tracking.RefreshCamerasAsync();
+        CameraSelector.SelectedItem = tracking.SelectedCamera;
+    }
+
+    private void SetCaptureOwned(bool value)
+    {
+        if (tracking is not null) tracking.CalibrationActive = value;
+        CameraSelector.IsEnabled = RefreshCameraButton.IsEnabled = !value;
     }
 
     private sealed record SavedCalibration(int CameraIndex, string CameraName, MappingIntrinsics Intrinsics);
@@ -83,6 +127,7 @@ public sealed partial class MappingWindow : Window
         var tagMeters = (double)(TagSize.Value ?? 100) / 1000;
         origin = Stopwatch.GetTimestamp();
         var opening = active = new();
+        SetCaptureOwned(true);
         var cancel = opening.Token;
         StartButton.IsEnabled = DemoButton.IsEnabled = PhotoButton.IsEnabled = MountInputs.IsEnabled = false;
         StopButton.IsEnabled = true;
@@ -126,6 +171,7 @@ public sealed partial class MappingWindow : Window
         finally
         {
             opening.Cancel(); timer.Stop(); active = null;
+            SetCaptureOwned(false);
             opening.Dispose();
             Interlocked.Exchange(ref requestSample, 0);
             StartButton.IsEnabled = camera is not null;
@@ -257,7 +303,9 @@ public sealed partial class MappingWindow : Window
 
     private async void SavePatterns(object? sender, RoutedEventArgs args)
     {
-        var dirs = await StorageProvider.OpenFolderPickerAsync(new() { Title = "选择标定图保存位置" });
+        var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storage is null) return;
+        var dirs = await storage.OpenFolderPickerAsync(new() { Title = "选择标定图保存位置" });
         if (dirs.FirstOrDefault()?.TryGetLocalPath() is not { } path) return;
         try
         {
@@ -294,7 +342,9 @@ public sealed partial class MappingWindow : Window
     {
         try
         {
-            var files = await StorageProvider.OpenFilePickerAsync(new()
+            var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+            if (storage is null) return;
+            var files = await storage.OpenFilePickerAsync(new()
             {
                 Title = "选择空间预览照片", AllowMultiple = false,
                 FileTypeFilter = [FilePickerFileTypes.ImageAll]
@@ -309,6 +359,7 @@ public sealed partial class MappingWindow : Window
     {
         if (active is not null) return Task.CompletedTask;
         var opening = active = new();
+        SetCaptureOwned(true);
         cameraJob = InferPhotoAsync(path, opening);
         return cameraJob;
     }
@@ -346,6 +397,7 @@ public sealed partial class MappingWindow : Window
         finally
         {
             active = null; opening.Dispose();
+            SetCaptureOwned(false);
             StartButton.IsEnabled = camera is not null;
             PhotoButton.IsEnabled = DemoButton.IsEnabled = MountInputs.IsEnabled = true;
             StopButton.IsEnabled = false;
@@ -377,25 +429,21 @@ public sealed partial class MappingWindow : Window
 
     private void StopCamera(object? sender, RoutedEventArgs args) => active?.Cancel();
 
-    protected override async void OnClosing(WindowClosingEventArgs args)
+    internal async Task StopAsync()
     {
-        base.OnClosing(args);
-        if (active is not null && cameraJob is { } stopping)
-        {
-            args.Cancel = true;
-            if (closeAfterStop) return;
-            closeAfterStop = true; active.Cancel();
-            await stopping;
-            Close();
-        }
+        active?.Cancel();
+        if (cameraJob is { } stopping) await stopping;
     }
 
-    protected override void OnClosed(EventArgs args)
+    public void Dispose()
     {
+        if (disposed) return;
+        disposed = true;
+        if (tracking is not null) tracking.PropertyChanged -= TrackingChanged;
+        active?.Cancel();
         timer.Stop(); timer.Tick -= PollRange;
         CameraPreview.Source = null; preview?.Dispose();
         DepthPreview.Source = null; depthPreview?.Dispose();
         Cloud.Show([]);
-        base.OnClosed(args);
     }
 }
