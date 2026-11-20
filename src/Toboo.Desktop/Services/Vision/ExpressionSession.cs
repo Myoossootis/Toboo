@@ -24,7 +24,9 @@ internal sealed class ExpressionSession : IDisposable
             nowSeconds = now.TotalSeconds, label = analysis.Estimate.Label.ToString(),
             analysis.Estimate.Score, analysis.Estimate.Margin, analysis.Estimate.Reason,
             sampleCapturedSeconds = analysis.Estimate.CapturedAt?.TotalSeconds,
-            modelScores = analysis.Estimate.Scores, analysis.InferenceMilliseconds, analysis.Brightness, analysis.Sharpness,
+            modelScores = analysis.Estimate.Scores, rawModelScores = analysis.RawScores,
+            alignment = "opencv-zoo-inverse-template-fit-v2",
+            analysis.InferenceMilliseconds, analysis.Brightness, analysis.Sharpness,
             analysis.TargetEpoch, analysis.WasInferred, pipeline.Diagnostic,
             scoreMeaning = "uncalibrated model score; visible expression, not psychological state" }));
         return analysis;

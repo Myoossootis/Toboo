@@ -16,6 +16,11 @@ public sealed partial class MainViewModel
     [ObservableProperty] private string expressionDetail = "本地识别可见表情，不代表真实心理情绪。";
     [ObservableProperty] private string expressionTiming = "尚未推理";
     [ObservableProperty] private IReadOnlyList<ExpressionScoreRow> expressionScores = Array.Empty<ExpressionScoreRow>();
+    [ObservableProperty] private IReadOnlyList<ExpressionScoreRow> expressionRawScores = Array.Empty<ExpressionScoreRow>();
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasExpressionCandidate))]
+    private string expressionCandidate = "";
+    public bool HasExpressionCandidate => ExpressionCandidate.Length > 0;
     private readonly Stopwatch expressionClock = Stopwatch.StartNew();
     private DispatcherTimer? expressionTimer;
     private TimeSpan? expressionExpires;
@@ -46,6 +51,7 @@ public sealed partial class MainViewModel
         ExpressionLabel = "表情线索 · " + reason; ExpressionEmoticon = "(?)";
         ExpressionDetail = "本地识别可见表情，不代表真实心理情绪。";
         ExpressionScores = []; ExpressionTiming = "无有效推理结果"; expressionExpires = null;
+        ExpressionRawScores = []; ExpressionCandidate = "";
         latestExpression = null;
     }
     private void PresentExpression(ExpressionAnalysis? analysis, TimeSpan now)
@@ -68,6 +74,25 @@ public sealed partial class MainViewModel
         ExpressionTiming = $"表情推理 {analysis.InferenceMilliseconds:0.0}ms · 最高5次/秒";
         ExpressionScores = result.Scores.Select((score, index) => new ExpressionScoreRow(
             new ExpressionEstimate((FacialExpression)index, 0, 0, "", null, []).DisplayName, score)).ToArray();
+        var raw = analysis.RawScores;
+        if (result.Scores.Length == 7 && raw is { Length: 7 } && raw.All(v => double.IsFinite(v) && v is >= 0 and <= 1))
+        {
+            var ranked = Enumerable.Range(0, 7).OrderByDescending(i => raw[i]).ToArray();
+            var top = ranked[0];
+            var name = new ExpressionEstimate((FacialExpression)top, 0, 0, "", null, []).DisplayName;
+            ExpressionCandidate = $"本次模型推测 · {name} {raw[top]:0.00}（未校准）";
+            ExpressionRawScores = raw.Select((score, index) => new ExpressionScoreRow(
+                new ExpressionEstimate((FacialExpression)index, 0, 0, "", null, []).DisplayName, score)).ToArray();
+            if (result.Reason == "uncertain")
+            {
+                var reason = raw[top] < 0.60 ? "本次最高分未达 0.60"
+                    : raw[top] - raw[ranked[1]] < 0.15 ? "本次首二类差未达 0.15"
+                    : result.Score < 0.60 ? "平滑最高分未达 0.60"
+                    : result.Margin < 0.15 ? "平滑首二类差未达 0.15" : "本次与平滑后的类别尚未一致";
+                ExpressionDetail = $"{reason} · 平滑最高分 {result.Score:0.00} · 首二类差 {result.Margin:0.00}";
+            }
+        }
+        else { ExpressionRawScores = []; ExpressionCandidate = ""; }
         expressionExpires = result.CapturedAt is { } captured
             ? expressionClock.Elapsed + TimeSpan.FromSeconds(0.5) - (now - captured) : null;
     }

@@ -40,6 +40,7 @@
                 <TextBlock Text="{Binding Tracking.ExpressionLabel}" FontWeight="Medium" TextWrapping="Wrap" />
                 <Button Grid.Column="1" Content="详情 →" Classes="textlink" Command="{Binding OpenExpressionCommand}" />
               </Grid>
+              <TextBlock Text="{Binding Tracking.ExpressionCandidate}" IsVisible="{Binding Tracking.HasExpressionCandidate}" Classes="caption" TextWrapping="Wrap" />
             </StackPanel>
           </Border>
           <Border Classes="shellcard">

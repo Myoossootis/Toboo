@@ -15,8 +15,9 @@ public sealed class FacialExpressionRecognizer : IDisposable
     public const string ModelSha256 = "4f61307602fc089ce20488a31d4e4614e3c9753a7d6c41578c854858b183e1a9";
     public static string DefaultModelPath => Path.Combine(AppContext.BaseDirectory, "models", "expression",
         "facial_expression_recognition_mobilefacenet_2022july.onnx");
-    internal static readonly Point2f[] Reference = [new(38.2946f, 51.6963f), new(73.5318f, 51.5014f),
-        new(56.0252f, 71.7366f), new(41.5493f, 92.3655f), new(70.7299f, 92.2041f)];
+    private static readonly Point2d[] alignmentReference = [new(38.2946, 51.6963), new(73.5318, 51.5014),
+        new(56.0252, 71.7366), new(41.5493, 92.3655), new(70.7299, 92.2041)];
+    internal static readonly Point2f[] Reference = alignmentReference.Select(p => new Point2f((float)p.X, (float)p.Y)).ToArray();
     private readonly Net network;
     public FacialExpressionRecognizer(string? path = null)
     {
@@ -61,27 +62,37 @@ public sealed class FacialExpressionRecognizer : IDisposable
         var logits = new float[7]; Marshal.Copy(output.Data, logits, 0, 7);
         return ExpressionTracker.Softmax(logits);
     }
-    // Least-squares, non-reflecting similarity fit to all five landmarks, equivalent to Zoo's alignment.
+    // Zoo fits template -> observed landmarks, then inverts that similarity transform.
+    // Fitting observed -> template directly is different when the five points have residual error.
     internal static Mat Align(Mat image, Point2f[] source)
     {
-        if (source.Length != 5) throw new ArgumentException("Five landmarks required.");
+        using var transform = AlignmentTransform(source);
+        var aligned = new Mat();
+        try { Cv2.WarpAffine(image, aligned, transform, new(112, 112)); return aligned; }
+        catch { aligned.Dispose(); throw; }
+    }
+    internal static Mat AlignmentTransform(Point2f[] source)
+    {
+        if (source.Length != 5 || source.Any(p => !float.IsFinite(p.X) || !float.IsFinite(p.Y)))
+            throw new ArgumentException("Five finite landmarks required.");
         var x = source.Average(p => (double)p.X); var y = source.Average(p => (double)p.Y);
-        var u = Reference.Average(p => (double)p.X); var v = Reference.Average(p => (double)p.Y);
+        var u = alignmentReference.Average(p => p.X); var v = alignmentReference.Average(p => p.Y);
         double denominator = 0, a = 0, b = 0;
         for (var i = 0; i < 5; i++)
         {
             var dx = source[i].X - x; var dy = source[i].Y - y;
-            var du = Reference[i].X - u; var dv = Reference[i].Y - v;
-            denominator += dx * dx + dy * dy; a += dx * du + dy * dv; b += dx * dv - dy * du;
+            var du = alignmentReference[i].X - u; var dv = alignmentReference[i].Y - v;
+            denominator += du * du + dv * dv; a += du * dx + dv * dy; b += du * dy - dv * dx;
         }
         if (!double.IsFinite(denominator) || denominator < 1e-6) throw new ArgumentException("Degenerate landmarks.");
         a /= denominator; b /= denominator;
-        using var transform = new Mat(2, 3, MatType.CV_64FC1);
+        var scaleSquared = a * a + b * b;
+        if (!double.IsFinite(scaleSquared) || scaleSquared < 1e-12) throw new ArgumentException("Degenerate landmarks.");
+        a /= scaleSquared; b = -b / scaleSquared;
+        var transform = new Mat(2, 3, MatType.CV_64FC1);
         transform.Set(0, 0, a); transform.Set(0, 1, -b); transform.Set(0, 2, u - a * x + b * y);
         transform.Set(1, 0, b); transform.Set(1, 1, a); transform.Set(1, 2, v - b * x - a * y);
-        var aligned = new Mat();
-        try { Cv2.WarpAffine(image, aligned, transform, new(112, 112)); return aligned; }
-        catch { aligned.Dispose(); throw; }
+        return transform;
     }
     public void Dispose() => network.Dispose();
 }

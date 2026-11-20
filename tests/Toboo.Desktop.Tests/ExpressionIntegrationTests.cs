@@ -12,6 +12,39 @@ namespace Toboo.Desktop.Tests;
 
 public sealed class ExpressionIntegrationTests
 {
+    [AvaloniaTheory]
+    [InlineData(FacialExpression.Angry)]
+    [InlineData(FacialExpression.Disgust)]
+    [InlineData(FacialExpression.Fearful)]
+    [InlineData(FacialExpression.Happy)]
+    [InlineData(FacialExpression.Neutral)]
+    [InlineData(FacialExpression.Sad)]
+    [InlineData(FacialExpression.Surprised)]
+    public void RawCandidatesForEveryClassAreVisibleWithoutBecomingConfirmedCues(FacialExpression candidate)
+    {
+        using var model = new MainViewModel { SourceIndex = 3, TargetIndex = 1, IsRunning = true };
+        var raw = Enumerable.Repeat(0.036, 7).ToArray();
+        raw[(int)candidate] = 0.52;
+        raw[((int)candidate + 1) % 7] = 0.30;
+        var estimate = new ExpressionEstimate(FacialExpression.Unknown, 0.52, 0.22, "uncertain", TimeSpan.Zero, [.. raw]);
+        model.Present(new(new byte[640 * 480 * 4], 640, 480, new(0, TimeSpan.Zero, 640, 480, 320, 240),
+            new(103, 100, TrackingState.Centered, 0, 0), TimeSpan.Zero, 1, VisionStatus: "face_locked", TargetCount: 1,
+            Expression: new(estimate, RawScores: raw)));
+        var name = new ExpressionEstimate(candidate, 0, 0, "", null, []).DisplayName;
+        Assert.Contains(name, model.ExpressionCandidate);
+        Assert.True(model.HasExpressionCandidate);
+        Assert.Equal(7, model.ExpressionRawScores.Count);
+        Assert.Contains("未达 0.60", model.ExpressionDetail);
+        Assert.Equal("(?)", model.ExpressionEmoticon);
+        Assert.Null(model.CaptureExpressionCue());
+        Assert.False(model.Servo.Ready);
+        model.Present(new(new byte[640 * 480 * 4], 640, 480, new(1, TimeSpan.FromSeconds(0.1), 640, 480, null, null),
+            new(103, 100, TrackingState.Lost, null, null), TimeSpan.FromSeconds(0.1), 2,
+            Expression: new(ExpressionEstimate.Unknown("no_selected_face"))));
+        Assert.False(model.HasExpressionCandidate);
+        Assert.Empty(model.ExpressionRawScores);
+        model.IsRunning = false;
+    }
     [FaceAimSampleFact]
     public async Task PublicFaceVideoUsesSelectedTargetAndClearsImmediatelyOnBlankFrames()
     {
@@ -69,12 +102,15 @@ public sealed class ExpressionIntegrationTests
             var estimate = new ExpressionEstimate(FacialExpression.Happy, 0.9, 0.8, "stable", TimeSpan.Zero,
                 [0.02, 0.01, 0.01, 0.9, 0.03, 0.01, 0.02]);
             model.Present(new(new byte[640 * 480 * 4], 640, 480, new(0, TimeSpan.Zero, 640, 480, 320, 240),
-                new(103, 100, TrackingState.Centered, 0, 0), TimeSpan.Zero, 1, VisionStatus: "face_locked", TargetCount: 1, Expression: new(estimate, 3)));
+                new(103, 100, TrackingState.Centered, 0, 0), TimeSpan.Zero, 1, VisionStatus: "face_locked", TargetCount: 1,
+                Expression: new(estimate, 3, RawScores: [.. estimate.Scores])));
             window.FindControl<TabControl>("SettingsTabs")!.SelectedIndex = 4;
             await Task.Delay(80);
             Assert.Equal("(^_^)", model.ExpressionEmoticon);
             Assert.Equal(7, model.ExpressionScores.Count);
             Assert.True(window.FindControl<TextBlock>("ExpressionDetailsLabel")!.IsEffectivelyVisible);
+            Assert.True(window.FindControl<TextBlock>("ExpressionCandidateLabel")!.IsEffectivelyVisible);
+            Assert.Equal(7, model.ExpressionRawScores.Count);
             Assert.False(window.FindControl<CheckBox>("ExpressionToggle")!.IsEffectivelyEnabled);
             using (var screenshot = window.CaptureRenderedFrame())
             {
@@ -87,6 +123,8 @@ public sealed class ExpressionIntegrationTests
             Assert.Equal("(?)", model.ExpressionEmoticon);
             Assert.Contains("过期", model.ExpressionLabel);
             Assert.Empty(model.ExpressionScores);
+            Assert.Empty(model.ExpressionRawScores);
+            Assert.False(model.HasExpressionCandidate);
         }
         finally { model.IsRunning = false; window.Close(); }
     }

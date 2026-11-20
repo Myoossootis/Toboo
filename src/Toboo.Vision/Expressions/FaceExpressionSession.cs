@@ -35,7 +35,10 @@ public sealed class FaceExpressionSession : IDisposable
         var targetEpoch = aim?.LockEpoch ?? 0;
         if (targetEpoch != epoch) { epoch = targetEpoch; lastAttempt = null; Clear("target_changed"); }
         if (lastAttempt is { } previous && captured >= previous && (captured - previous).TotalSeconds < IntervalSeconds)
-            return latest with { Estimate = tracker.At(now), WasInferred = false };
+        {
+            var estimate = tracker.At(now);
+            return latest with { Estimate = estimate, WasInferred = false, RawScores = estimate.Scores.Length == 7 ? latest.RawScores : null };
+        }
         lastAttempt = captured;
         try
         {
@@ -45,7 +48,7 @@ public sealed class FaceExpressionSession : IDisposable
             // Native inference may finish after the freshness budget; never show its late result as current.
             var completed = realTime ? now + TimeSpan.FromMilliseconds(result.InferenceMilliseconds) : now;
             latest = new(tracker.Update(result.Scores, faces.Observation.FrameNumber, epoch, captured, completed, singleImage),
-                result.InferenceMilliseconds, result.Brightness, result.Sharpness, epoch, true);
+                result.InferenceMilliseconds, result.Brightness, result.Sharpness, epoch, true, [.. result.Scores]);
             return latest;
         }
         catch (Exception error) when (error is OpenCVException or ArgumentException or InvalidDataException)

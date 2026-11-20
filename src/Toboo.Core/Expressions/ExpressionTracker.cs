@@ -37,7 +37,8 @@ public sealed record ExpressionSettings
 }
 
 public sealed record ExpressionAnalysis(ExpressionEstimate Estimate, double InferenceMilliseconds = 0,
-    double? Brightness = null, double? Sharpness = null, int TargetEpoch = 0, bool WasInferred = false);
+    double? Brightness = null, double? Sharpness = null, int TargetEpoch = 0, bool WasInferred = false,
+    double[]? RawScores = null);
 
 /// <summary>Single-target time-aware smoothing. Unknown input clears the old expression immediately.</summary>
 public sealed class ExpressionTracker

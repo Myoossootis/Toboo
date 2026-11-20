@@ -2,7 +2,7 @@
 
 ## 另一台笔记本首次启动
 
-1. 在 Release 附件中下载完整的 `toboo-0.3.1-win-x64-portable.zip`。
+1. 在 Release 附件中下载完整的 `toboo-0.3.2-win-x64-portable.zip`。
 2. 使用 Windows 10/11 x64，解压到用户可写目录，例如桌面上的 `Toboo` 文件夹。
 3. 双击解压目录内的 **toboo.exe**。保留整个文件夹，包含 DLL、`models`、`runtime` 和 `firmware`。
 4. 左侧「视觉标定」可打开照片或选择 USB 摄像头，查看相对深度和彩色点云。拖拽旋转，滚轮缩放。
@@ -57,7 +57,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/install-toboo-harn
 
 ## 诊断和升级
 
-已有 v0.3.0 完整便携版时，可下载 `toboo-0.3.1-update-from-0.3.0-win-x64.zip`。关闭 toboo，将 ZIP 内全部内容解压到原 `toboo.exe` 所在目录，选择替换同名文件，然后双击原来的 `toboo.exe`。增量包只适用于完整 v0.3.0，不能单独运行。可运行包内的 `verify-update.ps1` 检查覆盖结果。此次升级无需重刷 Uno 或 ESP32 固件，本机保存的设备标定保持在原位置。
+已有 v0.3.0 或 v0.3.1 完整便携版时，下载与当前版本对应的 `toboo-0.3.2-update-from-0.3.0-win-x64.zip` 或 `toboo-0.3.2-update-from-0.3.1-win-x64.zip`。关闭 toboo，将 ZIP 内全部内容解压到原 `toboo.exe` 所在目录，选择替换同名文件，然后双击原来的 `toboo.exe`。增量包不能单独运行。可运行包内的 `verify-update.ps1` 检查覆盖结果。此次升级无需重刷 Uno 或 ESP32 固件，本机保存的设备标定保持在原位置。
 
 完整解压新版本到新文件夹，关闭旧程序，再启动新版。设备设置位于 `%LOCALAPPDATA%\PanTiltTracker\`，本地诊断写入包目录 `diagnostics/`。启动失败时先查看 `diagnostics/startup-error.json`。
 

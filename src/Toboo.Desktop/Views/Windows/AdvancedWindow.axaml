@@ -316,7 +316,21 @@
                   <TextBlock Text="{Binding ExpressionEmoticon}" FontFamily="Consolas" FontSize="28" />
                   <TextBlock x:Name="ExpressionDetailsLabel" Text="{Binding ExpressionLabel}" FontWeight="SemiBold" TextWrapping="Wrap" />
                   <TextBlock Text="{Binding ExpressionDetail}" Classes="caption" TextWrapping="Wrap" />
+                  <TextBlock x:Name="ExpressionCandidateLabel" Text="{Binding ExpressionCandidate}" IsVisible="{Binding HasExpressionCandidate}" Classes="caption" TextWrapping="Wrap" />
                   <TextBlock Text="{Binding ExpressionTiming}" Classes="caption" TextWrapping="Wrap" />
+                  <Expander Header="本次模型七类分数" IsVisible="{Binding HasExpressionCandidate}" IsExpanded="True" HorizontalAlignment="Stretch">
+                    <ItemsControl ItemsSource="{Binding ExpressionRawScores}" Margin="0,8,0,0">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ExpressionScoreRow">
+                          <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                            <TextBlock Text="{Binding Name}" FontSize="12" />
+                            <TextBlock Grid.Column="1" Text="{Binding Score, StringFormat={}{0:0.00}}" FontSize="12" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </Expander>
+                  <TextBlock Text="平滑后的七类分数" FontWeight="Medium" />
                   <ItemsControl ItemsSource="{Binding ExpressionScores}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:ExpressionScoreRow">
