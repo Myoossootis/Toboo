@@ -50,6 +50,13 @@ foreach ($library in @('whisper.dll', 'ggml-whisper.dll', 'ggml-base-whisper.dll
     if (!(Test-Path -LiteralPath (Join-Path $appPath "runtimes/win-x64/$library"))) { throw "Missing speech runtime: $library" }
 }
 Write-Host 'PASS: packaged Whisper/Silero model hashes and CPU runtime files.'
+$depthModel = Get-Content -LiteralPath (Join-Path $appPath 'models/depth/model.json') -Raw | ConvertFrom-Json
+$depthPath = Join-Path $appPath ('models/depth/' + $depthModel.file)
+if (!(Test-Path -LiteralPath $depthPath) -or (Get-Item -LiteralPath $depthPath).Length -ne $depthModel.bytes -or
+    (Get-FileHash -LiteralPath $depthPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $depthModel.sha256) {
+    throw 'Packaged depth model failed size/SHA256 verification.'
+}
+if (!(Test-Path -LiteralPath (Join-Path $appPath 'licenses/MiDaS-MIT.txt'))) { throw 'Missing depth model license.' }
 $runtimeConfig = Get-Content -LiteralPath (Join-Path $appPath 'toboo.runtimeconfig.json') -Raw | ConvertFrom-Json
 if (!$runtimeConfig.runtimeOptions.includedFrameworks -or $runtimeConfig.runtimeOptions.framework) {
     throw 'Expected a self-contained runtime configuration.'
@@ -84,7 +91,8 @@ try {
     $serialTest = Get-Content -LiteralPath (Join-Path $appPath 'diagnostics/serial-runtime-self-test.json') -Raw | ConvertFrom-Json
     if (!$serialTest.success -or !$serialTest.bundledRuntime -or $serialTest.serialOpened) { throw 'Bundled serial runtime self-test failed.' }
     if (!$selfTest.success -or !$selfTest.faceModelLoaded -or $selfTest.faceDetector -ne 'yunet_2023mar' -or !$selfTest.faceBlankFramePassed -or
-        !$selfTest.expressionModelLoaded -or !$uiTest.success -or $uiTest.frames -lt 12) { throw 'Portable smoke checks did not pass.' }
+        !$selfTest.expressionModelLoaded -or !$selfTest.depthModelLoaded -or !$selfTest.depthInferencePassed -or
+        $selfTest.depthPoints -lt 8000 -or !$uiTest.success -or $uiTest.frames -lt 12) { throw 'Portable smoke checks did not pass.' }
     if (!$selfTest.runtimeDirectory.StartsWith($appPath, [StringComparison]::OrdinalIgnoreCase)) {
         throw 'The executable did not use its app-local .NET runtime.'
     }

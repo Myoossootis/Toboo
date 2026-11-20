@@ -1,17 +1,67 @@
-# toboo Windows x64
+# toboo Windows x64 便携版使用方法
 
-完整解压后，双击本目录的 **toboo.exe**。运行时、DLL 和 models 文件夹均需保留；不需要另装 .NET SDK。建议解压到可写目录。
+## 另一台笔记本首次启动
 
-聊天、设备和设置界面都在 toboo 内。AI 对话需要已配置模型服务的 DeepSeek Harness，安装步骤见 [聊天接入](https://github.com/Myoossootis/Toboo/blob/main/docs/harness.md)（离线文档：`docs/harness.md`）。本包包含 `scripts/install-toboo-harness.ps1` 和独立桥插件；首次安装后从托盘完全退出并重启 Harness。
+1. 在 Release 附件中下载完整的 `toboo-0.3.0-win-x64-portable.zip`。
+2. 使用 Windows 10/11 x64，解压到用户可写目录，例如桌面上的 `Toboo` 文件夹。
+3. 双击解压目录内的 **toboo.exe**。保留整个文件夹，包含 DLL、`models`、`runtime` 和 `firmware`。
+4. 左侧「视觉标定」可打开照片或选择 USB 摄像头，查看相对深度和彩色点云。拖拽旋转，滚轮缩放。
 
-摄像头和表情分析在本地运行。陪伴页和设备页可以直接预览角色动画。实体 LCD1602 通过独立的 Uno 同步状态，先下载对应版本的 Uno 固件并按 `docs/lcd.md` 烧录，再在设备页选择 Uno 的串口。串口支持随包提供，舵机与传感器工具使用包内运行环境，请保留 `runtime` 和 `firmware` 文件夹。
+便携包包含 .NET 运行时、图像依赖、深度与语音模型、独立串口 Python 环境。首次使用本地视觉功能可以离线运行。中文系统麦克风识别和朗读仍依赖 Windows 中文语音组件。
 
-连接 Harness 后按住说话、松开发送，回复会自动朗读；按 Esc 可取消识别，「停止语音」可打断朗读。默认电脑麦克风使用 Windows 中文识别，在设备页切换 ICS43432 并选择 ESP32-S3 串口后，使用随包附带的 Whisper 模型在本地识别。接线、合并固件及 CPU / 系统要求见 `docs/microphone.md`。朗读使用 Windows 中文声音和系统默认音频输出，缺少朗读组件时按 `docs/getting-started.md` 配置。
+## 摄像头与空间感知
 
-本版本另提供禁止执行器输出的 ESP32-S3 N16R8 采音固件。桌面更新不会自动烧录或解除已有运动锁定。360°连续旋转舵机不能使用当前角度定位与机械边界流程；更换定位型后也须重新核对请求参考、方向和范围，见 `docs/hardware.md`。
+将 USB 摄像头连接电脑，在「视觉标定」点击刷新，选择正确设备并开启。若无图像，检查 Windows 桌面应用相机权限及其他相机应用的占用情况。普通预览和点云可以直接开始，二维地图需要打印并采集棋盘格，之后固定 ArUco 7 标记。页面提供保存打印图功能。
 
-诊断信息写入本目录的 `diagnostics/`。原有设置保留在 `%LOCALAPPDATA%\PanTiltTracker\`；聊天私有数据在 `%USERPROFILE%\.toboo-harness\`。不要公开个人数据与连接文件。
+点云显示单帧估计的相对形状，空间比例需验证。超声波实测距离单独显示。标定步骤见 `docs/aruco-sonar-map.md`。
 
-版本及构建提交见 `build-info.json`，第三方声明见 `THIRD-PARTY-NOTICES.md` 和 `licenses/`。
+## Uno 表情屏与超声波
 
-[项目主页](https://github.com/Myoossootis/Toboo) · [问题反馈](https://github.com/Myoossootis/Toboo/issues)
+已有合并固件时连接 Uno USB，在「设备 → 表情屏幕」刷新并选择其 COM 口。新电脑的端口编号可能改变，请在设备管理器中确认。Uno 与 ESP32 使用不同端口。
+
+LCD 的 VCC/GND/SDA/SCL 对应 Uno 5V/GND/A4/A5，超声波 VCC/GND/TRIG/ECHO 对应 5V/GND/D7/D8。先断开 USB 后接线。首次需要烧录 Release 的 `uno-lcd-distance.hex`，具体方法见 `docs/lcd.md` 和 `docs/aruco-sonar-map.md`。
+
+## 云台与本地语音命令
+
+1. 在「设备 → 云台」选择 ESP32 的串口，点击连接并读状态。
+2. 首次装机完成工作边界、相机参数、两轴方向检查，保存配置。
+3. 确认外部 5V 已接、机构可动，再点击回到中心并检查姿态。
+4. 选中 USB 摄像头后，点击开启实物跟随。
+5. 也可以回到陪伴页按住语音按钮，说「打开摄像机跟随」后松开。设备就绪时启动，缺项时显示提示。此命令可在 Harness 离线时使用。
+
+相同且安装未改动的机器人，可在两台电脑都关闭 toboo 后，将旧电脑的 `%LOCALAPPDATA%\PanTiltTracker\servo.json` 和 `face-aim.local.json` 复制到新电脑同目录。只复制这两个配置文件即可恢复保存的中心、工作区和相机角度设置。核对新电脑摄像头与原设备一致，重新选择 COM 口并确认供电。原标定失效或更换相机时，重新标定。聊天凭据和个人实验记录保存在其他目录。
+
+跟随要求角度定位型舵机，360°连续旋转型号需要其他控制方式。固件附件提供定位版与全输出锁定版，使用方法见 `docs/hardware.md`。软件启动为待机，进入视觉标定页会结束主视觉会话。
+
+## 语音输入和朗读
+
+电脑麦克风使用 Windows 中文识别，ICS43432 模块通过 ESP32-S3 采音并使用包内 Whisper 转写。在设备页选择输入设备和模块串口。模块识别 CPU 需要 AVX2、FMA、F16C，缺少时界面会显示原因。系统麦克风缺少中文识别、朗读组件时，在 Windows 语言设置中为简体中文添加对应组件，然后重新检查本机语音。
+
+按住说话、松开发送，Esc 取消。蓝牙音响可设为 Windows 默认声音输出。接线及模型说明见 `docs/microphone.md`。
+
+## AI 对话
+
+1. 在新电脑安装 DeepSeek Harness，启动一次并配置模型服务。
+2. 在便携包根目录打开 PowerShell，执行下面的命令。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/install-toboo-harness.ps1
+```
+
+3. 从系统托盘完全退出 Harness，再重新启动。
+4. 在 toboo 设置页刷新连接、选择模型，回到陪伴页聊天。
+
+桥插件引用解压目录里的文件，因此保持文件夹路径稳定。更新前如存在旧桥路径，按 `docs/harness.md` 迁移。模型服务账户在 Harness 中配置。
+
+## 诊断和升级
+
+完整解压新版本到新文件夹，关闭旧程序，再启动新版。设备设置位于 `%LOCALAPPDATA%\PanTiltTracker\`，本地诊断写入包目录 `diagnostics/`。启动失败时先查看 `diagnostics/startup-error.json`。
+
+可在 PowerShell 中运行以下离线检查，结果写入 `diagnostics/`。
+
+```powershell
+./toboo.exe --self-test
+./toboo.exe --serial-runtime-self-test
+```
+
+版本和源码提交见 `build-info.json`，依赖声明见 `THIRD-PARTY-NOTICES.md` 和 `licenses/`。
