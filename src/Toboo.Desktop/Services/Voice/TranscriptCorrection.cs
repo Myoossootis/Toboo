@@ -20,7 +20,7 @@ internal static class TranscriptCorrection
             corrected.Length > Math.Max(40, original.Length * 1.4) || corrected.Length < original.Length * 0.6) return false;
         static string[] Tokens(string text, string pattern) => Regex.Matches(text.Normalize(NormalizationForm.FormKC), pattern)
             .Select(m => m.Value).ToArray();
-        return Tokens(original, @"\d+(?:\.\d+)?").SequenceEqual(Tokens(corrected, @"\d+(?:\.\d+)?"))
+        return Tokens(original, @"[+-]?\d+(?:\.\d+)?").SequenceEqual(Tokens(corrected, @"[+-]?\d+(?:\.\d+)?"))
             && Tokens(original, "不要|不能|不准|没有|别|没|不|停止|取消|禁止")
                 .SequenceEqual(Tokens(corrected, "不要|不能|不准|没有|别|没|不|停止|取消|禁止"));
     }

@@ -430,9 +430,9 @@
           "System.IO.Ports": "[8.0.0, )",
           "System.Security.Cryptography.ProtectedData": "[8.0.0, )",
           "System.Speech": "[8.0.0, )",
-          "Toboo.Core": "[0.3.3-preview.1, )",
-          "Toboo.Runtime": "[0.3.3-preview.1, )",
-          "Toboo.Vision": "[0.3.3-preview.1, )",
+          "Toboo.Core": "[0.3.3-preview.2, )",
+          "Toboo.Runtime": "[0.3.3-preview.2, )",
+          "Toboo.Vision": "[0.3.3-preview.2, )",
           "Whisper.net": "[1.9.1, )",
           "Whisper.net.Runtime": "[1.9.1, )"
         }
@@ -443,8 +443,8 @@
       "toboo.runtime": {
         "type": "Project",
         "dependencies": {
-          "Toboo.Core": "[0.3.3-preview.1, )",
-          "Toboo.Vision": "[0.3.3-preview.1, )"
+          "Toboo.Core": "[0.3.3-preview.2, )",
+          "Toboo.Vision": "[0.3.3-preview.2, )"
         }
       },
       "toboo.vision": {
@@ -452,7 +452,7 @@
         "dependencies": {
           "OpenCvSharp4": "[4.10.0.20240616, )",
           "OpenCvSharp4.runtime.win": "[4.10.0.20240616, )",
-          "Toboo.Core": "[0.3.3-preview.1, )"
+          "Toboo.Core": "[0.3.3-preview.2, )"
         }
       }
     },

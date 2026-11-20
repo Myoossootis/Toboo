@@ -92,6 +92,8 @@ public sealed class DeepSeekSpeechTests
     [Theory]
     [InlineData("不要打开摄像头", "打开摄像头", false)]
     [InlineData("转动5度", "转动50度", false)]
+    [InlineData("转动-5度", "转动5度", false)]
+    [InlineData("转动+5度", "转动-5度", false)]
     [InlineData("不要打开摄像机根随", "不要打开摄像机跟随", true)]
     [InlineData("今天心晴不错", "今天心情不错", true)]
     public void CorrectionPreservesNegationAndNumbers(string original, string corrected, bool accepted)
