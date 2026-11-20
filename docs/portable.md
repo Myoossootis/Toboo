@@ -2,7 +2,7 @@
 
 ## 另一台笔记本首次启动
 
-1. 在 Release 附件中下载完整的 `toboo-0.3.2-win-x64-portable.zip`。
+1. 在 Release 附件中下载完整的 `toboo-0.3.3-win-x64-portable.zip`。
 2. 使用 Windows 10/11 x64，解压到用户可写目录，例如桌面上的 `Toboo` 文件夹。
 3. 双击解压目录内的 **toboo.exe**。保留整个文件夹，包含 DLL、`models`、`runtime` 和 `firmware`。
 4. 左侧「视觉标定」可打开照片或选择 USB 摄像头，查看相对深度和彩色点云。拖拽旋转，滚轮缩放。
@@ -37,9 +37,11 @@ LCD 的 VCC/GND/SDA/SCL 对应 Uno 5V/GND/A4/A5，超声波 VCC/GND/TRIG/ECHO �
 
 ## 语音输入和朗读
 
-电脑麦克风使用 Windows 中文识别，ICS43432 模块通过 ESP32-S3 采音并使用包内 Whisper 转写。在设备页选择输入设备和模块串口。模块识别 CPU 需要 AVX2、FMA、F16C，缺少时界面会显示原因。系统麦克风缺少中文识别、朗读组件时，在 Windows 语言设置中为简体中文添加对应组件，然后重新检查本机语音。
+电脑麦克风使用 Windows 中文识别。ICS43432 模块通过 ESP32-S3 采音，可使用包内 Whisper 或 DeepSeek ASR。在设备页选择输入设备和模块串口，展开「模块识别与纠错」选择引擎。本地 Whisper 需要 CPU 支持 AVX2、FMA、F16C，缺少时界面会显示原因；云端引擎需要网络及自己的 DeepSeek API Key，在软件内输入并保存。密钥按当前 Windows 账户加密，更换电脑需重新配置。
 
-按住说话、松开发送，Esc 取消。蓝牙音响可设为 Windows 默认声音输出。接线及模型说明见 `docs/microphone.md`。
+云端模式会上传本次录音并按服务计费，可选纠错也会上传转写文字。默认「先核对文字」会暂停自动语音命令；核对原文和校正结果后再发送。修改过的文字不会自动触发硬件命令。实际模块与云端识别准确率仍需按设备与环境验证。系统麦克风缺少中文识别、朗读组件时，在 Windows 语言设置中为简体中文添加对应组件，然后重新检查本机语音。
+
+按住说话、松开结束录音；默认核对模式下先检查文字再发送，Esc 取消。蓝牙音响可设为 Windows 默认声音输出。接线及模型说明见 `docs/microphone.md`。
 
 ## AI 对话
 
@@ -57,7 +59,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/install-toboo-harn
 
 ## 诊断和升级
 
-已有 v0.3.0 或 v0.3.1 完整便携版时，下载与当前版本对应的 `toboo-0.3.2-update-from-0.3.0-win-x64.zip` 或 `toboo-0.3.2-update-from-0.3.1-win-x64.zip`。关闭 toboo，将 ZIP 内全部内容解压到原 `toboo.exe` 所在目录，选择替换同名文件，然后双击原来的 `toboo.exe`。增量包不能单独运行。可运行包内的 `verify-update.ps1` 检查覆盖结果。此次升级无需重刷 Uno 或 ESP32 固件，本机保存的设备标定保持在原位置。
+已有 v0.3.2 完整便携版（或增量升级后的 v0.3.2）时，下载 `toboo-0.3.3-update-from-0.3.2-win-x64.zip`。关闭 toboo，将 ZIP 内全部内容解压到原 `toboo.exe` 所在目录，选择替换同名文件，然后双击原来的 `toboo.exe`。增量包不能单独运行。可运行包内的 `verify-update.ps1` 检查覆盖结果。此次升级无需重刷 Uno 或 ESP32 固件，本机保存的设备标定保持在原位置。其他旧版本或候选版使用完整便携包，解压到新文件夹。
 
 完整解压新版本到新文件夹，关闭旧程序，再启动新版。设备设置位于 `%LOCALAPPDATA%\PanTiltTracker\`，本地诊断写入包目录 `diagnostics/`。启动失败时先查看 `diagnostics/startup-error.json`。
 
