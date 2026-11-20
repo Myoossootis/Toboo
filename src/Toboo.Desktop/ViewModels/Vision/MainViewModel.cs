@@ -92,8 +92,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private bool isChangingMode;
     [ObservableProperty] private string cameraModelLabel = "相机角度模型：待配置，可先预览表情。";
     public string OutputLabel => IsFollowing ? "人脸实物跟随 · 请求角度" : "视觉预览 · 独立于舵机";
-    public bool CanStartFollow => !CalibrationActive && !IsChangingMode && !IsFollowing && IsFace && IsCameraSource &&
-        Servo.CanFollow && FaceAim.DirectionsConfirmed && (CanStart || (IsRunning && !cameraFaulted));
+    // The product action chooses camera/face mode itself when no session owns the input.
+    public bool CanStartCameraFollow => !CalibrationActive && !IsChangingMode && !IsFollowing && !cameraFaulted &&
+        Servo.CanFollow && FaceAim.DirectionsConfirmed && (CanStart || (IsRunning && IsFace && IsCameraSource));
+    public bool CanStartFollow => CanStartCameraFollow && IsFace && IsCameraSource;
+    public string CameraFollowSessionHint => CalibrationActive ? "请先结束视觉标定。"
+        : cameraFaulted ? "摄像头未释放，请关闭并重新启动 toboo。"
+        : IsLoadingPreview ? "正在载入图像，请稍候。"
+        : IsRunning && (!IsFace || !IsCameraSource) ? "请先停止当前实验，再开启摄像头人脸跟随。" : "";
     public string PreviewStartLabel => IsFace ? "仅预览（不转动）" : "开始实验";
     public string FollowStartHint => IsRunning
         ? IsFollowing ? "正在控制舵机；可随时停止跟随。" : "当前仅预览；准备就绪后可直接开启跟随。"
@@ -190,6 +196,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (args.PropertyName is nameof(CanConfigure) or nameof(IsFace) or nameof(IsCameraSource) or nameof(IsRunning) or nameof(IsFollowing))
             {
                 OnPropertyChanged(nameof(CanStartFollow));
+                OnPropertyChanged(nameof(CanStartCameraFollow));
+                OnPropertyChanged(nameof(CameraFollowSessionHint));
                 OnPropertyChanged(nameof(PreviewStartLabel));
                 OnPropertyChanged(nameof(FollowStartHint));
             }
@@ -199,7 +207,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void ServoChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
-        if (args.PropertyName == nameof(Servo.CanFollow)) OnPropertyChanged(nameof(CanStartFollow));
+        if (args.PropertyName == nameof(Servo.CanFollow))
+        {
+            OnPropertyChanged(nameof(CanStartFollow));
+            OnPropertyChanged(nameof(CanStartCameraFollow));
+        }
         if (args.PropertyName is nameof(Servo.CanFollow) or nameof(Servo.Status) or nameof(Servo.FollowReadiness)) OnPropertyChanged(nameof(FollowStartHint));
     }
 
@@ -207,6 +219,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (args.PropertyName != nameof(FaceAim.DirectionsConfirmed)) return;
         OnPropertyChanged(nameof(CanStartFollow));
+        OnPropertyChanged(nameof(CanStartCameraFollow));
         OnPropertyChanged(nameof(FollowStartHint));
     }
 

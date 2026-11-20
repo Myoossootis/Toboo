@@ -19,6 +19,10 @@
       </StackPanel>
       <StackPanel IsVisible="{Binding SetupDirectionStep}" Spacing="8">
         <TextBlock Text="确认跟随方向" Classes="section" />
+        <StackPanel IsVisible="{Binding NeedsCameraModel}" Spacing="8">
+          <TextBlock Text="相机未配置时，可先用水平 60° / 垂直 45° 估算。此参数未经实测标定。" Classes="caption" TextWrapping="Wrap" />
+          <Button Content="使用视场角估算并保存" Command="{Binding QuickConfigureCameraCommand}" Classes="quiet" />
+        </StackPanel>
         <ComboBox SelectedIndex="{Binding Tracking.FaceAim.PanDirectionIndex}" HorizontalAlignment="Stretch">
           <ComboBoxItem Content="目标在右侧 → S1 增大" /><ComboBoxItem Content="目标在右侧 → S1 减小" />
         </ComboBox>
@@ -26,8 +30,8 @@
           <ComboBoxItem Content="目标在下方 → S2 增大" /><ComboBoxItem Content="目标在下方 → S2 减小" />
         </ComboBox>
         <CheckBox Content="已通过微调检查方向" IsChecked="{Binding Tracking.FaceAim.DirectionsConfirmed}" />
-        <TextBlock Text="{Binding SetupMessage}" Classes="caption" TextWrapping="Wrap" />
       </StackPanel>
+      <TextBlock Text="{Binding SetupMessage}" Classes="caption" TextWrapping="Wrap" />
       <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
         <Button Content="上一步" Command="{Binding PreviousSetupStepCommand}" Classes="quiet" />
         <Button Grid.Column="1" x:Name="SetupNextButton" Content="{Binding SetupNextLabel}" Command="{Binding AdvanceSetupCommand}" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />

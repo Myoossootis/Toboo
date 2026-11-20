@@ -77,9 +77,15 @@
                 <CheckBox Content="5V 已接，机构可动" IsChecked="{Binding Ready}" IsEnabled="{Binding !Busy}" />
               </StackPanel>
               <Button x:Name="DeviceHomeButton" Content="回到中心" Command="{Binding Tracking.Servo.HomeCommand}" IsEnabled="{Binding Tracking.Servo.CanCalibratedMotion}" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
-              <Button x:Name="DeviceFollowButton" Content="{Binding FollowActionLabel}" Command="{Binding Tracking.StartFollowCommand}" IsEnabled="{Binding CanFollow}" Classes="primary" IsVisible="{Binding !Tracking.IsFollowing}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+              <Button x:Name="DeviceFollowButton" Content="{Binding FollowActionLabel}" Command="{Binding StartFollowCommand}" IsEnabled="{Binding CanFollow}" Classes="primary" IsVisible="{Binding !Tracking.IsFollowing}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
               <Button Content="停止实物跟随" Command="{Binding Tracking.StopCommand}" Classes="quiet" IsVisible="{Binding Tracking.IsFollowing}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
               <TextBlock Text="{Binding PreparationHint}" Classes="caption" TextWrapping="Wrap" />
+              <StackPanel IsVisible="{Binding NeedsCameraModel}" Spacing="8">
+                <TextBlock Text="相机快速配置" FontWeight="Medium" />
+                <TextBlock Text="使用水平 60° / 垂直 45° 的通用估算。优先采用实际预览尺寸，否则按采集规格创建（默认 640×480）。可稍后在高级设置中校正。" Classes="caption" TextWrapping="Wrap" />
+                <Button x:Name="QuickCameraSetupButton" Content="使用视场角估算并保存" Command="{Binding QuickConfigureCameraCommand}" Classes="quiet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+              </StackPanel>
+              <TextBlock Text="{Binding CameraSetupNotice}" IsVisible="{Binding HasCameraSetupNotice}" Classes="caption" TextWrapping="Wrap" />
               <Expander x:Name="RobotSetupExpander" Header="快速准备（首次使用）" IsExpanded="{Binding CalibrationExpanded, Mode=TwoWay}" HorizontalAlignment="Stretch" Background="{StaticResource SurfaceBrush}">
                 <views:RobotCalibrationView />
               </Expander>

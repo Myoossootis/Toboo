@@ -103,8 +103,10 @@ public sealed partial class ServoViewModel : ObservableObject
         : !Ready ? "请确认 5V 已接、机构可动。"
         : Busy ? "串口正在使用中。"
         : !TiltCalibrationSaved || TiltCalibrating ? "先保存新 S2 的工作边界。"
-        : !panLast.HasValue || !tiltLast.HasValue ? "先点「平滑回中心」，建立两轴请求参考。"
-        : !CanFollow ? "当前请求不在工作区内，请先「平滑回中心」。"
+        : !followFirmware ? "当前固件不支持人脸跟随，请更新 ESP32 云台固件。"
+        : TiltFloor < pairedTiltMin || TiltCeiling > pairedTiltMax ? "当前固件不支持已保存的 S2 工作范围，请更新 ESP32 云台固件。"
+        : !panLast.HasValue || !tiltLast.HasValue ? "先点「回到中心」，建立两轴请求参考。"
+        : !CanFollow ? "当前请求不在工作区内，请先「回到中心」。"
         : "两轴请求与工作边界已就绪。";
     public bool CanPattern => CanCalibratedMotion && SweepReady;
 

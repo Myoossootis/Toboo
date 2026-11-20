@@ -4,7 +4,7 @@ Windows 桌面陪伴机器人原型：在一个界面中完成 AI 对话、摄�
 
 **[下载最新 Windows x64 版本](https://github.com/Myoossootis/Toboo/releases/latest)** · [开始使用](docs/getting-started.md) · [开发说明](docs/development.md) · [架构](docs/architecture.md)
 
-[v0.3.0 更新说明](docs/releases/v0.3.0.md)，新增独立视觉标定、相对深度与彩色点云、Uno 共板测距和本地语音跟随命令。
+[v0.3.1 更新说明](docs/releases/v0.3.1.md)，新增相机快速配置和逐步准备提示，支持从 v0.3.0 增量覆盖更新。
 
 ## 启动
 
