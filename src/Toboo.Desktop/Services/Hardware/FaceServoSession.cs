@@ -23,6 +23,8 @@ internal sealed class FaceServoSession : IAsyncDisposable
 
     public static async Task<FaceServoSession> OpenAsync(string port, int[] bounds, string axes, CancellationToken token)
     {
+        bounds = SnapshotBounds(bounds, axes);
+        token.ThrowIfCancellationRequested();
         if (!Regex.IsMatch(port, @"\ACOM[1-9][0-9]{0,3}\z")) throw new ArgumentException("请填写有效串口号。");
         var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PanTiltTracker", "servo-logs");
         Directory.CreateDirectory(folder);
@@ -44,6 +46,17 @@ internal sealed class FaceServoSession : IAsyncDisposable
         catch { await session.DisposeAsync(); throw; }
     }
 
+    internal static int[] SnapshotBounds(int[] bounds, string axes)
+    {
+        ArgumentNullException.ThrowIfNull(bounds);
+        if (bounds.Length != 4 || bounds[0] < 30 || bounds[1] > 175 || bounds[0] >= bounds[1] ||
+            bounds[2] < 0 || bounds[3] > 180 || bounds[2] >= bounds[3] || axes is not ("S1" or "S2" or "both"))
+            throw new ArgumentException("跟随工作区无效：S1 须在 30–175°、S2 在 0–180°内，下限小于上限，且需明确选择跟随轴。");
+        // Freeze the caller's measured working window before any asynchronous
+        // startup; UI/caller array changes must never expand an active session.
+        return [.. bounds];
+    }
+
     public void RestrictTrialRange(int halfRange)
     {
         if (started) throw new InvalidOperationException("跟随已启动，不能修改本轮边界。");
@@ -52,6 +65,7 @@ internal sealed class FaceServoSession : IAsyncDisposable
 
     internal static int[] CalculateTrialBounds(int[] limits, AimReference reference, int halfRange)
     {
+        limits = SnapshotBounds(limits, "both");
         if (halfRange is < 2 or > 10 || limits.Length != 4 ||
             reference.PanDegrees < limits[0] || reference.PanDegrees > limits[1] ||
             reference.TiltDegrees < limits[2] || reference.TiltDegrees > limits[3] ||

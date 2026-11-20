@@ -4,6 +4,7 @@ import sys
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from face_follow import follow, validate_frame, validate_start
 
@@ -147,6 +148,27 @@ class FollowTests(unittest.TestCase):
         for value in (float("nan"), float("inf"), True, "104"):
             with self.assertRaises(ValueError):
                 validate_frame(dict(type="frame", permit=True, age_ms=0, pan=value, tilt=50), [95, 110, 45, 55], [103, 50], "both")
+
+    def test_capture_and_queue_delays_share_one_freshness_budget(self):
+        frame = dict(type="frame", permit=True, age_ms=120, pan=104, tilt=50)
+        self.assertIsNone(validate_frame(frame, [95, 110, 45, 55], [103, 50], "both", queued_ms=90))
+        self.assertEqual(validate_frame(frame, [95, 110, 45, 55], [103, 50], "both", queued_ms=70), [10400, 5000])
+        for delay in (-1, float("nan"), float("inf"), True):
+            with self.assertRaises(ValueError):
+                validate_frame(frame, [95, 110, 45, 55], [103, 50], "both", queued_ms=delay)
+
+    def test_combined_expired_frame_holds_then_fresh_frame_can_resume(self):
+        link, inbox = FakeLink(), queue.Queue()
+        inbox.put((start(), 10))
+        inbox.put((dict(type="frame", permit=True, age_ms=120, pan=104, tilt=50), 9.9))
+        inbox.put((dict(type="frame", permit=True, age_ms=10, pan=105, tilt=50), 10))
+        inbox.put((dict(type="stop"), 10))
+        with patch("face_follow.time.monotonic", return_value=10):
+            follow(link, inbox, lambda _: None)
+        self.assertIn("HOLD_BOTH,boot-1,2", link.commands)
+        self.assertNotIn("FOLLOW_BOTH,boot-1,2,10400,5000", link.commands)
+        self.assertIn("FOLLOW_BOTH,boot-1,3,10500,5000", link.commands)
+        self.assertEqual(link.stop_count, 1)
 
     def test_old_firmware_rejected_without_any_output(self):
         link = FakeLink()

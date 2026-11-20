@@ -28,13 +28,16 @@ def validate_start(message, pair, tilt_limits=(35, 65)):
     return bounds, current, axes
 
 
-def validate_frame(message, bounds, reference, axes):
+def validate_frame(message, bounds, reference, axes, queued_ms=0):
     if message.get("type") != "frame" or type(message.get("permit")) is not bool:
         raise ValueError("Expected frame with explicit permit")
     age = message.get("age_ms")
-    if type(age) not in (int, float) or not math.isfinite(age) or age < 0:
+    if (type(age) not in (int, float) or not math.isfinite(age) or age < 0 or
+            type(queued_ms) not in (int, float) or not math.isfinite(queued_ms) or queued_ms < 0):
         raise ValueError("Invalid frame age")
-    if not message["permit"] or age > 200:
+    # The capture/inference age and the time waiting in this process share one
+    # freshness budget. Neither budget alone proves the target is still fresh.
+    if not message["permit"] or age + queued_ms > 200:
         return None
     values = [message.get("pan"), message.get("tilt")]
     for axis, value in enumerate(values):
@@ -85,10 +88,11 @@ def follow(link, inbox, emit):
             try: message, received = inbox.get(timeout=0.25)
             except queue.Empty: raise TimeoutError("No fresh host frame for 250 ms")
             if message is None or message.get("type") == "stop": break
-            if time.monotonic() - received > 0.15:
+            queued_ms = (time.monotonic() - received) * 1000
+            if queued_ms > 150:
                 request("HOLD_BOTH")
                 raise TimeoutError("Queued host frame expired")
-            target = validate_frame(message, bounds, reference, axes)
+            target = validate_frame(message, bounds, reference, axes, queued_ms)
             limited = []
             if target is not None:
                 for index, (axis, key) in enumerate((("S1", "pan"), ("S2", "tilt"))):
