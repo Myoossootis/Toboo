@@ -24,14 +24,20 @@ public sealed record ExpressionSettings
     public double MinimumScore { get; init; } = 0.60;
     public double MinimumMargin { get; init; } = 0.15;
     public double ConfirmationSeconds { get; init; } = 0.35;
+    public double TentativeMinimumScore { get; init; } = 0.40;
+    public double TentativeMinimumMargin { get; init; } = 0.08;
+    public double TentativeConfirmationSeconds { get; init; } = 0.80;
     public double FilterSeconds { get; init; } = 0.25;
     public double MaximumAgeSeconds { get; init; } = 0.50;
     public double MaximumGapSeconds { get; init; } = 0.50;
     public void Validate()
     {
-        double[] values = [MinimumScore, MinimumMargin, ConfirmationSeconds, FilterSeconds, MaximumAgeSeconds, MaximumGapSeconds];
+        double[] values = [MinimumScore, MinimumMargin, ConfirmationSeconds, FilterSeconds, MaximumAgeSeconds, MaximumGapSeconds,
+            TentativeMinimumScore, TentativeMinimumMargin, TentativeConfirmationSeconds];
         if (values.Any(v => !double.IsFinite(v)) || MinimumScore is <= 0 or > 1 || MinimumMargin is < 0 or > 1 ||
-            ConfirmationSeconds <= 0 || FilterSeconds <= 0 || MaximumAgeSeconds <= 0 || MaximumGapSeconds <= 0)
+            ConfirmationSeconds <= 0 || FilterSeconds <= 0 || MaximumAgeSeconds <= 0 || MaximumGapSeconds <= 0 ||
+            TentativeMinimumScore is <= 0 or > 1 || TentativeMinimumScore > MinimumScore ||
+            TentativeMinimumMargin < 0 || TentativeMinimumMargin > MinimumMargin || TentativeConfirmationSeconds < ConfirmationSeconds)
             throw new ArgumentException("Invalid expression settings.");
     }
 }
@@ -86,17 +92,22 @@ public sealed class ExpressionTracker
         var score = filtered[ranked[0]]; var margin = score - filtered[ranked[1]];
         // Both the fresh model output and smoothed score must be decisive. Old certainty cannot hide a new ambiguous frame.
         var raw = probabilities.OrderDescending().ToArray();
-        if (score < settings.MinimumScore || margin < settings.MinimumMargin || raw[0] < settings.MinimumScore ||
-            raw[0] - raw[1] < settings.MinimumMargin || Array.IndexOf(probabilities, raw[0]) != ranked[0])
+        var strong = score >= settings.MinimumScore && margin >= settings.MinimumMargin && raw[0] >= settings.MinimumScore
+            && raw[0] - raw[1] >= settings.MinimumMargin;
+        var tentative = !singleImage && score >= settings.TentativeMinimumScore && margin >= settings.TentativeMinimumMargin
+            && raw[0] >= settings.TentativeMinimumScore && raw[0] - raw[1] >= settings.TentativeMinimumMargin;
+        if ((!strong && !tentative) || Array.IndexOf(probabilities, raw[0]) != ranked[0])
         {
             candidate = FacialExpression.Unknown; candidateSince = null;
             Current = new(FacialExpression.Unknown, score, margin, "uncertain", capturedAt, [.. filtered]);
             return Current;
         }
         if (winner != candidate) { candidate = winner; candidateSince = capturedAt; }
-        var confirmed = singleImage || (capturedAt - candidateSince!.Value).TotalSeconds >= settings.ConfirmationSeconds;
+        var confirmed = singleImage || (capturedAt - candidateSince!.Value).TotalSeconds >=
+            (strong ? settings.ConfirmationSeconds : settings.TentativeConfirmationSeconds);
         Current = new(confirmed ? winner : FacialExpression.Unknown, score, margin,
-            confirmed ? singleImage ? "single_image" : "stable" : "confirming", capturedAt, [.. filtered]);
+            confirmed ? singleImage ? "single_image" : strong ? "stable" : "tentative"
+                : strong ? "confirming" : "confirming_tentative", capturedAt, [.. filtered]);
         return Current;
     }
     private void CheckClock(TimeSpan now)

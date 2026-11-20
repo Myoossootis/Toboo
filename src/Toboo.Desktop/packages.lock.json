@@ -50,6 +50,12 @@
           "runtime.native.System.IO.Ports": "8.0.0"
         }
       },
+      "System.Security.Cryptography.ProtectedData": {
+        "type": "Direct",
+        "requested": "[8.0.0, )",
+        "resolved": "8.0.0",
+        "contentHash": "+TUFINV2q2ifyXauQXRwy4CiBhqvDEDZeVJU7qfxya4aRYOKzVBpN+4acx25VcPB9ywUN6C0n8drWl110PhZEg=="
+      },
       "System.Speech": {
         "type": "Direct",
         "requested": "[8.0.0, )",
@@ -312,8 +318,8 @@
       "toboo.runtime": {
         "type": "Project",
         "dependencies": {
-          "Toboo.Core": "[0.2.4, )",
-          "Toboo.Vision": "[0.2.4, )"
+          "Toboo.Core": "[0.3.3-preview.1, )",
+          "Toboo.Vision": "[0.3.3-preview.1, )"
         }
       },
       "toboo.vision": {
@@ -321,7 +327,7 @@
         "dependencies": {
           "OpenCvSharp4": "[4.10.0.20240616, )",
           "OpenCvSharp4.runtime.win": "[4.10.0.20240616, )",
-          "Toboo.Core": "[0.2.4, )"
+          "Toboo.Core": "[0.3.3-preview.1, )"
         }
       }
     },

@@ -12,6 +12,20 @@ namespace Toboo.Desktop.Tests;
 
 public sealed class ExpressionIntegrationTests
 {
+    [AvaloniaFact]
+    public void TentativeLabelsAreVisibleButNeverBecomeChatEmotionCues()
+    {
+        using var model = new MainViewModel { SourceIndex = 3, TargetIndex = 1, IsRunning = true };
+        var estimate = new ExpressionEstimate(FacialExpression.Angry, 0.48, 0.18, "tentative", TimeSpan.Zero,
+            [0.48, 0.044, 0.044, 0.044, 0.30, 0.044, 0.044]);
+        model.Present(new(new byte[640 * 480 * 4], 640, 480, new(0, TimeSpan.Zero, 640, 480, 320, 240),
+            new(103, 100, TrackingState.Centered, 0, 0), TimeSpan.Zero, 1,
+            Expression: new(estimate, RawScores: [.. estimate.Scores])));
+        Assert.Contains("表情倾向", model.ExpressionLabel);
+        Assert.Equal("(>_<)", model.ExpressionEmoticon);
+        Assert.Null(model.CaptureExpressionCue());
+        model.IsRunning = false;
+    }
     [AvaloniaTheory]
     [InlineData(FacialExpression.Angry)]
     [InlineData(FacialExpression.Disgust)]

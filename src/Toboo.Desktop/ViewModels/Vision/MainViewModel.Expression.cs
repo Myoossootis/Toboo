@@ -59,10 +59,11 @@ public sealed partial class MainViewModel
         if (analysis is null) { ClearExpression(ExpressionEnabled ? "等待人脸" : "已关闭"); return; }
         var result = analysis.Estimate;
         latestExpression = result;
-        ExpressionLabel = "表情线索 · " + result.DisplayName;
+        ExpressionLabel = (result.Reason == "tentative" ? "表情倾向 · " : "表情线索 · ") + result.DisplayName;
         ExpressionEmoticon = result.Emoticon;
         var description = result.Reason switch {
             "stable" => "连续确认", "single_image" => "单张图像，未连续确认", "confirming" => "连续确认中",
+            "tentative" => "持续的低置信倾向，仅供参考", "confirming_tentative" => "较弱线索，需持续约 0.8 秒确认倾向",
             "uncertain" => "分数或类别差距不足", "no_selected_face" => "没有已确认的人脸目标",
             "stale" => "数据已过期", "face_too_small" => "人脸太小，请靠近相机",
             "face_clipped" => "人脸超出画面", "pose_or_occlusion" => "姿态或遮挡不适合判断",
@@ -85,10 +86,10 @@ public sealed partial class MainViewModel
                 new ExpressionEstimate((FacialExpression)index, 0, 0, "", null, []).DisplayName, score)).ToArray();
             if (result.Reason == "uncertain")
             {
-                var reason = raw[top] < 0.60 ? "本次最高分未达 0.60"
-                    : raw[top] - raw[ranked[1]] < 0.15 ? "本次首二类差未达 0.15"
-                    : result.Score < 0.60 ? "平滑最高分未达 0.60"
-                    : result.Margin < 0.15 ? "平滑首二类差未达 0.15" : "本次与平滑后的类别尚未一致";
+                var reason = raw[top] < 0.40 ? "本次最高分未达 0.40"
+                    : raw[top] - raw[ranked[1]] < 0.08 ? "本次首二类差未达 0.08"
+                    : result.Score < 0.40 ? "平滑最高分未达 0.40"
+                    : result.Margin < 0.08 ? "平滑首二类差未达 0.08" : "本次与平滑后的类别尚未一致，或单图分数未达 0.60";
                 ExpressionDetail = $"{reason} · 平滑最高分 {result.Score:0.00} · 首二类差 {result.Margin:0.00}";
             }
         }

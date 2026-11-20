@@ -5,6 +5,40 @@ namespace Toboo.Tests;
 
 public sealed class ExpressionTrackerTests
 {
+    [Theory]
+    [InlineData(FacialExpression.Angry)]
+    [InlineData(FacialExpression.Sad)]
+    [InlineData(FacialExpression.Fearful)]
+    public void PersistentWeakEvidenceBecomesATentativeLabelWithoutClaimingHighConfidence(FacialExpression label)
+    {
+        var scores = Enumerable.Repeat(0.044, 7).ToArray();
+        scores[(int)label] = 0.48;
+        scores[((int)label + 1) % 7] = 0.30;
+        var tracker = new ExpressionTracker();
+        for (var i = 0; i < 4; i++)
+        {
+            var value = tracker.Update(scores, i, 1, S(i * 0.2), S(i * 0.2));
+            Assert.Equal(FacialExpression.Unknown, value.Label);
+            Assert.Equal("confirming_tentative", value.Reason);
+        }
+        var tentative = tracker.Update(scores, 4, 1, S(0.8), S(0.8));
+        Assert.Equal(label, tentative.Label);
+        Assert.Equal("tentative", tentative.Reason);
+        Assert.True(tentative.Score < 0.6);
+        Assert.Equal("stale", tracker.At(S(1.31)).Reason);
+    }
+    [Fact]
+    public void WeakSingleImagesAndChangingWinnersCannotBecomeTentativeLabels()
+    {
+        double[] angry = [0.48, 0.044, 0.044, 0.044, 0.30, 0.044, 0.044];
+        Assert.Equal(FacialExpression.Unknown, new ExpressionTracker().Update(angry, 0, 0, S(0), S(0), singleImage: true).Label);
+        var tracker = new ExpressionTracker();
+        for (var i = 0; i < 15; i++)
+        {
+            var scores = i % 2 == 0 ? angry : new[] { 0.30, 0.044, 0.044, 0.044, 0.48, 0.044, 0.044 };
+            Assert.Equal(FacialExpression.Unknown, tracker.Update(scores, i, 1, S(i * 0.2), S(i * 0.2)).Label);
+        }
+    }
     private static TimeSpan S(double seconds) => TimeSpan.FromSeconds(seconds);
     private static double[] Happy => [0.02, 0.01, 0.01, 0.9, 0.03, 0.01, 0.02];
     private static ExpressionTracker Stable()

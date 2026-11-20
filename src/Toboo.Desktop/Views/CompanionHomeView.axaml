@@ -51,7 +51,7 @@
         <Border BorderBrush="{StaticResource ControlBorderBrush}" BorderThickness="1" CornerRadius="24" Padding="20,16">
           <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
             <TextBox x:Name="ConversationInput" Classes="conversation" Text="{Binding Chat.Draft}" Watermark="说说你此刻的想法…" IsEnabled="{Binding Chat.CanEditDraft}" MaxLength="4000" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="96" KeyDown="ComposerKeyDown" BorderThickness="0" Background="Transparent" FontSize="16" VerticalAlignment="Center" />
-            <Button x:Name="VoiceHoldButton" Grid.Column="1" Classes="quiet" IsEnabled="{Binding Voice.CanUseRecordButton}" ToolTip.Tip="{Binding Voice.RecordHint}" AutomationProperties.Name="按住说话，松开发送">
+            <Button x:Name="VoiceHoldButton" Grid.Column="1" Classes="quiet" IsEnabled="{Binding Voice.CanUseRecordButton}" ToolTip.Tip="{Binding Voice.RecordHint}" AutomationProperties.Name="{Binding Voice.RecordHint}">
               <StackPanel Orientation="Horizontal" Spacing="6"><icons:AppIcon Kind="Mic" Width="20" Height="20" /><TextBlock Text="{Binding Voice.RecordLabel}" VerticalAlignment="Center" /></StackPanel>
             </Button>
             <Button x:Name="SendChatButton" Grid.Column="2" Classes="round primary" Command="{Binding Chat.SendCommand}" ToolTip.Tip="发送 · Enter（Shift+Enter 换行）"><icons:AppIcon Kind="Send" Stroke="White" /></Button>

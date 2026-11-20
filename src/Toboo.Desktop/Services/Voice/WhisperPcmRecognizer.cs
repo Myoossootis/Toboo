@@ -43,7 +43,8 @@ internal static class WhisperPcmRecognizer
         // A fresh processor has no transcript context from previous conversations.
         using var factory = WhisperFactory.FromPath(ModelPath);
         await using var processor = factory.CreateBuilder().WithLanguage("zh").WithNoContext()
-            .WithPrompt("以下是普通话简体中文。")
+            .WithPrompt("以下是普通话简体中文对话，可能包含 toboo、DeepSeek、摄像头、云台等术语。")
+            .WithTemperature(0).WithBeamSearchSamplingStrategy(strategy => strategy.WithBeamSize(3))
             .WithThreads(Math.Clamp(Environment.ProcessorCount / 2, 1, 6))
             .WithProbabilities().WithNoSpeechThreshold(0.6f).Build();
         var text = new StringBuilder();
