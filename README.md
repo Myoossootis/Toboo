@@ -4,7 +4,7 @@ Windows 桌面陪伴机器人原型：在一个界面中完成 AI 对话、摄�
 
 **[下载最新 Windows x64 版本](https://github.com/Myoossootis/Toboo/releases/latest)** · [开始使用](docs/getting-started.md) · [开发说明](docs/development.md) · [架构](docs/architecture.md) · [边界检查与保护](docs/safety.md)
 
-[v0.3.3 更新说明](docs/releases/v0.3.3.md)：新增持续弱线索的「表情倾向」、ICS43432 的 DeepSeek ASR 与文字纠错，支持从 v0.3.2 增量覆盖更新。
+[v0.3.4 更新说明](docs/releases/v0.3.4.md)：补强跟随目标的新鲜度检查与工作边界快照，新增[边界检查与保护说明](docs/safety.md)，支持从 v0.3.3 增量覆盖更新。包含此前的表情倾向、DeepSeek ASR 与文字纠错。
 
 ## 启动
 
