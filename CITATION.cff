@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "复用本项目代码时，请按 LICENSE 保留来源，并在相关项目、报告或论文中引用本仓库。"
+type: software
+title: "toboo"
+authors:
+  - name: "Myoossootis"
+    website: "https://github.com/Myoossootis"
+repository-code: "https://github.com/Myoossootis/Toboo"
+url: "https://github.com/Myoossootis/Toboo"
+abstract: "Windows desktop companion robot prototype with AI chat, visual expression cues and optional hardware integration."

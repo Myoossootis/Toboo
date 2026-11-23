@@ -96,4 +96,6 @@ dotnet build Toboo.sln -c Release --no-restore
 
 ## 依赖与许可
 
-第三方组件和模型的来源、许可及再分发声明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) 与 [`licenses/`](licenses/)。便携包也包含这些声明。仓库尚未为项目原创代码授予开源许可证；公开可见不代表可以任意再分发或商用。
+未另行标注的项目原创代码和文档采用 [Toboo Attribution License 1.0](LICENSE)。**使用本项目原创代码时，必须保留许可与版权声明，并在项目 README、致谢或第三方声明中引用 [toboo 原仓库](https://github.com/Myoossootis/Toboo)**；介绍该工作的论文、报告和演示也需注明来源。允许修改、再发布和商用；仅运行未修改的程序不要求公开引用。具体范围、引用示例及历史授权说明见 [代码使用与项目引用](docs/licensing.md)，GitHub 引用信息见 [CITATION.cff](CITATION.cff)。
+
+这是自定义署名许可证，并非标准 MIT。第三方组件、模型以及已有单独授权的部分保留各自许可；来源与再分发声明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) 与 [`licenses/`](licenses/)。

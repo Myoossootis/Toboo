@@ -1,5 +1,7 @@
 # Third-party components in the Windows portable distribution
 
+Original project code and documentation without a separate license are covered by the root `LICENSE` (Toboo Attribution License 1.0); its repository attribution requirements are explained in `docs/licensing.md`. These terms do not relicense third-party material or override separate grants. The independently MIT-declared `integrations/toboo-harness/` component retains MIT, and `firmware/uno_lcd/` retains GPL-3.0-or-later.
+
 Separate UNO LCD firmware in `firmware/uno_lcd/` uses Bill Perry's **hd44780 1.3.2** library (GPL-3.0-or-later), https://github.com/duinoWitchery/hd44780. The display firmware sources carry the same license; the complete license is retained in `licenses/hd44780-GPL-3.0.txt`. This library is not linked into the .NET application or included in the Windows executable. The pinned firmware build installs the unmodified library into the ignored local toolchain directory.
 
 The source project's publication does not grant an additional license to third-party components. Original license and notice texts are retained in `licenses/`, including texts extracted from the exact locked NuGet packages. Dependency versions and hashes are recorded in `licenses/packages.lock.json`.

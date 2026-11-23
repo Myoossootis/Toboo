@@ -30,6 +30,11 @@ if ($BaseZipPath) {
 $executable = Join-Path $appPath 'toboo.exe'
 $buildInfo = Get-Content -LiteralPath (Join-Path $appPath 'build-info.json') -Raw | ConvertFrom-Json
 if ($buildInfo.workingTreeDirty -or $buildInfo.commit -notmatch '^[0-9a-f]{40}$') { throw 'Release must identify a clean source commit.' }
+if (Test-Path -LiteralPath (Join-Path $appPath 'docs/licensing.md')) {
+    foreach ($notice in @('LICENSE', 'CITATION.cff')) {
+        if (!(Test-Path -LiteralPath (Join-Path $appPath $notice))) { throw "Missing project attribution file: $notice" }
+    }
+}
 foreach ($required in @('README-portable-zh-CN.md', 'docs/harness.md', 'docs/lcd.md', 'System.IO.Ports.dll', 'firmware/uno_lcd/uno_lcd.ino', 'scripts/install-toboo-harness.ps1', 'integrations/toboo-harness/index.mjs', 'integrations/toboo-harness/engine.mjs', 'integrations/toboo-harness/server.mjs', 'integrations/toboo-harness/lock.mjs')) {
     if (!(Test-Path -LiteralPath (Join-Path $appPath $required))) { throw "Missing packaged feature dependency: $required" }
 }

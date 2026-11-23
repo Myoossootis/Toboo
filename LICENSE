@@ -1,0 +1,68 @@
+Toboo Attribution License 1.0
+License identifier: LicenseRef-Toboo-Attribution-1.0
+
+Copyright (c) 2026 Myoossootis and the respective Toboo contributors.
+Project: toboo
+Source repository: https://github.com/Myoossootis/Toboo
+
+1. Scope
+
+This license applies to original code and documentation in this repository
+unless a file, directory or component explicitly carries a different license.
+Third-party code, models, libraries and other assets retain their own licenses.
+In particular, firmware/uno_lcd/ retains GPL-3.0-or-later, and
+integrations/toboo-harness/ retains its existing MIT license declaration.
+Consult THIRD-PARTY-NOTICES.md and the component-specific notices.
+
+2. Permission
+
+You may use, study, copy, modify, combine and redistribute the covered material,
+including as part of commercial products, provided that you satisfy the
+attribution requirements below. You may choose terms for your own additions,
+but must not remove these requirements from the covered material.
+
+3. Required attribution
+
+When reusing covered code, keep this license and the relevant copyright notices
+with the reused material, and identify the source project and repository:
+
+    This project uses code from toboo by Myoossootis and contributors.
+    https://github.com/Myoossootis/Toboo
+
+Place this attribution in the consuming project's README, acknowledgements or
+third-party notices. If you distribute a binary without source, include it in
+the accompanying documentation, license notices or an accessible About page.
+For private projects, a notice retained in the private project is sufficient;
+you are not required to publish private source code or private project details.
+
+If a paper, report, presentation or public project description describes work
+that incorporates covered code, cite toboo and the repository URL in its
+references or acknowledgements. Adding the version or commit used is
+recommended for reproducibility, but is not a condition of this license.
+
+Merely running an unmodified application does not require a public citation.
+Independent implementations of ideas without copying covered material are not
+subject to these attribution requirements. This license does not restrict uses
+that do not require copyright permission under applicable law.
+
+4. Separate and earlier grants
+
+This license does not replace a component's separate license or withdraw rights
+already granted for earlier copies under another license. When using material
+under such a separate grant, follow that grant's conditions. Attribution to
+toboo remains appreciated where it is not required by the applicable grant.
+
+5. Warranty and responsibility
+
+The material is supplied without a promise of correctness, fitness, reliability
+or non-infringement. To the extent permitted by applicable law, the authors and
+contributors accept no liability for losses resulting from its use. Users must
+independently assess hardware compatibility, power, movement limits and other
+operating risks before using it with physical devices.
+
+6. License identity
+
+This is a project-specific license, not the standard MIT license. The identifier
+above is a local LicenseRef, not a claim of SPDX-list or OSI approval. The
+English text in this file is the license; docs/licensing.md explains its use
+in Chinese without changing these terms.

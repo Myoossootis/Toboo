@@ -63,6 +63,7 @@ try {
         Copy-Item -LiteralPath (Join-Path 'integrations/toboo-harness' $file) -Destination $bridgePath
     }
     Copy-Item THIRD-PARTY-NOTICES.md $outputPath
+    Copy-Item -LiteralPath LICENSE,CITATION.cff -Destination $outputPath
     $serialDestination = Join-Path $outputPath 'runtime/python'
     New-Item -ItemType Directory -Force (Split-Path -Parent $serialDestination) | Out-Null
     Copy-Item -LiteralPath $serialRuntime -Destination $serialDestination -Recurse
