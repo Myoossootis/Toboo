@@ -57,7 +57,7 @@ public sealed partial class ChatViewModel : ObservableObject, IDisposable
     public bool HasPending => state.Pending is not null;
     public bool CanConnect => !IsBusy && !closing && !VoiceInputActive;
     public bool CanSend => IsConnected && !IsBusy && !RemoteRunning && !HasPending && !closing && !VoiceInputActive && SelectedModel is not null && Draft.Trim().Length > 0 && Draft.Length <= 4000;
-    public bool CanEditDraft => IsConnected && !VoiceInputActive;
+    public bool CanEditDraft => !VoiceInputActive && (IsConnected || Draft.Length > 0);
     public bool CanRetry => IsConnected && HasPending && !IsBusy && !closing && !VoiceInputActive;
     public bool CanStop => !IsStopping && !closing && sessionId is not null && currentRequestId is not null && (RemoteRunning || HasPending || IsBusy);
     public bool CanChoose => IsConnected && !IsBusy && !RemoteRunning && !HasPending && !closing && !VoiceInputActive;

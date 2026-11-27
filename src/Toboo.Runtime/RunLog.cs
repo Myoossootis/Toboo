@@ -32,7 +32,6 @@ internal sealed class RunLog : IDisposable
 
     public void Write(TargetObservation observation, TrackingCommand command, TimeSpan now, double algorithmMs,
         Rect? box = null, string visionStatus = "aruco_detection", int? candidateCount = null,
-        double? targetScore = null, string? targetClass = null, string? targetSource = null, int? trackEpoch = null,
         FaceAimResult? faceAim = null)
     {
         csv.WriteLine(string.Join(',',
@@ -43,7 +42,8 @@ internal sealed class RunLog : IDisposable
             Number(faceAim is { HasReference: false } ? null : command.PanDegrees),
             Number(faceAim is { HasReference: false } ? null : command.TiltDegrees), command.State, Number(algorithmMs),
             Number(box?.X), Number(box?.Y), Number(box?.Width), Number(box?.Height), visionStatus, Number(candidateCount),
-            Number(targetScore), targetClass ?? "", targetSource ?? "", Number(trackEpoch),
+            // Keep the retired tracker columns empty for existing CSV readers.
+            "", "", "", "",
             Number(faceAim?.FilteredX), Number(faceAim?.FilteredY), Number(faceAim?.SightError?.HorizontalDegrees),
             Number(faceAim?.SightError?.VerticalDegrees), Number(faceAim?.PanVelocity), Number(faceAim?.TiltVelocity),
             Number(faceAim is { SelectedBox: not null } ? faceAim.LockEpoch : null),

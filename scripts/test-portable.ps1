@@ -8,38 +8,50 @@ if ($BaseZipPath) {
     Expand-Archive -LiteralPath (Resolve-Path -LiteralPath $BaseZipPath).Path -DestinationPath $testPath
 }
 else { Expand-Archive -LiteralPath $resolvedZip -DestinationPath $testPath }
-$appPath = (Get-ChildItem -LiteralPath $testPath -Directory | Select-Object -First 1).FullName
+$packagePath = (Get-ChildItem -LiteralPath $testPath -Directory | Select-Object -First 1).FullName
 if ($BaseZipPath) {
     $patchPath = Join-Path $testPath 'patch'
     Expand-Archive -LiteralPath $resolvedZip -DestinationPath $patchPath
     $manifest = Get-Content -LiteralPath (Join-Path $patchPath 'update-manifest.json') -Raw | ConvertFrom-Json
-    $base = Get-Content -LiteralPath (Join-Path $appPath 'build-info.json') -Raw | ConvertFrom-Json
+    $base = Get-Content -LiteralPath (Join-Path $packagePath 'build-info.json') -Raw | ConvertFrom-Json
     if ($base.version -ne $manifest.baseVersion -or
         (Get-FileHash -LiteralPath $BaseZipPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.baseArchiveSha256) {
         throw 'Update does not match the supplied base ZIP.'
     }
-    Copy-Item -Path (Join-Path $patchPath '*') -Destination $appPath -Recurse -Force
+    Copy-Item -Path (Join-Path $patchPath '*') -Destination $packagePath -Recurse -Force
     foreach ($file in $manifest.targetFiles) {
-        $path = Join-Path $appPath $file.path
+        $path = Join-Path $packagePath $file.path
         if (!(Test-Path -LiteralPath $path) -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $file.sha256) {
             throw "Updated installation differs from the full package: $($file.path)"
         }
     }
     Write-Host "PASS: applied $($manifest.baseVersion) -> $($manifest.targetVersion); all target file hashes match."
 }
-$executable = Join-Path $appPath 'toboo.exe'
-$buildInfo = Get-Content -LiteralPath (Join-Path $appPath 'build-info.json') -Raw | ConvertFrom-Json
+$executable = Join-Path $packagePath 'toboo.exe'
+$buildInfo = Get-Content -LiteralPath (Join-Path $packagePath 'build-info.json') -Raw | ConvertFrom-Json
 if ($buildInfo.workingTreeDirty -or $buildInfo.commit -notmatch '^[0-9a-f]{40}$') { throw 'Release must identify a clean source commit.' }
-if (Test-Path -LiteralPath (Join-Path $appPath 'docs/licensing.md')) {
-    foreach ($notice in @('LICENSE', 'CITATION.cff')) {
-        if (!(Test-Path -LiteralPath (Join-Path $appPath $notice))) { throw "Missing project attribution file: $notice" }
+$appPath = $packagePath
+if ($buildInfo.appDirectory) {
+    if ($buildInfo.appDirectory -ne 'app') { throw 'Unexpected portable app directory.' }
+    $appPath = Join-Path $packagePath 'app'
+    $binaries = @(Get-ChildItem -LiteralPath $packagePath -File | Where-Object { $_.Extension -in '.dll', '.exe' })
+    if ($binaries.Count -ne 1 -or $binaries[0].Name -ne 'toboo.exe' -or (Test-Path -LiteralPath (Join-Path $appPath 'toboo.exe'))) {
+        throw 'Expected toboo.exe as the only top-level binary and no duplicate launcher.'
     }
 }
-foreach ($required in @('README-portable-zh-CN.md', 'docs/harness.md', 'docs/lcd.md', 'System.IO.Ports.dll', 'firmware/uno_lcd/uno_lcd.ino', 'scripts/install-toboo-harness.ps1', 'integrations/toboo-harness/index.mjs', 'integrations/toboo-harness/engine.mjs', 'integrations/toboo-harness/server.mjs', 'integrations/toboo-harness/lock.mjs')) {
+if (Test-Path -LiteralPath (Join-Path $packagePath 'docs/licensing.md')) {
+    foreach ($notice in @('LICENSE', 'CITATION.cff')) {
+        if (!(Test-Path -LiteralPath (Join-Path $packagePath $notice))) { throw "Missing project attribution file: $notice" }
+    }
+}
+foreach ($required in @('README-portable-zh-CN.md', 'docs/harness.md', 'docs/lcd.md')) {
+    if (!(Test-Path -LiteralPath (Join-Path $packagePath $required))) { throw "Missing portable documentation: $required" }
+}
+foreach ($required in @('System.IO.Ports.dll', 'firmware/uno_lcd/uno_lcd.ino', 'scripts/install-toboo-harness.ps1', 'integrations/toboo-harness/index.mjs', 'integrations/toboo-harness/engine.mjs', 'integrations/toboo-harness/server.mjs', 'integrations/toboo-harness/lock.mjs')) {
     if (!(Test-Path -LiteralPath (Join-Path $appPath $required))) { throw "Missing packaged feature dependency: $required" }
 }
-$unexpected = @(Get-ChildItem -LiteralPath $appPath -Recurse -Force -File | Where-Object {
-    $_.FullName.Substring($appPath.Length + 1) -match '^(local|hardware|output|data|calibration|tmp|artifacts)[\\/]|(^|[\\/])(connection|client)\.json$|(^|[\\/])AGENTS\.md$|\.local\.json$|\.(wav|pcm|mp3|mp4|avi|jsonl)$'
+$unexpected = @(Get-ChildItem -LiteralPath $packagePath -Recurse -Force -File | Where-Object {
+    $_.FullName.Substring($packagePath.Length + 1) -match '^(app[\\/])?(local|hardware|output|data|calibration|tmp|artifacts)[\\/]|(^|[\\/])(connection|client)\.json$|(^|[\\/])AGENTS\.md$|\.local\.json$|\.(wav|pcm|mp3|mp4|avi|jsonl)$'
 })
 if ($unexpected.Count) { throw 'Local-only files found in the portable package.' }
 if (!(Test-Path -LiteralPath (Join-Path $appPath 'scripts/prepare-speech-model.ps1'))) { throw 'Missing speech model repair script.' }
@@ -54,6 +66,14 @@ foreach ($model in @($speechModel, $speechModel.vad)) {
 foreach ($library in @('whisper.dll', 'ggml-whisper.dll', 'ggml-base-whisper.dll', 'ggml-cpu-whisper.dll')) {
     if (!(Test-Path -LiteralPath (Join-Path $appPath "runtimes/win-x64/$library"))) { throw "Missing speech runtime: $library" }
 }
+if ($buildInfo.whisperRuntimePlatform -eq 'win-x64') {
+    $otherRuntimes = @(Get-ChildItem -LiteralPath (Join-Path $appPath 'runtimes') -Directory | Where-Object {
+        $_.Name -match '^(linux-|macos-|win-(arm64|x86)$)'
+    })
+    if ($otherRuntimes.Count -or (Test-Path -LiteralPath (Join-Path $appPath 'ggml-metal.metal'))) {
+        throw 'Found foreign-platform speech runtimes in the Windows x64 package.'
+    }
+}
 Write-Host 'PASS: packaged Whisper/Silero model hashes and CPU runtime files.'
 $depthModel = Get-Content -LiteralPath (Join-Path $appPath 'models/depth/model.json') -Raw | ConvertFrom-Json
 $depthPath = Join-Path $appPath ('models/depth/' + $depthModel.file)
@@ -61,7 +81,7 @@ if (!(Test-Path -LiteralPath $depthPath) -or (Get-Item -LiteralPath $depthPath).
     (Get-FileHash -LiteralPath $depthPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $depthModel.sha256) {
     throw 'Packaged depth model failed size/SHA256 verification.'
 }
-if (!(Test-Path -LiteralPath (Join-Path $appPath 'licenses/MiDaS-MIT.txt'))) { throw 'Missing depth model license.' }
+if (!(Test-Path -LiteralPath (Join-Path $packagePath 'licenses/MiDaS-MIT.txt'))) { throw 'Missing depth model license.' }
 $runtimeConfig = Get-Content -LiteralPath (Join-Path $appPath 'toboo.runtimeconfig.json') -Raw | ConvertFrom-Json
 if (!$runtimeConfig.runtimeOptions.includedFrameworks -or $runtimeConfig.runtimeOptions.framework) {
     throw 'Expected a self-contained runtime configuration.'
@@ -79,11 +99,14 @@ try {
     $env:PYTHONPATH = Join-Path $testPath 'wrong-python-modules'
     $uiArguments = if ($CameraIndex -ge 0) { "--smoke-test-ui --camera-index $CameraIndex" } else { '--smoke-test-ui' }
     $checks = @('--self-test', '--serial-runtime-self-test', $uiArguments)
-    if ($SpeechSelfTest) { $checks += '--speech-self-test' }
+    if ($SpeechSelfTest) {
+        $checks += '--speech-self-test'
+        if ($buildInfo.appDirectory -eq 'app') { $checks += '--wake-self-test' }
+    }
     foreach ($argument in $checks) {
-        $process = Start-Process -FilePath $executable -ArgumentList $argument -WorkingDirectory $appPath -WindowStyle Hidden -PassThru
+        $process = Start-Process -FilePath $executable -ArgumentList $argument -WorkingDirectory $testPath -WindowStyle Hidden -PassThru
         $null = $process.Handle
-        if (!$process.WaitForExit(30000)) {
+        if (!$process.WaitForExit(65000)) {
             Stop-Process -Id $process.Id
             throw "Portable test timed out: $argument"
         }

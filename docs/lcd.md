@@ -72,7 +72,7 @@ arduino-cli upload --fqbn arduino:avr:uno --port COM7 --input-file ./toboo-0.2.4
 
 需要从源码构建时，使用以下隔离工具环境。
 
-沿用 [隔离串口工具环境](../firmware/README.md)，固定 Arduino CLI 1.5.1、AVR core 1.8.6、pyserial 3.5。新增显示驱动 **hd44780 1.3.2**，仅安装到 `tmp/esp32-tools/user/libraries`，自动探测 I²C 地址和转接板映射。
+使用 [隔离工具环境](../firmware/README.md)中的 Arduino CLI 1.5.1 和 AVR core 1.8.6。显示驱动 **hd44780 1.3.2** 安装到 `tmp/esp32-tools/user/libraries`，用于自动探测 I²C 地址和转接板映射。串口实测脚本使用 pyserial 3.5。
 
 ```powershell
 ./tmp/esp32-tools/cli/arduino-cli.exe lib install hd44780@1.3.2 --config-file tmp/esp32-tools/arduino-cli.yaml
@@ -81,13 +81,13 @@ arduino-cli upload --fqbn arduino:avr:uno --port COM7 --input-file ./toboo-0.2.4
 ./tmp/esp32-tools/cli/arduino-cli.exe upload --config-file tmp/esp32-tools/arduino-cli.yaml --fqbn arduino:avr:uno --port COM7 --input-dir artifacts/uno-lcd --verify
 ```
 
-构建脚本运行纯 C++ 协议测试、Python 主机模拟测试并编译固件，不自动烧录。输出在忽略目录 `artifacts/uno-lcd`。实际串口验证会短暂显示七类表情，可显式运行：
+构建脚本运行 C++ 协议测试并编译固件，输出到 `artifacts/uno-lcd`。烧录后，可手动运行以下串口测试，屏幕会依次短暂显示七类表情。
 
 ```powershell
 ./tmp/esp32-tools/host/Scripts/python.exe firmware/tests/serial_lcd_test.py --port COM7 --out artifacts/uno-lcd/hardware-validation.json
 ```
 
-测试记录区分真实 Uno 协议交互与光学显示检查。桌面使用内置 .NET 串口实现，便携包无需 Python 或源码目录。Python 工具仅用于可选的协议调试；源码启动入口为仓库根目录 `start-toboo.cmd`。
+测试记录区分真实 Uno 协议交互与光学显示检查。桌面使用内置 .NET 串口实现，便携包无需 Python 或源码目录。源码启动入口为仓库根目录 `start-toboo.cmd`。
 
 便携包的显式实物自检：`toboo.exe --lcd-self-test --lcd-port COM7`（端口以实际 Uno 为准，先断开已有屏幕连接）。自检只向屏幕发送 Unknown / neutral / Unknown 并核对回复，不启动摄像头或云台。
 

@@ -1,0 +1,40 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Toboo.Desktop.Controls" x:Class="Toboo.Desktop.StartupWindow"
+        Title="toboo" Width="400" Height="480" CanResize="False" WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
+  <Border Background="{StaticResource WorkspaceBrush}" BorderBrush="{StaticResource ControlBorderBrush}" BorderThickness="1">
+    <Grid RowDefinitions="42,*">
+      <Grid ColumnDefinitions="*,Auto" Background="{StaticResource WorkspaceBrush}">
+        <Border Background="Transparent" PointerPressed="DragWindow">
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="14,0,0,0" VerticalAlignment="Center">
+            <controls:AppIcon Kind="Robot" Width="19" Height="19" />
+            <TextBlock Text="toboo" FontFamily="Segoe UI" FontSize="17" FontWeight="Bold" VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+        <Button Grid.Column="1" Content="×" Width="42" Height="41" Classes="windowbutton close"
+                AutomationProperties.Name="关闭 toboo" ToolTip.Tip="关闭" Click="CloseWindow" />
+      </Grid>
+      <Border Grid.Row="1">
+        <Border.Background>
+          <RadialGradientBrush Center="50%,40%" GradientOrigin="50%,40%" RadiusX="68%" RadiusY="62%">
+            <GradientStop Color="#DEF3E9" Offset="0" />
+            <GradientStop Color="#F0F7F3" Offset="0.58" />
+            <GradientStop Color="#F6F9F7" Offset="1" />
+          </RadialGradientBrush>
+        </Border.Background>
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24,12,24,16">
+          <controls:StartupMascot x:Name="Mascot" Width="228" Height="228" HorizontalAlignment="Center" />
+          <TextBlock Text="toboo" FontFamily="Segoe UI" FontSize="44" FontWeight="Bold" Foreground="#193036"
+                     HorizontalAlignment="Center" Margin="0,9,0,0" />
+          <TextBlock x:Name="LaunchStatus" Text="正在启动" FontSize="15" Foreground="{StaticResource AccentBrush}"
+                     HorizontalAlignment="Center" Margin="0,7,0,0" />
+          <ProgressBar x:Name="LaunchProgress" IsIndeterminate="True" Width="176" Height="4" MinHeight="4"
+                       Margin="0,22,0,0" Foreground="{StaticResource AccentBrush}" Background="#D5E3DF"
+                       AutomationProperties.Name="正在启动 toboo" />
+          <Button x:Name="FailureCloseButton" Content="关闭" IsVisible="False" Classes="quiet"
+                  HorizontalAlignment="Center" Margin="0,16,0,0" Click="CloseWindow" />
+        </StackPanel>
+      </Border>
+    </Grid>
+  </Border>
+</Window>

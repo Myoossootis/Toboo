@@ -5,7 +5,7 @@
 ## 安装
 
 1. 安装 DeepSeek Harness，至少启动一次，完成模型服务配置。
-2. 从源码根目录或解压后的便携包目录执行：
+2. 在源码根目录执行以下命令。使用便携版时，从解压目录执行，将路径改为 `./app/scripts/install-toboo-harness.ps1`。
 
    ```powershell
    powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/install-toboo-harness.ps1

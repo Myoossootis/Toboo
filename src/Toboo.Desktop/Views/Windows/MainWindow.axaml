@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Toboo.Desktop.ViewModels" xmlns:views="using:Toboo.Desktop.Views"
         xmlns:icons="using:Toboo.Desktop.Controls" x:Class="Toboo.Desktop.MainWindow"
-        x:DataType="vm:CompanionShellViewModel" Title="toboo · 桌面陪伴机器人"
+        x:DataType="vm:CompanionShellViewModel" Title="toboo · 桌面陪伴机器人" Icon="/Assets/toboo.ico"
         Width="1440" Height="900" MinWidth="900" MinHeight="680" Classes="product"
         ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0"
         WindowStartupLocation="CenterScreen">

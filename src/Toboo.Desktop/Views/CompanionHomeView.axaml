@@ -1,6 +1,46 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Toboo.Desktop.ViewModels" xmlns:icons="using:Toboo.Desktop.Controls"
              x:Class="Toboo.Desktop.Views.CompanionHomeView" x:DataType="vm:CompanionShellViewModel">
+  <UserControl.Styles>
+    <Style Selector="Border.composer">
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource ControlBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="22" />
+      <Setter Property="BoxShadow" Value="0 3 12 0 #1025332F" />
+    </Style>
+    <Style Selector="Border.composer.capturing">
+      <Setter Property="Background" Value="#F2F8F5" />
+      <Setter Property="BorderBrush" Value="#BED9CE" />
+      <Setter Property="CornerRadius" Value="28" />
+    </Style>
+    <Style Selector="Button.composerIcon">
+      <Setter Property="Width" Value="36" />
+      <Setter Property="Height" Value="36" />
+      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="Padding" Value="8" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Background" Value="{StaticResource SubtleBrush}" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.composerIcon.captureStop">
+      <Setter Property="Background" Value="#DBEEE5" />
+    </Style>
+    <Style Selector="Button.composerIcon.composerSend">
+      <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource SurfaceBrush}" />
+    </Style>
+    <Style Selector="Button.composerIcon.composerSend:disabled">
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="Button.composerIcon:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#DBEEE5" />
+    </Style>
+    <Style Selector="Button.composerIcon.composerSend:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource AccentHoverBrush}" />
+    </Style>
+  </UserControl.Styles>
   <Grid x:Name="HomeGrid">
     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="320" /></Grid.ColumnDefinitions>
     <Grid RowDefinitions="*,Auto" Margin="32,24,32,24">
@@ -48,25 +88,67 @@
           <Button Content="重试原请求" Command="{Binding Chat.RetryCommand}" IsVisible="{Binding Chat.HasPending}" Classes="textlink" />
           <Button x:Name="StopChatButton" Content="停止回复" Command="{Binding Chat.StopCommand}" IsVisible="{Binding Chat.CanStop}" Classes="quiet" />
         </StackPanel>
-        <Border BorderBrush="{StaticResource ControlBorderBrush}" BorderThickness="1" CornerRadius="24" Padding="20,16">
-          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
-            <TextBox x:Name="ConversationInput" Classes="conversation" Text="{Binding Chat.Draft}" Watermark="说说你此刻的想法…" IsEnabled="{Binding Chat.CanEditDraft}" MaxLength="4000" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="96" KeyDown="ComposerKeyDown" BorderThickness="0" Background="Transparent" FontSize="16" VerticalAlignment="Center" />
-            <Button x:Name="VoiceHoldButton" Grid.Column="1" Classes="quiet" IsEnabled="{Binding Voice.CanUseRecordButton}" ToolTip.Tip="{Binding Voice.RecordHint}" AutomationProperties.Name="{Binding Voice.RecordHint}">
-              <StackPanel Orientation="Horizontal" Spacing="6"><icons:AppIcon Kind="Mic" Width="20" Height="20" /><TextBlock Text="{Binding Voice.RecordLabel}" VerticalAlignment="Center" /></StackPanel>
-            </Button>
-            <Button x:Name="SendChatButton" Grid.Column="2" Classes="round primary" Command="{Binding Chat.SendCommand}" ToolTip.Tip="发送 · Enter（Shift+Enter 换行）"><icons:AppIcon Kind="Send" Stroke="White" /></Button>
+        <Border Classes="composer" Classes.capturing="{Binding Chat.VoiceInputActive}" Padding="12,8">
+          <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <TextBox x:Name="ConversationInput" Grid.ColumnSpan="2" Classes="conversation"
+                     IsVisible="{Binding !Chat.VoiceInputActive}" IsEnabled="{Binding Chat.CanEditDraft}"
+                     Text="{Binding Chat.Draft}" Watermark="说说你此刻的想法…"
+                     MaxLength="4000" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56" MaxHeight="132"
+                     KeyDown="ComposerKeyDown" BorderThickness="0" Background="Transparent" Padding="4,8" FontSize="16" />
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center"
+                        IsVisible="{Binding !Chat.VoiceInputActive}">
+              <Button x:Name="VoiceWakeButton" Content="{Binding Voice.WakeButtonLabel}" Command="{Binding Voice.ToggleWakeCommand}"
+                      ToolTip.Tip="{Binding Voice.WakeHint}" Background="{StaticResource SubtleBrush}" BorderThickness="0"
+                      MinHeight="30" Padding="10,5" CornerRadius="15" FontSize="13" />
+              <ProgressBar x:Name="VoiceStandbyMeter" Width="58" Height="3" VerticalAlignment="Center"
+                           Minimum="0" Maximum="100" Value="{Binding Voice.InputMeterLevel}" IsVisible="{Binding Voice.ShowWakeMeter}"
+                           Foreground="{StaticResource AccentBrush}" Background="{StaticResource ControlBorderBrush}"
+                           ToolTip.Tip="{Binding Voice.InputMeterDetail}" AutomationProperties.Name="语音会话麦克风音量" />
+            </StackPanel>
+            <Grid x:Name="ComposerVoiceStrip" Grid.Row="1" ColumnDefinitions="Auto,*" ColumnSpacing="10"
+                  IsVisible="{Binding Chat.VoiceInputActive}">
+              <Button x:Name="ComposerVoiceCancelButton" Classes="composerIcon" Click="CancelComposerVoice"
+                      ToolTip.Tip="取消语音 · Esc" AutomationProperties.Name="取消语音">
+                <icons:AppIcon Kind="Cancel" Width="14" Height="14" />
+              </Button>
+              <icons:InputWaveform x:Name="ComposerWaveform" Grid.Column="1" Height="26" VerticalAlignment="Center"
+                                   Level="{Binding Voice.InputMeterLevel}" IsActive="{Binding Voice.ShowComposerWaveform}"
+                                   PulseBrush="{StaticResource AccentBrush}" TrackBrush="{StaticResource ControlBorderBrush}"
+                                   ToolTip.Tip="{Binding Voice.InputMeterDetail}" AutomationProperties.Name="麦克风波形" />
+            </Grid>
+            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+              <Button x:Name="VoiceHoldButton" Classes="composerIcon" Classes.captureStop="{Binding Chat.VoiceInputActive}"
+                      IsVisible="{Binding Voice.ShowComposerMic}" IsEnabled="{Binding Voice.CanUseRecordButton}"
+                      ToolTip.Tip="{Binding Voice.RecordHint}" AutomationProperties.Name="{Binding Voice.RecordLabel}">
+                <Panel>
+                  <icons:AppIcon Kind="Mic" Width="15" Height="18" IsVisible="{Binding !Chat.VoiceInputActive}" />
+                  <icons:AppIcon Kind="StopCapture" Width="13" Height="13" Fill="{StaticResource AccentBrush}"
+                                 IsVisible="{Binding Chat.VoiceInputActive}" />
+                </Panel>
+              </Button>
+              <Button x:Name="SendChatButton" Classes="composerIcon composerSend" Command="{Binding Chat.SendCommand}"
+                      ToolTip.Tip="发送 · Enter（Shift+Enter 换行）" AutomationProperties.Name="发送">
+                <icons:AppIcon Kind="SendUp" Stroke="{Binding $parent[Button].Foreground}" Width="16" Height="16" />
+              </Button>
+            </StackPanel>
           </Grid>
         </Border>
-        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16" Margin="8,0">
-          <TextBlock Text="文字 · Enter 发送" Classes="caption" />
-          <TextBlock Grid.Column="1" Text="{Binding Chat.ConnectionStatus}" Classes="caption" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" />
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Margin="8,0">
+          <CheckBox Content="朗读回复" IsChecked="{Binding Chat.ReadReplies}" IsEnabled="{Binding Voice.CanSpeak}"
+                    FontSize="13" MinHeight="28" />
+          <TextBlock Grid.Column="1" Text="{Binding Chat.ConnectionStatus}" Classes="caption"
+                     HorizontalAlignment="Right" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                     ToolTip.Tip="{Binding Chat.PrivacyHint}" />
+          <Panel Grid.Column="2" IsVisible="{Binding !Chat.VoiceInputActive}">
+            <Button x:Name="StopVoiceButton" Content="停止语音" Command="{Binding Voice.StopCommand}" IsVisible="{Binding Voice.CanStop}"
+                    Classes="quiet" MinHeight="30" Padding="8,4" FontSize="13" />
+          </Panel>
         </Grid>
-        <TextBlock Text="{Binding Chat.PrivacyHint}" Classes="caption" TextWrapping="Wrap" />
-        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-          <CheckBox Content="朗读回复" IsChecked="{Binding Chat.ReadReplies}" IsEnabled="{Binding Voice.CanSpeak}" />
-          <Button x:Name="StopVoiceButton" Grid.Column="1" Content="停止语音" Command="{Binding Voice.StopCommand}" IsVisible="{Binding Voice.CanStop}" Classes="quiet" />
-        </Grid>
-        <TextBlock Text="{Binding Voice.Status}" Classes="caption" TextWrapping="Wrap" />
+        <TextBlock x:Name="VoiceActivityText" Text="{Binding Voice.VoiceActivityMessage}" Margin="8,0"
+                   Classes="caption" FontWeight="Medium" Foreground="{StaticResource TextPrimaryBrush}"
+                   TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+        <TextBlock Text="{Binding Voice.WakeCorrectionNotice}" IsVisible="{Binding Voice.HasWakeCorrectionNotice}"
+                   Margin="8,0" Classes="caption" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
       </StackPanel>
     </Grid>
     <Border Grid.Column="1" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1,0,0,0">

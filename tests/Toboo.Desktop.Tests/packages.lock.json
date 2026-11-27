@@ -211,6 +211,19 @@
           "Newtonsoft.Json": "13.0.1"
         }
       },
+      "NAudio.Core": {
+        "type": "Transitive",
+        "resolved": "2.3.0",
+        "contentHash": "jMd7r6dB6tAtXhOYL58ntPqwERNm1/Rhw5MKOIYvsnXzuX+PTGsa2VMam6n0npZYSwlSidKa4GAm4bFcXFUlcg=="
+      },
+      "NAudio.Wasapi": {
+        "type": "Transitive",
+        "resolved": "2.3.0",
+        "contentHash": "y5K2BxrLnvohgu5znzg5wRsai3YcuNXfrpo68i7PmCQqpK5MC/R24e5aO3OyN/XhfRr12e0QYV0OnUWEHi5SzA==",
+        "dependencies": {
+          "NAudio.Core": "2.3.0"
+        }
+      },
       "Newtonsoft.Json": {
         "type": "Transitive",
         "resolved": "13.0.1",
@@ -427,6 +440,7 @@
           "Avalonia.Desktop": "[11.3.22, )",
           "Avalonia.Themes.Fluent": "[11.3.22, )",
           "CommunityToolkit.Mvvm": "[8.4.0, )",
+          "NAudio.Wasapi": "[2.3.0, )",
           "System.IO.Ports": "[8.0.0, )",
           "System.Security.Cryptography.ProtectedData": "[8.0.0, )",
           "System.Speech": "[8.0.0, )",

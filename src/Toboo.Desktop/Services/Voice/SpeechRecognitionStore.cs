@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace Toboo.Desktop.Services;
 
 internal sealed record SpeechRecognitionOptions(int Engine = 0, bool CorrectText = true, bool ReviewText = true,
-    string? ProtectedKey = null, int Source = 0, string? Port = null);
+    string? ProtectedKey = null, int Source = 0, string? Port = null, bool CorrectWakeText = false);
 
 internal sealed class SpeechRecognitionStore
 {
@@ -36,14 +36,15 @@ internal sealed class SpeechRecognitionStore
         { throw new InvalidOperationException("无法解密本机语音密钥，请在当前 Windows 账户重新配置。", error); }
     }
     public void Save(int engine, bool correctText, bool reviewText, string? newKey = null, bool clearKey = false,
-        int? source = null, string? port = null)
+        int? source = null, string? port = null, bool? correctWakeText = null)
     {
         if (engine is < 0 or > 1) throw new ArgumentOutOfRangeException(nameof(engine));
         if (source is < 0 or > 1 || port is { Length: > 64 } || port?.Any(char.IsControl) == true) throw new ArgumentException("麦克风设置无效。");
         if (newKey is not null && (newKey.Length > 1024 || string.IsNullOrWhiteSpace(newKey) || newKey.Any(char.IsControl)))
             throw new ArgumentException("API Key 格式无效。");
         var key = clearKey ? null : newKey is null ? Current.ProtectedKey : Convert.ToBase64String(protect(Encoding.UTF8.GetBytes(newKey.Trim())));
-        var next = new SpeechRecognitionOptions(engine, correctText, reviewText, key, source ?? Current.Source, source.HasValue ? port : Current.Port);
+        var next = new SpeechRecognitionOptions(engine, correctText, reviewText, key, source ?? Current.Source,
+            source.HasValue ? port : Current.Port, correctWakeText ?? Current.CorrectWakeText);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try

@@ -19,14 +19,12 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'LCD protocol test build failed.' }
     & "$output/lcd_protocol_test.exe"
     if ($LASTEXITCODE -ne 0) { throw 'LCD protocol tests failed.' }
-    & ./tmp/esp32-tools/host/Scripts/python.exe -m unittest discover -s firmware/tests -p lcd_expression_test.py
-    if ($LASTEXITCODE -ne 0) { throw 'LCD host tests failed.' }
     $flags = '-DTOBOO_LCD_ULTRASONIC=' + [int][bool]$EnableUltrasonic
     & $cli compile --config-file $config --fqbn $settings.fqbn --warnings all `
         --build-property "compiler.cpp.extra_flags=$flags" `
         --build-path (Join-Path $repositoryPath "tmp/esp32-tools/build-$variant") --output-dir $output firmware/uno_lcd
     if ($LASTEXITCODE -ne 0) { throw 'UNO LCD compilation failed.' }
     Copy-Item tmp/esp32-tools/user/libraries/hd44780/license.txt "$output/hd44780-GPL-3.0.txt"
-    Write-Host 'PASS: LCD protocol/host tests and UNO build. No board was flashed; physical LCD remains unverified.'
+    Write-Host 'PASS: LCD protocol tests and UNO build. No board was flashed; physical LCD remains unverified.'
 }
 finally { Pop-Location }

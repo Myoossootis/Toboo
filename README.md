@@ -40,7 +40,7 @@ Windows 桌面陪伴机器人原型：在一个界面中完成 AI 对话、摄�
 
 先安装并配置 DeepSeek Harness 的模型服务，再安装本仓库附带的独立桥接插件。聊天界面始终在 **toboo** 中，Harness 提供后台模型连接。
 
-源码和便携包都提供 `scripts/install-toboo-harness.ps1`。首次安装后需要从系统托盘完全退出并重新打开 Harness。完整步骤、连接文件和故障排查见 [Harness 接入](docs/harness.md)。
+源码版使用 `scripts/install-toboo-harness.ps1`，便携版使用 `app/scripts/install-toboo-harness.ps1`。首次安装后，从系统托盘退出并重新打开 Harness。完整步骤见 [Harness 接入](docs/harness.md)。
 
 ## 硬件连接
 

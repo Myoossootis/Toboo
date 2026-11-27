@@ -34,17 +34,7 @@ internal static class Diagnostics
             var peak = I2sMicrophone.Peak(pcm);
             string? recognized = null;
             var observations = new List<object>();
-            if (saveAudio)
-            {
-                Directory.CreateDirectory(DirectoryPath);
-                using var file = File.Create(Path.Combine(DirectoryPath, "mic-debug.wav"));
-                using var wav = new BinaryWriter(file);
-                wav.Write(System.Text.Encoding.ASCII.GetBytes("RIFF")); wav.Write(36 + pcm.Length);
-                wav.Write(System.Text.Encoding.ASCII.GetBytes("WAVEfmt ")); wav.Write(16);
-                wav.Write((short)1); wav.Write((short)1); wav.Write(16000); wav.Write(32000);
-                wav.Write((short)2); wav.Write((short)16);
-                wav.Write(System.Text.Encoding.ASCII.GetBytes("data")); wav.Write(pcm.Length); wav.Write(pcm);
-            }
+            var rawAudioPath = saveAudio && pcm.Length > 0 ? TemporaryMicrophoneRecording.Save(DirectoryPath, pcm) : null;
             if (recognize)
             {
                 I2sMicrophone.Normalize(pcm);
@@ -55,7 +45,9 @@ internal static class Diagnostics
                 source = "actual-ics43432-usb", port, samples = pcm.Length / 2, sampleRate = 16000,
                 peak, recognized, observations, recognitionEngine = recognize ? "whisper-base-local-zh" : null,
                 servoStatusReadDuringCapture = true,
-                rawAudioSaved = saveAudio, modelRequestsSent = false, movementRequested = false });
+                rawAudioSaved = rawAudioPath is not null, rawAudioPath,
+                rawAudioRetentionMinutes = rawAudioPath is null ? (double?)null : TemporaryMicrophoneRecording.Lifetime.TotalMinutes,
+                modelRequestsSent = false, movementRequested = false });
             if (pcm.Length < 32000 || I2sMicrophone.Peak(pcm) == 0)
                 throw new IOException("没有采到有效音频，请核对接线、声道和模块。");
             if (recognize && string.IsNullOrWhiteSpace(recognized)) throw new IOException("采音成功，但没有识别出有效语音。");
@@ -64,7 +56,7 @@ internal static class Diagnostics
         {
             timeout.Cancel();
             try { await stop; } catch (OperationCanceledException) { }
-            try { await recording; } catch (Exception) { }
+            try { Array.Clear(await recording); } catch (Exception) { }
             SharedEsp32.CloseAll();
         }
     }
@@ -112,6 +104,58 @@ internal static class Diagnostics
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("本机语音需要 Windows。");
         Write("speech-self-test.json", await WindowsSpeechService.SelfTestAsync());
+    }
+
+    public static async Task<bool> WakeSelfTestAsync()
+    {
+        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("本机语音需要 Windows。");
+        var (success, report) = await WindowsSpeechService.WakeSelfTestAsync();
+        Write("wake-self-test.json", report);
+        return success;
+    }
+
+    public static async Task<bool> SystemMicSelfTestAsync()
+    {
+        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("系统麦克风自检需要 Windows。");
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(55));
+        var speech = new WindowsSpeechService();
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var input = await speech.InspectAsync(stop.Token);
+        var durationSeconds = 0d;
+        var peak = 0d;
+        var highestSpeechWindowRms = 0d;
+        void ObserveAudio(byte[] pcm)
+        {
+            durationSeconds = pcm.Length / 32000d;
+            peak = I2sMicrophone.Peak(pcm);
+            var samples = WhisperPcmRecognizer.ToSamples(pcm);
+            try
+            {
+                foreach (var segment in samples.Chunk(4000))
+                {
+                    var mean = segment.Average();
+                    highestSpeechWindowRms = Math.Max(highestSpeechWindowRms,
+                        Math.Sqrt(segment.Average(value => (value - mean) * (value - mean))));
+                    Array.Clear(segment);
+                }
+            }
+            finally { Array.Clear(samples); }
+        }
+        var recording = WhisperPcmRecognizer.UnavailableReason is null
+            ? speech.RecordWithWhisperAsync(() => ready.TrySetResult(), stop.Token, ObserveAudio)
+            : speech.ListenAsync(() => ready.TrySetResult(), stop.Token);
+        if (await Task.WhenAny(ready.Task, recording) == ready.Task)
+        {
+            Write("system-mic-self-test.json", new { state = "listening", input = input.Input, rawAudioSaved = false });
+            await Task.Delay(TimeSpan.FromSeconds(15), stop.Token);
+            speech.FinishListening();
+        }
+        var text = await recording;
+        var success = !string.IsNullOrWhiteSpace(text);
+        Write("system-mic-self-test.json", new { state = "complete", success, input = input.Input,
+            transcript = text, durationSeconds, peak, strongestWindowRms = highestSpeechWindowRms,
+            rawAudioSaved = false, modelRequestsSent = false });
+        return success;
     }
 
     public static async Task SerialRuntimeSelfTestAsync()

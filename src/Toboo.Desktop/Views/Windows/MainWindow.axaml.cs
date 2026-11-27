@@ -9,6 +9,7 @@ namespace Toboo.Desktop;
 public sealed partial class MainWindow : Window
 {
     private bool closing;
+    private bool closeInProgress;
     private AdvancedWindow? advancedWindow;
     private SensorWindow? sensorWindow;
     public MainViewModel ViewModel { get; }
@@ -73,12 +74,14 @@ public sealed partial class MainWindow : Window
     protected override async void OnClosing(WindowClosingEventArgs args)
     {
         base.OnClosing(args);
-        Shell.Voice.Stop();
         if (closing) return;
-        if (ViewModel.Servo.Busy && !ViewModel.IsFollowing) { args.Cancel = true; return; }
-        if (ViewModel.IsRunning || SpatialView.IsBusy || Shell.Chat.RemoteRunning || Shell.Chat.HasPending || Shell.Chat.IsBusy)
+        if (closeInProgress || ViewModel.Servo.Busy && !ViewModel.IsFollowing) { args.Cancel = true; return; }
+        var wakeShutdown = Shell.Voice.CloseWakeAsync();
+        Shell.Voice.Stop();
+        if (!wakeShutdown.IsCompleted || ViewModel.IsRunning || SpatialView.IsBusy || Shell.Chat.RemoteRunning || Shell.Chat.HasPending || Shell.Chat.IsBusy)
         {
-            args.Cancel = true; IsEnabled = false;
+            closeInProgress = true; args.Cancel = true; IsEnabled = false;
+            await wakeShutdown;
             await SpatialView.StopAsync();
             await ViewModel.StopAsync();
             await Shell.Chat.ShutdownAsync();

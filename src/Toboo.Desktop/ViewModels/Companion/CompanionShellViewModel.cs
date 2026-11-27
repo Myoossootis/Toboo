@@ -71,7 +71,6 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     public string CameraState => Tracking.IsRunning ? Tracking.SourceLabel + " · 运行中"
         : Tracking.SelectedCamera is null ? "未开启 · 请选择摄像头" : "已发现 · 未开启";
     public string RobotConnection => Tracking.IsFollowing ? "云台跟随中" : CanFollow ? "跟随已就绪" : Tracking.Servo.FirmwareReady ? "已连接 · 待准备" : "云台待确认";
-    public string FollowState => Tracking.IsFollowing ? "实物跟随中" : "实物跟随已关闭";
     public string SourceCaption => !Tracking.HasPreview ? "开启摄像头后显示画面"
         : Tracking.IsCameraSource && !Tracking.IsRunning ? "USB 摄像头 · 已停止" : Tracking.SourceLabel;
     public string StopLabel => Tracking.IsFollowing ? "停止跟随" : "停止感知";
@@ -135,11 +134,6 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
     {
         await NavigateAsync("1");
         if (!Tracking.CalibrationActive) AdvancedRequested?.Invoke(0);
-    }
-    [RelayCommand] private async Task OpenCalibrationAsync()
-    {
-        await NavigateAsync("1");
-        SetupStep = 0; CalibrationExpanded = !CalibrationExpanded;
     }
     [RelayCommand(CanExecute = nameof(CanAdvanceSetup))]
     private void AdvanceSetup()
@@ -210,10 +204,16 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
 
     internal async Task<string?> HandleVoiceCommandAsync(string text, CancellationToken cancellation)
     {
-        var command = string.Concat(text.Where(c => !char.IsWhiteSpace(c) && !char.IsPunctuation(c)));
-        if (command != "打开摄像机跟随") return null;
         cancellation.ThrowIfCancellationRequested();
+        var command = VoiceCommands.Match(text);
         string Notice(string message) => VoiceCommandNotice = message;
+        if (command == VoiceCommand.StopFollow)
+        {
+            if (!Tracking.IsFollowing) return Notice("摄像机跟随当前未开启。");
+            await Tracking.StopAsync();
+            return Notice("摄像机跟随已关闭。");
+        }
+        if (command != VoiceCommand.StartFollow) return null;
         if (Tracking.IsFollowing) return Notice("摄像机跟随已开启。");
         if (navigating || Tracking.IsChangingMode) return Notice("正在切换视觉会话，请稍后再说一次。");
         await NavigateAsync("1");
@@ -257,7 +257,7 @@ public sealed partial class CompanionShellViewModel : ObservableObject, IDisposa
         OnPropertyChanged(nameof(RobotDetail));
         OnPropertyChanged(nameof(CameraState)); OnPropertyChanged(nameof(RobotConnection));
         OnPropertyChanged(nameof(SourceCaption)); OnPropertyChanged(nameof(CanFollow));
-        OnPropertyChanged(nameof(CanStartVision)); OnPropertyChanged(nameof(FollowState));
+        OnPropertyChanged(nameof(CanStartVision));
         OnPropertyChanged(nameof(CanPrepareRobot)); OnPropertyChanged(nameof(PreparationHint)); OnPropertyChanged(nameof(FollowActionLabel));
         OnPropertyChanged(nameof(CanAdvanceSetup)); AdvanceSetupCommand.NotifyCanExecuteChanged(); PreviousSetupStepCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(SetupMessage));

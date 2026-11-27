@@ -54,20 +54,33 @@
                 <ComboBox x:Name="MicrophonePortSelector" ItemsSource="{Binding Voice.MicrophonePorts}" SelectedItem="{Binding Voice.MicrophonePort}" PlaceholderText="选择 ESP32-S3 串口" IsEnabled="{Binding Voice.CanConfigureMicrophone}" HorizontalAlignment="Stretch" />
                 <Button Grid.Column="1" Content="刷新" Command="{Binding Voice.RefreshMicrophonePortsCommand}" Classes="quiet" IsEnabled="{Binding Voice.CanConfigureMicrophone}" />
               </Grid>
-              <ProgressBar Minimum="0" Maximum="100" Value="{Binding Voice.MicrophoneLevel}" Height="6" IsVisible="{Binding Voice.IsI2sMicrophone}" />
-              <Expander x:Name="ModuleRecognitionExpander" Header="模块识别与纠错" HorizontalAlignment="Stretch">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding Voice.ShowInputMeter}"
+                    ToolTip.Tip="{Binding Voice.InputMeterDetail}">
+                <TextBlock Text="{Binding Voice.InputMeterLabel}" Classes="caption" VerticalAlignment="Center" />
+                <ProgressBar x:Name="DeviceVoiceInputMeter" Grid.Column="1" Minimum="0" Maximum="100"
+                             Value="{Binding Voice.InputMeterLevel}" Height="6" VerticalAlignment="Center"
+                             Foreground="{StaticResource AccentBrush}" Background="{StaticResource ControlBorderBrush}"
+                             AutomationProperties.Name="{Binding Voice.InputMeterLabel}"
+                             AutomationProperties.HelpText="{Binding Voice.InputMeterDetail}" />
+              </Grid>
+              <Expander x:Name="ModuleRecognitionExpander" Header="语音识别与纠错" HorizontalAlignment="Stretch">
                 <StackPanel Spacing="8" Margin="0,8,0,0">
                   <StackPanel Spacing="8" IsEnabled="{Binding Voice.CanConfigureMicrophone}">
-                    <ComboBox x:Name="ModuleRecognizerSelector" SelectedIndex="{Binding Voice.ModuleRecognizerIndex}" HorizontalAlignment="Stretch">
+                    <ComboBox x:Name="ModuleRecognizerSelector" SelectedIndex="{Binding Voice.ModuleRecognizerIndex}" IsVisible="{Binding Voice.IsI2sMicrophone}" HorizontalAlignment="Stretch">
                       <ComboBoxItem Content="本地 Whisper · 离线" />
                       <ComboBoxItem Content="DeepSeek ASR · 云端" />
                     </ComboBox>
-                    <StackPanel IsVisible="{Binding Voice.IsCloudModule}" Spacing="8">
-                      <TextBox x:Name="SpeechApiKeyBox" Text="{Binding Voice.ApiKeyDraft}" PasswordChar="●" Watermark="DeepSeek API Key（留空保留已保存密钥）" MaxLength="1024" />
-                      <CheckBox Content="识别后校正明显错字" IsChecked="{Binding Voice.CorrectTranscript}" />
-                      <CheckBox Content="先核对文字（暂停自动语音命令）" IsChecked="{Binding Voice.ReviewTranscript}" />
-                      <TextBlock Text="云端模式会将模块录音上传到 DeepSeek；纠错也使用 DeepSeek API，按服务计费。聊天仍使用 Harness。" Classes="caption" TextWrapping="Wrap" />
+                    <StackPanel IsVisible="{Binding Voice.IsI2sMicrophone}" Spacing="8">
+                      <StackPanel IsVisible="{Binding Voice.IsCloudModule}" Spacing="8">
+                        <CheckBox Content="识别后校正明显错字" IsChecked="{Binding Voice.CorrectTranscript}" />
+                        <CheckBox Content="先核对文字（暂停自动语音命令）" IsChecked="{Binding Voice.ReviewTranscript}" />
+                        <TextBlock Text="云端模式会将模块录音上传到 DeepSeek；纠错也使用 DeepSeek API，按服务计费。聊天仍使用 Harness。" Classes="caption" TextWrapping="Wrap" />
+                      </StackPanel>
                     </StackPanel>
+                    <TextBox x:Name="SpeechApiKeyBox" Text="{Binding Voice.ApiKeyDraft}" PasswordChar="●" Watermark="DeepSeek API Key（留空保留已保存密钥）" MaxLength="1024" />
+                    <CheckBox Content="连续语音使用 DeepSeek 纠错" IsChecked="{Binding Voice.CorrectWakeTranscript}" />
+                    <TextBlock Text="开启后，连续对话只上传转写文字用于纠错，使用此处的 API Key。"
+                               Classes="caption" TextWrapping="Wrap" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                       <Button Content="保存语音设置" Command="{Binding Voice.SaveRecognitionSettingsCommand}" Classes="quiet" />
                       <Button Grid.Column="1" Content="清除密钥" Command="{Binding Voice.ClearSpeechKeyCommand}" Classes="textlink" IsVisible="{Binding Voice.HasCloudKey}" />
@@ -75,6 +88,8 @@
                   </StackPanel>
                   <TextBlock Text="{Binding Voice.VoiceSettingsStatus}" Classes="caption" TextWrapping="Wrap" />
                   <TextBlock Text="{Binding Voice.AudioDiagnostics}" Classes="caption" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding Voice.WakeCorrectionNotice}" IsVisible="{Binding Voice.HasWakeCorrectionNotice}"
+                             Classes="caption" TextWrapping="Wrap" />
                   <StackPanel IsVisible="{Binding Voice.HasTranscript}" Spacing="6">
                     <TextBlock Text="识别原文" FontWeight="Medium" />
                     <SelectableTextBlock Text="{Binding Voice.OriginalTranscript}" TextWrapping="Wrap" />

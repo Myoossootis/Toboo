@@ -2,12 +2,12 @@
 
 ## 另一台笔记本首次启动
 
-1. 在 Release 附件中下载完整的 `toboo-0.3.4-win-x64-portable.zip`。
-2. 使用 Windows 10/11 x64，解压到用户可写目录，例如桌面上的 `Toboo` 文件夹。
-3. 双击解压目录内的 **toboo.exe**。保留整个文件夹，包含 DLL、`models`、`runtime` 和 `firmware`。
+1. 在 Release 附件中下载完整的 `toboo-版本号-win-x64-portable.zip`。
+2. 在 Windows x64 上完整解压到可写目录，例如桌面上的 `Toboo` 文件夹。
+3. 双击顶层带绿色机器人图标的 **toboo.exe**。运行库、模型和硬件工具都在旁边的 `app` 文件夹，请将两者放在一起。
 4. 左侧「视觉标定」可打开照片或选择 USB 摄像头，查看相对深度和彩色点云。拖拽旋转，滚轮缩放。
 
-便携包包含 .NET 运行时、图像依赖、深度与语音模型、独立串口 Python 环境。首次使用本地视觉功能可以离线运行。中文系统麦克风识别和朗读仍依赖 Windows 中文语音组件。
+便携包包含 .NET 运行时、图像依赖、深度与语音模型、独立串口 Python 环境。本地视觉和 Whisper 转写可以离线运行，系统朗读需要 Windows 中文语音组件。
 
 ## 摄像头与空间感知
 
@@ -37,9 +37,9 @@ LCD 的 VCC/GND/SDA/SCL 对应 Uno 5V/GND/A4/A5，超声波 VCC/GND/TRIG/ECHO �
 
 ## 语音输入和朗读
 
-电脑麦克风使用 Windows 中文识别。ICS43432 模块通过 ESP32-S3 采音，可使用包内 Whisper 或 DeepSeek ASR。在设备页选择输入设备和模块串口，展开「模块识别与纠错」选择引擎。本地 Whisper 需要 CPU 支持 AVX2、FMA、F16C，缺少时界面会显示原因；云端引擎需要网络及自己的 DeepSeek API Key，在软件内输入并保存。密钥按当前 Windows 账户加密，更换电脑需重新配置。
+电脑麦克风和 ICS43432 模块都支持本地 Whisper。在设备页选择输入设备，使用模块时再选择 ESP32-S3 串口。本地 Whisper 需要 CPU 支持 AVX2、FMA、F16C。DeepSeek 云端识别和连续语音纠错需要网络及 API Key，在「语音识别与纠错」中保存。密钥按当前 Windows 账户加密，更换电脑时需重新配置。
 
-云端模式会上传本次录音并按服务计费，可选纠错也会上传转写文字。默认「先核对文字」会暂停自动语音命令；核对原文和校正结果后再发送。修改过的文字不会自动触发硬件命令。实际模块与云端识别准确率仍需按设备与环境验证。系统麦克风缺少中文识别、朗读组件时，在 Windows 语言设置中为简体中文添加对应组件，然后重新检查本机语音。
+连续语音纠错只上传转写文字。模块云端识别会上传按住说话的录音，打开「先核对文字」可先编辑再发送。连续语音命令和关闭核对后的按住说话指令会在本地处理，实物跟随仍需设备就绪。系统朗读需要 Windows 中文语音组件。
 
 按住说话、松开结束录音；默认核对模式下先检查文字再发送，Esc 取消。蓝牙音响可设为 Windows 默认声音输出。接线及模型说明见 `docs/microphone.md`。
 
@@ -49,7 +49,7 @@ LCD 的 VCC/GND/SDA/SCL 对应 Uno 5V/GND/A4/A5，超声波 VCC/GND/TRIG/ECHO �
 2. 在便携包根目录打开 PowerShell，执行下面的命令。
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/install-toboo-harness.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File ./app/scripts/install-toboo-harness.ps1
 ```
 
 3. 从系统托盘完全退出 Harness，再重新启动。
@@ -59,13 +59,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/install-toboo-harn
 
 ## 诊断和升级
 
-已有 v0.3.3 完整便携版（或增量升级后的 v0.3.3）时，下载 `toboo-0.3.4-update-from-0.3.3-win-x64.zip`。关闭 toboo，将 ZIP 内全部内容解压到原 `toboo.exe` 所在目录，选择替换同名文件，然后双击原来的 `toboo.exe`。增量包不能单独运行。可运行包内的 `verify-update.ps1` 检查覆盖结果。此次升级无需重刷 Uno 或 ESP32 固件，本机保存的设备标定保持在原位置。其他旧版本或候选版使用完整便携包，解压到新文件夹。
+从旧版升级时，下载完整便携包并解压到新文件夹。新目录布局需要重新安装 Harness 桥。已有的设备标定、语音设置和会话仍从本机配置目录读取。
 
 v0.3.4 加强跟随目标的新鲜度检查和本轮工作区边界冻结。完整保护机制、测试依据与硬件能力限制见 `docs/safety.md`：软件停发不等于切断外部 5V，当前没有真实轴位或堵转反馈。
 
-完整解压新版本到新文件夹，关闭旧程序，再启动新版。设备设置位于 `%LOCALAPPDATA%\PanTiltTracker\`，本地诊断写入包目录 `diagnostics/`。启动失败时先查看 `diagnostics/startup-error.json`。
+启动新版前请关闭旧程序。设备设置位于 `%LOCALAPPDATA%\PanTiltTracker\`，本地诊断写入 `app/diagnostics/`。启动失败时先查看 `app/diagnostics/startup-error.json`。
 
-可在 PowerShell 中运行以下离线检查，结果写入 `diagnostics/`。
+可在 PowerShell 中从便携包顶层运行以下离线检查，结果写入 `app/diagnostics/`。
 
 ```powershell
 ./toboo.exe --self-test

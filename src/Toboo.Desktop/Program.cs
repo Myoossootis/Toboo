@@ -10,8 +10,14 @@ internal static class Program
     {
         try
         {
+            static void SweepAudio() => TemporaryMicrophoneRecording.RemoveExpired(Diagnostics.DirectoryPath, DateTime.UtcNow);
+            SweepAudio();
+            using var audioCleanup = new Timer(_ => SweepAudio(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
             if (args.Contains("--self-test", StringComparer.Ordinal)) { Diagnostics.SelfTest(); return 0; }
             if (args.Contains("--speech-self-test", StringComparer.Ordinal)) { Diagnostics.SpeechSelfTestAsync().GetAwaiter().GetResult(); return 0; }
+            if (args.Contains("--wake-self-test", StringComparer.Ordinal)) return Diagnostics.WakeSelfTestAsync().GetAwaiter().GetResult() ? 0 : 1;
+            if (args.Contains("--system-mic-self-test", StringComparer.Ordinal))
+                return Diagnostics.SystemMicSelfTestAsync().GetAwaiter().GetResult() ? 0 : 1;
             var audioFile = Array.IndexOf(args, "--recognize-audio");
             if (audioFile >= 0)
             {

@@ -41,6 +41,15 @@
         "resolved": "8.4.0",
         "contentHash": "tqVU8yc/ADO9oiTRyTnwhFN68hCwvkliMierptWOudIAvWY1mWCh5VFh+guwHJmpMwfg0J0rY+yyd5Oy7ty9Uw=="
       },
+      "NAudio.Wasapi": {
+        "type": "Direct",
+        "requested": "[2.3.0, )",
+        "resolved": "2.3.0",
+        "contentHash": "y5K2BxrLnvohgu5znzg5wRsai3YcuNXfrpo68i7PmCQqpK5MC/R24e5aO3OyN/XhfRr12e0QYV0OnUWEHi5SzA==",
+        "dependencies": {
+          "NAudio.Core": "2.3.0"
+        }
+      },
       "System.IO.Ports": {
         "type": "Direct",
         "requested": "[8.0.0, )",
@@ -186,6 +195,11 @@
         "dependencies": {
           "System.Text.Json": "10.0.2"
         }
+      },
+      "NAudio.Core": {
+        "type": "Transitive",
+        "resolved": "2.3.0",
+        "contentHash": "jMd7r6dB6tAtXhOYL58ntPqwERNm1/Rhw5MKOIYvsnXzuX+PTGsa2VMam6n0npZYSwlSidKa4GAm4bFcXFUlcg=="
       },
       "OpenCvSharp4": {
         "type": "Transitive",

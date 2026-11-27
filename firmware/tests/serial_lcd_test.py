@@ -2,12 +2,20 @@
 import argparse
 import json
 from pathlib import Path
-import sys
 import time
 import serial
 
-sys.path.insert(0, str(Path(__file__).parents[1] / "tools"))
-from lcd_expression import read_line
+
+def read_line(port, timeout):
+    deadline = time.monotonic() + timeout
+    data = bytearray()
+    while time.monotonic() < deadline:
+        data.extend(port.read(1))
+        if len(data) > 80:
+            raise RuntimeError("Oversized LCD response")
+        if data.endswith(b"\n"):
+            return data.decode("ascii").rstrip("\r\n")
+    raise RuntimeError("LCD response timed out")
 
 
 def main():

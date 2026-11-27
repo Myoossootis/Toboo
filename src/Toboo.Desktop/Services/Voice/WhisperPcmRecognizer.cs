@@ -10,6 +10,7 @@ internal static class WhisperPcmRecognizer
 {
     internal const string ModelSha256 = "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe";
     internal const string VadSha256 = "29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf";
+    internal const string ChinesePrompt = "以下是普通话简体中文对话，可能包含 toboo、DeepSeek、摄像头、云台等术语。";
     internal static string ModelPath => Path.Combine(AppContext.BaseDirectory, "models", "speech", "ggml-base.bin");
     internal static string VadPath => Path.Combine(AppContext.BaseDirectory, "models", "speech", "ggml-silero-v5.1.2.bin");
     internal static string? UnavailableReason => !Avx.IsSupported || !Avx2.IsSupported || !Fma.IsSupported || !F16cSupported()
@@ -43,7 +44,7 @@ internal static class WhisperPcmRecognizer
         // A fresh processor has no transcript context from previous conversations.
         using var factory = WhisperFactory.FromPath(ModelPath);
         await using var processor = factory.CreateBuilder().WithLanguage("zh").WithNoContext()
-            .WithPrompt("以下是普通话简体中文对话，可能包含 toboo、DeepSeek、摄像头、云台等术语。")
+            .WithPrompt(ChinesePrompt)
             .WithTemperature(0).WithBeamSearchSamplingStrategy(strategy => strategy.WithBeamSize(3))
             .WithThreads(Math.Clamp(Environment.ProcessorCount / 2, 1, 6))
             .WithProbabilities().WithNoSpeechThreshold(0.6f).Build();
@@ -60,7 +61,7 @@ internal static class WhisperPcmRecognizer
         return text.ToString().Trim();
     }, cancellation);
 
-    private static async Task VerifyModelAsync(string path, string expected, CancellationToken cancellation)
+    internal static async Task VerifyModelAsync(string path, string expected, CancellationToken cancellation)
     {
         using var model = File.OpenRead(path);
         var hash = Convert.ToHexString(await SHA256.HashDataAsync(model, cancellation)).ToLowerInvariant();

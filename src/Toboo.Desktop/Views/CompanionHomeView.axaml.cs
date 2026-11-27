@@ -10,6 +10,7 @@ public sealed partial class CompanionHomeView : UserControl
 {
     private ChatViewModel? chat;
     private bool voiceHeld;
+    private IPointer? heldPointer;
     public CompanionHomeView()
     {
         InitializeComponent();
@@ -47,15 +48,16 @@ public sealed partial class CompanionHomeView : UserControl
             || DataContext is not CompanionShellViewModel shell || !shell.Voice.CanRecord) return;
         args.Handled = true; voiceHeld = true;
         VoiceHoldButton.Focus();
-        args.Pointer.Capture(VoiceHoldButton);
+        heldPointer = args.Pointer;
+        heldPointer.Capture(VoiceHoldButton);
         await shell.Voice.BeginListeningAsync();
     }
     private void VoiceReleased(object? sender, PointerReleasedEventArgs args)
     {
-        if (!voiceHeld || args.InitialPressMouseButton != MouseButton.Left) return;
+        if (!voiceHeld || !ReferenceEquals(heldPointer, args.Pointer) || args.InitialPressMouseButton != MouseButton.Left) return;
         args.Handled = true; voiceHeld = false;
         (DataContext as CompanionShellViewModel)?.Voice.FinishListening();
-        args.Pointer.Capture(null);
+        ReleaseHeldPointer();
     }
     private async void VoiceKeyDown(object? sender, KeyEventArgs args)
     {
@@ -67,19 +69,34 @@ public sealed partial class CompanionHomeView : UserControl
     }
     private void VoiceKeyUp(object? sender, KeyEventArgs args)
     {
-        if (!voiceHeld || args.Key is not (Key.Space or Key.Enter)) return;
+        if (!voiceHeld || heldPointer is not null || args.Key is not (Key.Space or Key.Enter)) return;
         args.Handled = true; voiceHeld = false;
         (DataContext as CompanionShellViewModel)?.Voice.FinishListening();
     }
     private void VoiceEscape(object? sender, KeyEventArgs args)
     {
         if (args.Key != Key.Escape || DataContext is not CompanionShellViewModel shell || !shell.Voice.CanStop) return;
-        args.Handled = true; voiceHeld = false; shell.Voice.Stop();
+        args.Handled = true;
+        CancelComposerVoice();
     }
+    private void CancelComposerVoice(object? sender, RoutedEventArgs args) => CancelComposerVoice();
+
     private void CancelHeldVoice()
     {
-        if (!voiceHeld) return;
-        voiceHeld = false; (DataContext as CompanionShellViewModel)?.Voice.Stop();
+        if (voiceHeld) CancelComposerVoice();
+    }
+    private void CancelComposerVoice()
+    {
+        voiceHeld = false;
+        ReleaseHeldPointer();
+        (DataContext as CompanionShellViewModel)?.Voice.Stop();
+    }
+    private void ReleaseHeldPointer()
+    {
+        var pointer = heldPointer;
+        heldPointer = null;
+        if (pointer is not null && ReferenceEquals(pointer.Captured, VoiceHoldButton))
+            pointer.Capture(null);
     }
     public bool Compact { set { Classes.Set("compact", value); HomeGrid.ColumnDefinitions[1].Width = new(value ? 264 : 320); } }
 }

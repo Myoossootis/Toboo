@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Speech.Recognition;
 using System.Speech.Synthesis;
@@ -12,17 +13,18 @@ internal sealed record SpeechCapabilities(bool CanListen, bool CanSpeak, string 
 internal interface ISpeechService
 {
     Task<SpeechCapabilities> InspectAsync(CancellationToken cancellation);
-    Task<string> ListenAsync(Action started, CancellationToken cancellation);
+    Task<string> ListenAsync(Action started, CancellationToken cancellation, Action<double>? level = null);
     Task<string> RecognizePcmAsync(byte[] pcm, CancellationToken cancellation);
     void FinishListening();
     Task SpeakAsync(string text, Action<bool> playing, Action word, CancellationToken cancellation);
 }
 
 [SupportedOSPlatform("windows")]
-internal sealed class WindowsSpeechService : ISpeechService
+internal sealed partial class WindowsSpeechService : ISpeechService, IVoiceWakeService
 {
     private readonly object sync = new();
     private SpeechRecognitionEngine? listening;
+    private CancellationTokenSource? pcmRecording;
     private bool finishRequested;
 
     public Task<SpeechCapabilities> InspectAsync(CancellationToken cancellation) => Task.Run(() =>
@@ -30,20 +32,91 @@ internal sealed class WindowsSpeechService : ISpeechService
         var recognizer = ChineseRecognizer();
         using var synth = new SpeechSynthesizer();
         var voice = ChineseVoice(synth);
-        return new SpeechCapabilities(recognizer is not null, voice is not null,
-            recognizer is null ? "请在 Windows 添加中文语音识别语言包" : "中文识别 · 系统默认麦克风",
+        var localWhisper = WhisperPcmRecognizer.UnavailableReason is null;
+        var canListen = localWhisper || recognizer is not null;
+        var microphone = canListen ? WindowsWakeMicrophone.DefaultInputName() : null;
+        var input = canListen ? $"{(localWhisper ? "Whisper 本地中文识别" : "Windows 中文识别")} · {microphone ?? "系统默认麦克风"}"
+            : "请准备本地语音模型或安装 Windows 中文语音识别组件";
+        return new SpeechCapabilities(canListen, voice is not null, input,
             voice is null ? "请在 Windows 添加中文朗读声音" : voice.VoiceInfo.Name + " · 系统默认音频输出",
-            WhisperPcmRecognizer.UnavailableReason is null,
+            localWhisper,
             WhisperPcmRecognizer.UnavailableReason ?? "ICS43432 · Whisper 本地中文识别");
     }, cancellation);
 
-    public Task<string> ListenAsync(Action started, CancellationToken cancellation)
-        => RecognizeAsync(started, cancellation, null);
+    public Task<string> ListenAsync(Action started, CancellationToken cancellation, Action<double>? level = null)
+        => WhisperPcmRecognizer.UnavailableReason is null ? RecordWithWhisperAsync(started, cancellation, level: level)
+            : RecognizeAsync(started, cancellation, level);
 
     public Task<string> RecognizePcmAsync(byte[] pcm, CancellationToken cancellation)
         => WhisperPcmRecognizer.RecognizeAsync(pcm, cancellation);
 
-    private Task<string> RecognizeAsync(Action started, CancellationToken cancellation, byte[]? pcm)
+    internal Task<string> RecordWithWhisperAsync(Action started, CancellationToken cancellation, Action<byte[]>? observe = null,
+        Action<double>? level = null)
+    {
+        lock (sync) finishRequested = false;
+        return Task.Run(async () =>
+        {
+            const int maximumBytes = WindowsWakeMicrophone.SampleRate * sizeof(short) * 30;
+            using var capture = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+            using var buffer = new MemoryStream();
+            capture.CancelAfter(TimeSpan.FromSeconds(30));
+            lock (sync)
+            {
+                if (finishRequested) return "";
+                pcmRecording = capture;
+            }
+            try
+            {
+                var ready = false;
+                var lastMeter = Stopwatch.GetTimestamp();
+                var peak = 0d;
+                try
+                {
+                    await WindowsWakeMicrophone.StreamAsync(frame =>
+                    {
+                        var room = maximumBytes - (int)buffer.Length;
+                        buffer.Write(frame, 0, Math.Min(room, frame.Length));
+                        if (!ready)
+                        {
+                            ready = true;
+                            started();
+                        }
+                        if (level is not null)
+                        {
+                            peak = Math.Max(peak, I2sMicrophone.Peak(frame));
+                            var now = Stopwatch.GetTimestamp();
+                            if (Stopwatch.GetElapsedTime(lastMeter, now) >= TimeSpan.FromMilliseconds(100))
+                            {
+                                level(I2sMicrophone.MeterLevel(peak));
+                                lastMeter = now;
+                                peak = 0;
+                            }
+                        }
+                        if (buffer.Length == maximumBytes) capture.Cancel();
+                        Array.Clear(frame);
+                    }, capture.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (capture.IsCancellationRequested && !cancellation.IsCancellationRequested) { }
+                cancellation.ThrowIfCancellationRequested();
+                if (buffer.Length < 3200) return "";
+                var pcm = buffer.ToArray();
+                try
+                {
+                    observe?.Invoke(pcm);
+                    I2sMicrophone.Normalize(pcm);
+                    return await WhisperPcmRecognizer.RecognizeAsync(pcm, cancellation).ConfigureAwait(false);
+                }
+                finally { Array.Clear(pcm); }
+            }
+            finally
+            {
+                lock (sync) if (ReferenceEquals(pcmRecording, capture)) pcmRecording = null;
+                if (buffer.TryGetBuffer(out var segment)) segment.AsSpan().Clear();
+            }
+        }, cancellation);
+    }
+
+    private Task<string> RecognizeAsync(Action started, CancellationToken cancellation, Action<double>? level)
     {
         lock (sync) finishRequested = false;
         return Task.Run(async () =>
@@ -52,7 +125,6 @@ internal sealed class WindowsSpeechService : ISpeechService
             deadline.CancelAfter(TimeSpan.FromSeconds(40));
             var info = ChineseRecognizer() ?? throw new InvalidOperationException("未安装中文语音识别语言包。");
             using var engine = new SpeechRecognitionEngine(info);
-            using var audio = pcm is null ? null : new MemoryStream(pcm, writable: false);
             var complete = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             var text = new StringBuilder();
             engine.LoadGrammar(new DictationGrammar());
@@ -61,6 +133,7 @@ internal sealed class WindowsSpeechService : ISpeechService
             engine.InitialSilenceTimeout = TimeSpan.FromSeconds(30);
             engine.BabbleTimeout = TimeSpan.FromSeconds(15);
             engine.EndSilenceTimeout = TimeSpan.FromMilliseconds(600);
+            if (level is not null) engine.AudioLevelUpdated += (_, args) => level(args.AudioLevel / 100d);
             engine.SpeechRecognized += (_, args) =>
             {
                 if (args.Result.Confidence < 0.35 || string.IsNullOrWhiteSpace(args.Result.Text)) return;
@@ -83,8 +156,7 @@ internal sealed class WindowsSpeechService : ISpeechService
             {
                 deadline.Token.ThrowIfCancellationRequested();
                 lock (sync) if (finishRequested) return "";
-                if (audio is null) engine.SetInputToDefaultAudioDevice();
-                else engine.SetInputToAudioStream(audio, new SpeechAudioFormatInfo(16000, AudioBitsPerSample.Sixteen, AudioChannel.Mono));
+                engine.SetInputToDefaultAudioDevice();
                 using var cancel = deadline.Token.Register(() =>
                 {
                     lock (sync)
@@ -119,6 +191,7 @@ internal sealed class WindowsSpeechService : ISpeechService
         lock (sync)
         {
             finishRequested = true;
+            pcmRecording?.Cancel();
             listening?.RecognizeAsyncStop();
         }
     }

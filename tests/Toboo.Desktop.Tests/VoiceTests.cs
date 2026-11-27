@@ -4,6 +4,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Toboo.Desktop.Controls;
 using Toboo.Desktop.Services;
 using Toboo.Desktop.ViewModels;
 using Toboo.Desktop.Views;
@@ -11,7 +12,7 @@ using Xunit;
 
 namespace Toboo.Desktop.Tests;
 
-public sealed class VoiceTests
+public sealed partial class VoiceTests
 {
     [AvaloniaTheory]
     [InlineData(1440, 900)]
@@ -90,7 +91,7 @@ public sealed class VoiceTests
         Assert.False(chat.VoiceInputActive);
     }
     [AvaloniaFact]
-    public async Task CorrectedTextCannotBecomeAnAutomaticHardwareCommandEvenWithReviewDisabled()
+    public async Task CorrectedTrackingCommandExecutesWithReviewDisabledWhenOriginalMatchesIntent()
     {
         using var chat = Chat(new TobooChatTests.FakeClient());
         var cloud = new CloudSpeech();
@@ -100,10 +101,10 @@ public sealed class VoiceTests
         await chat.ConnectAsync(); await voice.InitializeAsync();
         voice.MicrophoneSourceIndex = 1; voice.MicrophonePort = "COM-test";
         var recording = voice.BeginListeningAsync(); voice.FinishListening();
-        cloud.Transcript.SetResult("打开摄像机根随"); cloud.Correction.SetResult("打开摄像机跟随");
+        cloud.Transcript.SetResult("打开摄像机跟水"); cloud.Correction.SetResult("打开摄像机跟随");
         await recording;
-        Assert.Equal(0, commands);
-        Assert.Equal("打开摄像机跟随", chat.Draft);
+        Assert.Equal(1, commands);
+        Assert.Empty(chat.Draft);
     }
     [AvaloniaFact]
     public async Task CancelledCloudRecognitionCannotFillDraftOrTriggerCommands()
@@ -215,11 +216,12 @@ public sealed class VoiceTests
         public bool FailInspection;
         public Action<bool>? Playing;
         public Action? Word;
+        public Action<double>? InputLevel;
         public Task<SpeechCapabilities> InspectAsync(CancellationToken cancellation) => FailInspection
             ? Task.FromException<SpeechCapabilities>(new InvalidOperationException("fixture speech failure")) : Task.FromResult(Capabilities);
-        public Task<string> ListenAsync(Action started, CancellationToken cancellation)
+        public Task<string> ListenAsync(Action started, CancellationToken cancellation, Action<double>? level = null)
         {
-            Listens++; started();
+            Listens++; InputLevel = level; started();
             return IgnoreCancellation ? Transcript.Task : Transcript.Task.WaitAsync(cancellation);
         }
         public void FinishListening() => Finishes++;
@@ -235,8 +237,9 @@ public sealed class VoiceTests
         }
     }
 
-    private static VoiceViewModel NewVoice(ChatViewModel chat, ISpeechService speech, IMicrophoneCapture? microphone = null) =>
-        new(chat, speech, microphone, new SpeechRecognitionStore(Path.Combine(Path.GetTempPath(), "toboo-voice-options", Guid.NewGuid().ToString("N"), "voice.local.json")));
+    private static VoiceViewModel NewVoice(ChatViewModel chat, ISpeechService speech, IMicrophoneCapture? microphone = null,
+        IVoiceWakeService? wakeSpeech = null) => new(chat, speech, microphone,
+            new SpeechRecognitionStore(Path.Combine(Path.GetTempPath(), "toboo-voice-options", Guid.NewGuid().ToString("N"), "voice.local.json")), wakeSpeech: wakeSpeech);
 
     private static ChatViewModel Chat(TobooChatTests.FakeClient client) => new(client,
         new(Path.Combine(Path.GetTempPath(), "toboo-voice-tests", Guid.NewGuid().ToString("N"), "client.json")));
@@ -295,13 +298,15 @@ public sealed class VoiceTests
         voice.MicrophoneSourceIndex = 1; voice.MicrophonePort = "COM-test";
         var recording = voice.BeginListeningAsync();
         Assert.True(voice.IsListening);
+        await Until(() => voice.ShowInputMeter && voice.InputMeterLevel == 50);
         voice.FinishListening();
         speech.Transcript.SetResult("这是模块采音");
         await recording;
         Assert.Equal(0, speech.Listens);
         Assert.Equal(1, speech.PcmCalls);
         Assert.Equal("这是模块采音", client.Turns.Single().Text);
-        Assert.Equal(0, voice.MicrophoneLevel);
+        Assert.False(voice.ShowInputMeter);
+        Assert.Equal(0, voice.InputMeterLevel);
     }
 
     [AvaloniaFact]
@@ -446,28 +451,112 @@ public sealed class VoiceTests
             await chat.ConnectAsync(); await voice.InitializeAsync(); await Task.Delay(40);
             var home = window.FindControl<CompanionHomeView>("HomeView")!;
             var button = home.FindControl<Button>("VoiceHoldButton")!;
+            var input = home.FindControl<TextBox>("ConversationInput")!;
+            var strip = home.FindControl<Control>("ComposerVoiceStrip")!;
+            var waveform = home.FindControl<InputWaveform>("ComposerWaveform")!;
+            var cancel = home.FindControl<Button>("ComposerVoiceCancelButton")!;
             Assert.True(button.IsEffectivelyEnabled);
-            var center = button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value;
-            window.MouseDown(center, MouseButton.Left);
-            await Until(() => voice.IsListening);
-            await Until(() => tracking.Lcd.PreviewRole == LcdRole.Attentive);
-            Assert.Equal("松开发送", voice.RecordLabel);
-            Assert.True(button.IsEffectivelyEnabled);
+            Assert.True(input.IsEffectivelyVisible);
+            Assert.False(strip.IsEffectivelyVisible);
+            Assert.False(waveform.IsEffectivelyVisible);
+            Assert.False(cancel.IsEffectivelyVisible);
+            var directory = Path.Combine(Workspace(), "artifacts", "voice-preview");
+            Directory.CreateDirectory(directory);
             using (var bitmap = window.CaptureRenderedFrame())
             {
                 Assert.NotNull(bitmap);
-                var directory = Path.Combine(Workspace(), "artifacts", "voice-preview");
-                Directory.CreateDirectory(directory);
+                bitmap.Save(Path.Combine(directory, $"typing-{width}.png"));
+            }
+            var center = button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value;
+            window.MouseDown(center, MouseButton.Left);
+            await Until(() => voice.IsListening && strip.IsEffectivelyVisible);
+            await Until(() => tracking.Lcd.PreviewRole == LcdRole.Attentive);
+            Assert.Same(button, home.FindControl<Button>("VoiceHoldButton"));
+            Assert.True(button.IsEffectivelyVisible);
+            Assert.True(button.IsEffectivelyEnabled);
+            Assert.False(input.IsEffectivelyVisible);
+            Assert.True(cancel.IsEffectivelyVisible);
+            speech.InputLevel!(0.5);
+            await Until(() => waveform.IsEffectivelyVisible && waveform.Level == 50);
+            speech.InputLevel!(0.75);
+            await Until(() => waveform.Level == 75);
+            foreach (var level in new[] { 0.45, 0.80, 0.25, 0.60, 0.85, 0.35 })
+            {
+                speech.InputLevel!(level);
+                await Task.Delay(115);
+            }
+            using (var bitmap = window.CaptureRenderedFrame())
+            {
+                Assert.NotNull(bitmap);
                 bitmap.Save(Path.Combine(directory, $"listening-{width}.png"));
             }
             window.MouseUp(center, MouseButton.Left);
             Assert.Equal(1, speech.Finishes);
+            Assert.True(voice.IsFinishing);
+            speech.InputLevel!(1);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(0, voice.InputMeterLevel);
+            Assert.Equal(0, waveform.Level);
             speech.Transcript.SetResult("测试语音按钮");
-            await Until(() => client.Sends == 1);
+            await Until(() => client.Sends == 1 && input.IsEffectivelyVisible);
+            Assert.False(strip.IsEffectivelyVisible);
             Assert.False(chat.VoiceInputActive);
             Assert.Equal("测试语音按钮", client.Turns[0].Text);
         }
         finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task WakeComposerKeepsTypingVisibleAndStopReturnsToStandby()
+    {
+        var client = new TobooChatTests.FakeClient();
+        using var chat = Chat(client);
+        var wake = new WakeSpeech();
+        using var voice = NewVoice(chat, new Speech(), wakeSpeech: wake);
+        using var tracking = new MainViewModel();
+        var window = new MainWindow(tracking, chat, voice) { Width = 980, Height = 700 };
+        try
+        {
+            window.Show();
+            await chat.ConnectAsync();
+            await voice.InitializeAsync();
+            var home = window.FindControl<CompanionHomeView>("HomeView")!;
+            var input = home.FindControl<TextBox>("ConversationInput")!;
+            var strip = home.FindControl<Control>("ComposerVoiceStrip")!;
+            var cancel = home.FindControl<Button>("StopVoiceButton")!;
+            var standby = home.FindControl<Control>("VoiceStandbyMeter")!;
+            voice.ToggleWakeCommand.Execute(null);
+            await Until(() => wake.Waits.Count == 1 && standby.IsEffectivelyVisible);
+            Assert.True(input.IsEffectivelyVisible);
+            Assert.False(strip.IsEffectivelyVisible);
+
+            wake.Waits[0].Result.SetResult("");
+            await Until(() => wake.Captures.Count == 1 && cancel.IsEffectivelyVisible && cancel.Bounds.Width > 0);
+            Assert.True(input.IsEffectivelyVisible);
+            Assert.True(standby.IsEffectivelyVisible);
+            Assert.False(strip.IsEffectivelyVisible);
+            var center = cancel.TranslatePoint(new Point(cancel.Bounds.Width / 2, cancel.Bounds.Height / 2), window)!.Value;
+            window.MouseDown(center, MouseButton.Left);
+            window.MouseUp(center, MouseButton.Left);
+            await Until(() => wake.Waits.Count == 2 && input.IsEffectivelyVisible);
+            Assert.True(wake.Captures[0].Cancellation.IsCancellationRequested);
+            Assert.Empty(chat.Draft);
+
+            wake.Waits[1].Result.SetResult("");
+            await Until(() => wake.Captures.Count == 2);
+            wake.Captures[1].Recognizing!();
+            wake.Captures[1].Result.SetResult("请讲一个故事");
+            await Until(() => client.Sends == 1);
+            Assert.Equal("请讲一个故事", client.Turns[0].Text);
+            Assert.Empty(input.Text ?? "");
+            Assert.False(strip.IsEffectivelyVisible);
+            Assert.True(input.IsEffectivelyEnabled);
+        }
+        finally
+        {
+            await voice.CloseWakeAsync();
+            window.Close();
+        }
     }
 
     [AvaloniaFact]
@@ -490,7 +579,9 @@ public sealed class VoiceTests
     public async Task ModuleSelectorRendersAtBothWidthsWithoutOpeningHardware(int width, int height)
     {
         using var tracking = new MainViewModel();
-        var window = new MainWindow(tracking) { Width = width, Height = height };
+        using var chat = Chat(new TobooChatTests.FakeClient());
+        using var voice = NewVoice(chat, new Speech());
+        var window = new MainWindow(tracking, chat, voice) { Width = width, Height = height };
         try
         {
             window.Show(); window.Shell.PageIndex = 1;

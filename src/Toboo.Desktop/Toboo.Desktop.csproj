@@ -2,12 +2,14 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <AssemblyName>toboo</AssemblyName>
+    <ApplicationIcon>Assets/toboo.ico</ApplicationIcon>
     <Product>toboo</Product>
     <Title>toboo · 桌面陪伴机器人</Title>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
   <ItemGroup>
     <AvaloniaResource Include="Assets/*.png" />
+    <AvaloniaResource Include="Assets/toboo.ico" />
     <EmbeddedResource Include="../../firmware/uno_lcd/LcdMotion.h" LogicalName="Toboo.LcdMotion" />
     <InternalsVisibleTo Include="Toboo.Desktop.Tests" />
     <ProjectReference Include="../Toboo.Runtime/Toboo.Runtime.csproj" />
@@ -17,6 +19,7 @@
     <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.3.0" />
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
     <PackageReference Include="System.Speech" Version="8.0.0" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
@@ -31,4 +34,28 @@
     <None Include="../../config/tracker.json" Link="tracker.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../config/face-aim.json" Link="face-aim.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <!-- Whisper includes native files for every desktop platform as copy items, outside NuGet RID selection. -->
+  <Target Name="PruneForeignWhisperRuntimeFiles" AfterTargets="ComputeFilesToPublish"
+          Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+          Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(ResolvedFileToPublish.Identity)', '(?i)[/\\]whisper\.net\.runtime[/\\][^/\\]+[/\\]build[/\\](linux-|macos-|win-(arm64|x86)[/\\])')) Or
+                     $([System.Text.RegularExpressions.Regex]::IsMatch('%(ResolvedFileToPublish.Identity)', '(?i)[/\\]whisper\.net\.runtime\.metal[/\\][^/\\]+[/\\]build[/\\]ggml-metal\.metal$'))" />
+    </ItemGroup>
+  </Target>
+  <!-- The SDK apphost can load a self-contained application from a relative directory. -->
+  <Target Name="WritePortableLauncher" AfterTargets="Publish" DependsOnTargets="_ChooseAppHost"
+          Condition="'$(TobooPortableLauncher)' != '' and '$(RuntimeIdentifier)' == 'win-x64' and '$(SelfContained)' == 'true'">
+    <CreateAppHost AppHostSourcePath="$(AppHostSourcePath)"
+                   AppHostDestinationPath="$(TobooPortableLauncher)"
+                   AppBinaryName="app/$(AssemblyName)$(TargetExt)"
+                   IntermediateAssembly="@(IntermediateAssembly->'%(FullPath)')"
+                   WindowsGraphicalUserInterface="true" />
+  </Target>
+  <Target Name="ExcludePortableInnerAppHost" AfterTargets="ComputeFilesToPublish"
+          Condition="'$(TobooPortableLauncher)' != ''">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.RelativePath)' == '$(AssemblyName).exe'" />
+    </ItemGroup>
+  </Target>
 </Project>

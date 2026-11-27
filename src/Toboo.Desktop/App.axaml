@@ -79,10 +79,6 @@
       <Setter Property="FontSize" Value="20" />
     </Style>
     <Style Selector="Button.close:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="#FBEDE8" /></Style>
-    <Style Selector="Button.round">
-      <Setter Property="Width" Value="44" /><Setter Property="Height" Value="44" />
-      <Setter Property="CornerRadius" Value="24" /><Setter Property="Padding" Value="10" />
-    </Style>
     <Style Selector="Border.shellcard">
       <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource SurfaceBorderBrush}" />

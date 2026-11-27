@@ -10,6 +10,8 @@ namespace Toboo.Desktop.ViewModels;
 
 public sealed partial class VoiceViewModel : ObservableObject, IDisposable
 {
+    private enum InputMeterMode { Off, Wake, WakeRecording, Manual }
+
     private readonly ChatViewModel chat;
     private readonly ISpeechService? speech;
     private readonly IMicrophoneCapture microphone;
@@ -19,10 +21,12 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     private string? cloudApiKey;
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private CancellationTokenSource? input, output;
-    private Task listeningTask = Task.CompletedTask, speakingTask = Task.CompletedTask;
+    private Task speakingTask = Task.CompletedTask;
     private long listenStarted, lastWord;
     private long? repliedAt;
     private bool disposed;
+    private InputMeterMode inputMeterMode;
+    private bool preferVoiceOutcome;
     private SpeechCapabilities? capabilities;
     private Func<string, CancellationToken, Task<string?>>? localCommandHandler;
     internal Func<string, CancellationToken, Task<string?>>? LocalCommandHandler
@@ -42,9 +46,10 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int microphoneSourceIndex;
     [ObservableProperty] private string? microphonePort;
     [ObservableProperty] private string[] microphonePorts = [];
-    [ObservableProperty] private double microphoneLevel;
+    [ObservableProperty] private double inputMeterLevel;
     [ObservableProperty] private int moduleRecognizerIndex;
     [ObservableProperty] private bool correctTranscript = true;
+    [ObservableProperty] private bool correctWakeTranscript;
     [ObservableProperty] private bool reviewTranscript = true;
     [ObservableProperty] private string apiKeyDraft = "";
     [ObservableProperty] private string voiceSettingsStatus = "本地识别在电脑上运行；DeepSeek 模式会上传本次录音，并按服务计费。";
@@ -56,13 +61,20 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     public bool HasTranscript => OriginalTranscript.Length > 0;
     public bool IsI2sMicrophone => MicrophoneSourceIndex == 1;
     public bool CanConfigureMicrophone => !CanStop && !Initializing;
-    public bool CanRecord => !disposed && CanListen && !IsListening && !chat.IsBusy
+    public bool CanRecord => !disposed && CanListen && input is null && !IsListening && !chat.IsBusy
         && !chat.RemoteRunning && !chat.HasPending && (localCommandHandler is not null || chat.IsConnected && chat.SelectedModel is not null)
         && string.IsNullOrWhiteSpace(chat.Draft)
         && (!IsI2sMicrophone || !string.IsNullOrWhiteSpace(MicrophonePort));
     public bool CanStop => IsListening || output is not null;
-    public bool CanUseRecordButton => CanRecord || IsListening;
-    public string RecordLabel => IsFinishing ? "正在识别…" : IsListening ? IsI2sMicrophone && IsCloudModule && ReviewTranscript ? "松开识别" : "松开发送" : "按住说话";
+    public bool CanUseRecordButton => CanRecord || input is not null && IsListening;
+    public bool ShowComposerMic => !chat.VoiceInputActive || input is not null;
+    public bool ShowInputMeter => inputMeterMode != InputMeterMode.Off;
+    public bool ShowComposerWaveform => inputMeterMode is InputMeterMode.Manual or InputMeterMode.WakeRecording;
+    public string InputMeterLabel => inputMeterMode == InputMeterMode.Wake ? "待机音量" : "麦克风音量";
+    public string InputMeterDetail => IsI2sMicrophone ? $"ICS43432 · {MicrophonePort}" : InputDescription;
+    public string VoiceActivityMessage => WakeStatus.Length != 0 && input is null && output is null && !preferVoiceOutcome
+        ? WakeStatus : Status;
+    public string RecordLabel => IsFinishing ? "正在识别…" : input is not null && IsListening ? IsI2sMicrophone && IsCloudModule && ReviewTranscript ? "松开识别" : "松开发送" : "按住说话";
     public string RecordHint => !CanListen ? InputDescription : !chat.IsConnected
         ? IsI2sMicrophone && IsCloudModule && ReviewTranscript ? "可识别并查看文字；语音对话需连接 Harness"
             : localCommandHandler is not null ? "可说“打开摄像机跟随”；语音对话需连接 Harness" : "连接 Harness 后可语音对话"
@@ -71,17 +83,21 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
         : IsI2sMicrophone && IsCloudModule && ReviewTranscript ? "按住说话，松开识别；确认文字后点击发送；Esc 取消" : "按住说话，松开发送；Esc 取消";
 
     internal VoiceViewModel(ChatViewModel chat, ISpeechService? speech = null, IMicrophoneCapture? microphone = null,
-        SpeechRecognitionStore? recognitionStore = null, IDeepSeekSpeech? cloudSpeech = null)
+        SpeechRecognitionStore? recognitionStore = null, IDeepSeekSpeech? cloudSpeech = null, IVoiceWakeService? wakeSpeech = null)
     {
         this.chat = chat;
         this.speech = speech ?? (OperatingSystem.IsWindows() ? new WindowsSpeechService() : null);
+        this.wakeSpeech = wakeSpeech ?? this.speech as IVoiceWakeService;
         this.microphone = microphone ?? new I2sMicrophone();
+        if (this.wakeSpeech is not null && this.microphone is IStreamingMicrophoneCapture streaming)
+            moduleWakeSpeech = new ModuleWakeSpeech(streaming, this.wakeSpeech);
         this.recognitionStore = recognitionStore ?? new();
         this.cloudSpeech = cloudSpeech ?? new DeepSeekSpeechClient();
         ownsCloudSpeech = cloudSpeech is null;
         moduleRecognizerIndex = this.recognitionStore.Current.Engine;
         microphoneSourceIndex = this.recognitionStore.Current.Source;
         correctTranscript = this.recognitionStore.Current.CorrectText;
+        correctWakeTranscript = this.recognitionStore.Current.CorrectWakeText;
         reviewTranscript = this.recognitionStore.Current.ReviewText;
         if (this.recognitionStore.LoadError is { } loadError) voiceSettingsStatus = loadError;
         try { cloudApiKey = this.recognitionStore.ReadKey(); }
@@ -94,12 +110,21 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     }
     partial void OnMicrophoneSourceIndexChanged(int value)
     {
+        WakeInputChanged();
         OnPropertyChanged(nameof(IsI2sMicrophone));
+        OnPropertyChanged(nameof(InputMeterDetail));
         ApplyInputCapabilities();
         Status = CanListen ? "按住说话，松开发送" : InputDescription;
         Refresh();
     }
-    partial void OnMicrophonePortChanged(string? value) => Refresh();
+    partial void OnMicrophonePortChanged(string? value)
+    {
+        if (IsI2sMicrophone) WakeInputChanged();
+        OnPropertyChanged(nameof(InputMeterDetail));
+        Refresh();
+    }
+    partial void OnInputDescriptionChanged(string value) => OnPropertyChanged(nameof(InputMeterDetail));
+    partial void OnStatusChanged(string value) => OnPropertyChanged(nameof(VoiceActivityMessage));
     partial void OnModuleRecognizerIndexChanged(int value)
     {
         OnPropertyChanged(nameof(IsCloudModule));
@@ -113,7 +138,8 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
         try
         {
             recognitionStore.Save(ModuleRecognizerIndex, CorrectTranscript, ReviewTranscript,
-                string.IsNullOrWhiteSpace(ApiKeyDraft) ? null : ApiKeyDraft, source: MicrophoneSourceIndex, port: MicrophonePort);
+                string.IsNullOrWhiteSpace(ApiKeyDraft) ? null : ApiKeyDraft, source: MicrophoneSourceIndex,
+                port: MicrophonePort, correctWakeText: CorrectWakeTranscript);
             cloudApiKey = recognitionStore.ReadKey(); ApiKeyDraft = "";
             VoiceSettingsStatus = HasCloudKey ? "语音设置已保存，密钥由本机 Windows 账户加密。" : "语音设置已保存；DeepSeek 模式仍需配置 API Key。";
             OnPropertyChanged(nameof(HasCloudKey)); ApplyInputCapabilities(); Refresh();
@@ -187,17 +213,19 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     public Task BeginListeningAsync()
     {
         if (!CanRecord || speech is null) return Task.CompletedTask;
-        Stop();
+        output?.Cancel();
+        IsSpeaking = false;
         repliedAt = null;
+        preferVoiceOutcome = false;
         input = new CancellationTokenSource();
+        wakeOperation?.Cancel();
         IsListening = true; IsFinishing = false; chat.VoiceInputActive = true;
         OriginalTranscript = ""; CorrectedTranscript = "";
         AudioDiagnostics = "";
         listenStarted = Stopwatch.GetTimestamp();
         Status = "正在准备麦克风…";
         timer.Start(); Refresh();
-        listeningTask = ListenAndSendAsync(input);
-        return listeningTask;
+        return ListenAndSendAsync(input);
     }
 
     private async Task ListenAndSendAsync(CancellationTokenSource operation)
@@ -207,45 +235,77 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
         var key = cloudApiKey;
         var correct = CorrectTranscript;
         var review = useCloud && ReviewTranscript;
+        var captureEnded = false;
         try
         {
             await speakingTask;
+            await wakeTask;
             operation.Token.ThrowIfCancellationRequested();
-            if (IsFinishing) return;
+            if (IsFinishing)
+            {
+                ShowVoiceOutcome("录音太短。按住并等到「正在听」后再开口。");
+                return;
+            }
             void Started() => Post(operation, () =>
             {
-                if (!IsFinishing) Status = review ? "正在听… 松开识别，核对后发送" : "正在听… 松开发送";
+                if (IsFinishing || captureEnded) return;
+                SetInputMeterMode(InputMeterMode.Manual);
+                Status = review ? "正在听 · 松开后识别，请核对文字" : "正在听 · 松开后识别";
             });
+            void ReportLevel(double value) => Post(operation, () => UpdateInputMeter(InputMeterMode.Manual, value));
+            void CaptureEnded()
+            {
+                captureEnded = true;
+                SetInputMeterMode(InputMeterMode.Off);
+            }
             string text;
             if (useModule)
             {
-                var pcm = await microphone.RecordAsync(MicrophonePort!, Started,
-                    value => Post(operation, () => MicrophoneLevel = value * 100), operation.Token);
-                operation.Token.ThrowIfCancellationRequested();
-                if (pcm.Length < 3200 || I2sMicrophone.Peak(pcm) == 0)
+                var pcm = await microphone.RecordAsync(MicrophonePort!, Started, ReportLevel, operation.Token);
+                CaptureEnded();
+                try
                 {
-                    Status = "模块没有收到有效声音，请检查接线和声道选择。"; return;
+                    operation.Token.ThrowIfCancellationRequested();
+                    if (pcm.Length < 3200 || I2sMicrophone.Peak(pcm) == 0)
+                    {
+                        ShowVoiceOutcome("模块没有收到有效声音，请检查接线和声道选择。"); return;
+                    }
+                    AudioDiagnostics = DescribeAudio(pcm);
+                    Status = useCloud ? "正在使用 DeepSeek 识别模块录音…" : "正在本地识别模块录音…";
+                    I2sMicrophone.Normalize(pcm);
+                    text = useCloud ? await cloudSpeech.TranscribeAsync(pcm, key ?? "", operation.Token)
+                        : await speech!.RecognizePcmAsync(pcm, operation.Token);
                 }
-                AudioDiagnostics = DescribeAudio(pcm);
-                Status = useCloud ? "正在使用 DeepSeek 识别模块录音…" : "正在本地识别模块录音…";
-                I2sMicrophone.Normalize(pcm);
-                text = useCloud ? await cloudSpeech.TranscribeAsync(pcm, key ?? "", operation.Token)
-                    : await speech!.RecognizePcmAsync(pcm, operation.Token);
+                finally { Array.Clear(pcm); }
             }
-            else text = await speech!.ListenAsync(Started, operation.Token);
+            else
+            {
+                text = await speech!.ListenAsync(Started, operation.Token, ReportLevel);
+                CaptureEnded();
+            }
             operation.Token.ThrowIfCancellationRequested();
-            if (string.IsNullOrWhiteSpace(text)) { Status = "没有听清，请按住后再说一次。"; return; }
+            if (string.IsNullOrWhiteSpace(text)) { ShowVoiceOutcome("没有听清。按住并等到「正在听」后再开口。"); return; }
             if (text.Length > 4000) { Status = "这段语音太长，请分成几句说。"; return; }
             OriginalTranscript = text.Trim(); CorrectedTranscript = OriginalTranscript;
             var original = OriginalTranscript;
             var correctionNotice = "";
             // The draft stays editable after transcription, including on an uncertain send.
             var released = IsFinishing;
-            if (released && !review && localCommandHandler is not null)
+            if (released && !review)
             {
-                var result = await localCommandHandler(original, operation.Token);
-                operation.Token.ThrowIfCancellationRequested();
-                if (result is not null) { Status = result; return; }
+                var voiceCommand = VoiceCommands.Match(original);
+                if (TryHandleVoiceSessionCommand(voiceCommand)) return;
+                if (localCommandHandler is not null)
+                {
+                    var result = await localCommandHandler(original, operation.Token);
+                    operation.Token.ThrowIfCancellationRequested();
+                    if (result is not null) { Status = result; return; }
+                }
+                if (voiceCommand != VoiceCommand.None)
+                {
+                    ShowVoiceOutcome("当前无法执行跟随指令。");
+                    return;
+                }
             }
             text = TranscriptCorrection.NormalizeTerms(original);
             if (useCloud && correct)
@@ -264,6 +324,21 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
             }
             operation.Token.ThrowIfCancellationRequested();
             CorrectedTranscript = text;
+            var correctedCommand = VoiceCommands.Match(text);
+            if (released && !review && text != original && correctedCommand != VoiceCommand.None)
+            {
+                if (!VoiceCommands.SupportsCorrection(original, text, correctedCommand))
+                    ShowVoiceOutcome("语音指令不明确，请重新说一遍。");
+                else if (!TryHandleVoiceSessionCommand(correctedCommand))
+                {
+                    var result = localCommandHandler is { } handle
+                        ? await handle(VoiceCommands.FollowText(correctedCommand), operation.Token)
+                        : null;
+                    operation.Token.ThrowIfCancellationRequested();
+                    ShowVoiceOutcome(result ?? "当前无法执行跟随指令。");
+                }
+                return;
+            }
             if (!chat.IsConnected)
             {
                 Status = "未匹配本地语音命令；识别文字已保留在语音详情中。连接 Harness 后可语音对话。";
@@ -288,14 +363,15 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
         }
         catch (Exception error)
         {
-            if (!disposed) Status = (IsI2sMicrophone ? "模块语音输入失败。" : "语音输入失败，请检查默认麦克风和中文识别组件。") + " " + error.Message;
+            if (!disposed) ShowVoiceOutcome((IsI2sMicrophone ? "模块语音输入失败。" : "语音输入失败，请检查系统麦克风。") + " " + error.Message);
         }
         finally
         {
             if (ReferenceEquals(input, operation))
             {
                 input = null; IsListening = false; IsFinishing = false;
-                chat.VoiceInputActive = false; MicrophoneLevel = 0; timer.Stop(); Refresh();
+                SetInputMeterMode(InputMeterMode.Off);
+                chat.VoiceInputActive = false; timer.Stop(); Refresh();
             }
             operation.Dispose();
         }
@@ -303,13 +379,14 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
 
     public void FinishListening()
     {
-        if (!IsListening || IsFinishing || speech is null) return;
+        if (input is null || !IsListening || IsFinishing || speech is null) return;
+        SetInputMeterMode(InputMeterMode.Off);
         IsFinishing = true; Status = "正在识别…"; Refresh();
         try
         {
             if (IsI2sMicrophone) microphone.Finish();
             else speech.FinishListening();
-            input?.CancelAfter(TimeSpan.FromSeconds(IsI2sMicrophone ? IsCloudModule ? 90 : 45 : 8));
+            input?.CancelAfter(TimeSpan.FromSeconds(IsI2sMicrophone && IsCloudModule ? 90 : 45));
         }
         catch (Exception) { Stop(); Status = "无法结束语音识别，请重试。"; }
     }
@@ -317,7 +394,10 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void Stop()
     {
-        input?.Cancel(); output?.Cancel();
+        voiceSessionActive = false;
+        input?.Cancel(); output?.Cancel(); wakeOperation?.Cancel();
+        preferVoiceOutcome = false;
+        SetInputMeterMode(InputMeterMode.Off);
         IsSpeaking = false; repliedAt = null;
         if (!disposed) Status = "已停止语音";
         Refresh();
@@ -328,6 +408,7 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
         if (disposed || !chat.ReadReplies || !CanSpeak || IsListening) return;
         output?.Cancel();
         output = new CancellationTokenSource();
+        wakeOperation?.Cancel();
         var previous = speakingTask;
         speakingTask = SpeakReplyAsync(text, previous, output);
         Refresh();
@@ -338,6 +419,7 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
         try
         {
             await previous;
+            await wakeTask;
             operation.Token.ThrowIfCancellationRequested();
             text = ReadableText(text);
             if (text.Length == 0) return;
@@ -346,18 +428,26 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
                 playing => Post(operation, () =>
                 {
                     IsSpeaking = playing;
-                    if (playing) { lastWord = Stopwatch.GetTimestamp(); Status = "正在朗读 · 可停止或按住说下一句"; }
+                    if (playing)
+                    {
+                        lastWord = Stopwatch.GetTimestamp();
+                        Status = voiceSessionActive ? "正在朗读 · 朗读完继续听" : "正在朗读 · 可停止或按住说下一句";
+                    }
                 }),
                 () => Post(operation, () => lastWord = Stopwatch.GetTimestamp()), operation.Token);
             operation.Token.ThrowIfCancellationRequested();
             repliedAt = Stopwatch.GetTimestamp();
-            Status = "朗读结束 · 按住可继续说话";
+            Status = voiceSessionActive ? "朗读结束 · 正在恢复收音" : "朗读结束 · 按住可继续说话";
         }
         catch (OperationCanceledException) { }
         catch (Exception error) { if (!disposed) Status = "朗读失败，请检查音频输出。" + " " + error.Message; }
         finally
         {
-            if (ReferenceEquals(output, operation)) { output = null; IsSpeaking = false; Refresh(); }
+            if (ReferenceEquals(output, operation))
+            {
+                lastSpeechEnd = Stopwatch.GetTimestamp();
+                output = null; IsSpeaking = false; Refresh();
+            }
             operation.Dispose();
         }
     }
@@ -389,6 +479,7 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     }
     private void ChatChanged(object? sender, PropertyChangedEventArgs args)
     {
+        if (args.PropertyName == nameof(ChatViewModel.Draft)) preferVoiceOutcome = false;
         if (output is not null && (args.PropertyName == nameof(ChatViewModel.ReadReplies) && !chat.ReadReplies
             || args.PropertyName == nameof(ChatViewModel.IsBusy) && chat.IsBusy))
         {
@@ -400,9 +491,35 @@ public sealed partial class VoiceViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(CanRecord)); OnPropertyChanged(nameof(CanStop));
         OnPropertyChanged(nameof(CanUseRecordButton));
+        OnPropertyChanged(nameof(ShowComposerMic));
         OnPropertyChanged(nameof(CanConfigureMicrophone));
         OnPropertyChanged(nameof(RecordLabel)); OnPropertyChanged(nameof(RecordHint));
         SaveRecognitionSettingsCommand.NotifyCanExecuteChanged(); ClearSpeechKeyCommand.NotifyCanExecuteChanged();
+        RefreshWake();
+        OnPropertyChanged(nameof(VoiceActivityMessage));
+    }
+
+    private void SetInputMeterMode(InputMeterMode mode)
+    {
+        if (inputMeterMode == mode) return;
+        inputMeterMode = mode;
+        InputMeterLevel = 0;
+        OnPropertyChanged(nameof(ShowInputMeter));
+        OnPropertyChanged(nameof(ShowComposerWaveform));
+        OnPropertyChanged(nameof(InputMeterLabel));
+    }
+
+    private void UpdateInputMeter(InputMeterMode mode, double level)
+    {
+        if (inputMeterMode == mode)
+            InputMeterLevel = double.IsFinite(level) ? Math.Clamp(level, 0, 1) * 100 : 0;
+    }
+
+    private void ShowVoiceOutcome(string message)
+    {
+        preferVoiceOutcome = true;
+        Status = message;
+        OnPropertyChanged(nameof(VoiceActivityMessage));
     }
     private static string DescribeAudio(byte[] pcm)
     {

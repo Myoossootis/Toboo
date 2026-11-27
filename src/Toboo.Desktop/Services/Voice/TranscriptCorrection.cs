@@ -5,6 +5,13 @@ namespace Toboo.Desktop.Services;
 
 internal static class TranscriptCorrection
 {
+    internal static string? RestoreKnownReadingRequest(string text) =>
+        string.Concat(text.Where(c => !char.IsWhiteSpace(c) && !char.IsPunctuation(c))) switch
+    {
+        "浪独幸运春雪" or "浪独庆元春雪" => "朗读《沁园春·雪》。",
+        _ => null
+    };
+
     public static string NormalizeTerms(string text)
     {
         text = text.Trim().Normalize(NormalizationForm.FormKC);

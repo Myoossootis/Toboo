@@ -235,7 +235,8 @@ public sealed class PreparationWorkflowTests
         {
             window.Show(); window.Shell.PageIndex = 1;
             var advanced = 0; window.Shell.AdvancedRequested += _ => advanced++;
-            window.Shell.OpenCalibrationCommand.Execute(null);
+            var devices = window.FindControl<DevicesView>("DevicesView")!;
+            devices.FindControl<Expander>("RobotSetupExpander")!.IsExpanded = true;
             Assert.True(window.Shell.CalibrationExpanded); Assert.Equal(0, advanced);
             Assert.False(window.Shell.CanFollow);
             await servo.InspectCommand.ExecuteAsync(null); servo.Ready = true;
@@ -249,7 +250,6 @@ public sealed class PreparationWorkflowTests
             window.Shell.AdvanceSetupCommand.Execute(null);
             Assert.Equal(2, window.Shell.SetupStep);
             Assert.Equal(1, calls); // Rendering and calibration expansion never send motion commands.
-            var devices = window.FindControl<DevicesView>("DevicesView")!;
             Assert.Same(window.Shell.StartFollowCommand, devices.FindControl<Button>("DeviceFollowButton")!.Command);
             var scroll = devices.FindControl<ScrollViewer>("DeviceScroll")!;
             await Task.Delay(50);
