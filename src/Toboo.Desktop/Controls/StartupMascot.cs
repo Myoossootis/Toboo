@@ -23,11 +23,16 @@ public sealed class StartupMascot : Control
     private static readonly Keyframe[] Keyframes =
     [
         new(0, 0.06, 0, 0.46, 0),
-        new(155, 0.18, 0.05, 0.78, 0),
-        new(305, 0.82, 0.72, 0.98, 0),
-        new(395, 0.68, 0.02, 0.89, 0),
-        new(600, 1, 1, 1, 0),
-        new(790, 1, 1, 1, 1)
+        new(420, 0.18, 0.05, 0.78, 0),
+        new(1050, 0.82, 0.72, 0.98, 0),
+        new(1650, 0.88, 0.75, 1, 0),
+        new(1770, 0.72, 0.02, 0.89, 0),
+        new(1940, 0.91, 0.78, 1, 0),
+        new(2920, 0.94, 0.83, 1, 0),
+        new(3040, 0.76, 0.02, 0.89, 0),
+        new(3240, 1, 1, 1, 0),
+        new(4280, 1, 1, 1, 0.65),
+        new(5000, 1, 1, 1, 1)
     ];
     internal static double AnimationEnd => Keyframes[^1].Milliseconds;
     private Bitmap? mascot;

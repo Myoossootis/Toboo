@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Headless;
@@ -18,12 +19,12 @@ public sealed class StartupWindowTests
             splash.Show();
             var progress = splash.FindControl<ProgressBar>("LaunchProgress")!;
             var status = splash.FindControl<TextBlock>("LaunchStatus")!;
-            Assert.True(progress.IsVisible && progress.IsIndeterminate);
+            Assert.True(progress.IsVisible && !progress.IsIndeterminate);
             Assert.Equal("正在启动", status.Text);
 
             var mascot = splash.FindControl<StartupMascot>("Mascot")!;
             var folder = PreviewFolder();
-            foreach (var (at, name) in new[] { (0, "power-on"), (395, "blink"), (790, "smile") })
+            foreach (var (at, name) in new[] { (0, "power-on"), (1770, "blink"), (5000, "smile") })
             {
                 mascot.ShowFrame(at);
                 await Task.Delay(40);
@@ -51,9 +52,14 @@ public sealed class StartupWindowTests
         try
         {
             splash.Show();
+            Assert.Equal(TimeSpan.FromSeconds(5), StartupWindow.IntroDuration);
+            var shown = Stopwatch.GetTimestamp();
             var startup = App.CompleteStartupAsync(desktop, splash, () => main);
-            Assert.False(main.IsVisible);
-            await startup.WaitAsync(TimeSpan.FromSeconds(5));
+            await Task.Delay(1000);
+            Assert.True(splash.IsVisible && !main.IsVisible);
+            Assert.True(splash.FindControl<ProgressBar>("LaunchProgress")!.Value > 0);
+            await startup.WaitAsync(TimeSpan.FromSeconds(8));
+            Assert.True(Stopwatch.GetElapsedTime(shown) >= StartupWindow.IntroDuration);
             Assert.True(splashWasVisible && main.IsVisible);
             Assert.False(splash.IsVisible);
             Assert.Same(main, desktop.MainWindow);

@@ -1,6 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="using:Toboo.Desktop.Controls" x:Class="Toboo.Desktop.StartupWindow"
-        Title="toboo" Width="400" Height="480" CanResize="False" WindowStartupLocation="CenterScreen"
+        Title="toboo" Icon="/Assets/toboo.ico" Width="400" Height="480" CanResize="False" WindowStartupLocation="CenterScreen"
         ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
   <Border Background="{StaticResource WorkspaceBrush}" BorderBrush="{StaticResource ControlBorderBrush}" BorderThickness="1">
     <Grid RowDefinitions="42,*">
@@ -28,7 +28,7 @@
                      HorizontalAlignment="Center" Margin="0,9,0,0" />
           <TextBlock x:Name="LaunchStatus" Text="正在启动" FontSize="15" Foreground="{StaticResource AccentBrush}"
                      HorizontalAlignment="Center" Margin="0,7,0,0" />
-          <ProgressBar x:Name="LaunchProgress" IsIndeterminate="True" Width="176" Height="4" MinHeight="4"
+          <ProgressBar x:Name="LaunchProgress" Width="176" Height="4" MinHeight="4"
                        Margin="0,22,0,0" Foreground="{StaticResource AccentBrush}" Background="#D5E3DF"
                        AutomationProperties.Name="正在启动 toboo" />
           <Button x:Name="FailureCloseButton" Content="关闭" IsVisible="False" Classes="quiet"

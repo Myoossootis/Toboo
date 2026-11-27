@@ -40,7 +40,8 @@ public sealed partial class App : Application
             closing.Token.ThrowIfCancellationRequested();
             window = createMainWindow();
             var remaining = StartupWindow.IntroDuration - Stopwatch.GetElapsedTime(started);
-            if (remaining > TimeSpan.Zero) await Task.Delay(remaining, closing.Token);
+            if (remaining > TimeSpan.Zero)
+                await Task.Delay(TimeSpan.FromMilliseconds(Math.Ceiling(remaining.TotalMilliseconds)), closing.Token);
             closing.Token.ThrowIfCancellationRequested();
 
             var content = window.Content as Control;

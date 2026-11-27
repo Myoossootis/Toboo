@@ -9,7 +9,7 @@ namespace Toboo.Desktop;
 
 public sealed partial class StartupWindow : Window
 {
-    internal static readonly TimeSpan IntroDuration = TimeSpan.FromMilliseconds(900);
+    internal static readonly TimeSpan IntroDuration = TimeSpan.FromMilliseconds(StartupMascot.AnimationEnd);
     private readonly DispatcherTimer animation = new() { Interval = TimeSpan.FromMilliseconds(16) };
     private long started;
 
@@ -23,6 +23,7 @@ public sealed partial class StartupWindow : Window
     {
         started = Stopwatch.GetTimestamp();
         Mascot.ShowFrame(0);
+        LaunchProgress.Value = 0;
         animation.Start();
     }
 
@@ -38,6 +39,7 @@ public sealed partial class StartupWindow : Window
     {
         var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
         Mascot.ShowFrame(elapsed);
+        LaunchProgress.Value = Math.Min(100, elapsed / IntroDuration.TotalMilliseconds * 100);
         if (elapsed >= StartupMascot.AnimationEnd) animation.Stop();
     }
 
